@@ -27,7 +27,7 @@ const program = Effect.gen(function* () {
 	const updateSystem = yield* UpdateSystemService;
 	const renderSystem = yield* RenderSystemService;
 	const world = yield* state.make({
-		key: "saishumin/oblique-world-v2",
+		key: "saishumin/world-v2",
 		initial: initialWorld,
 	});
 	yield* Ref.update(world, reconcileWorld);

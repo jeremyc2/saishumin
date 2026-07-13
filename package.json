@@ -1,7 +1,8 @@
 {
 	"name": "saishumin",
-	"description": "An Effect v4 project.",
+	"description": "A browser game built with Effect, lit-html, and Otaku.",
 	"scripts": {
+		"build": "bun scripts/build.ts",
 		"dev": "bun --hot index.html",
 		"typecheck": "tsc",
 		"check": "bun --bun biome check --write",
