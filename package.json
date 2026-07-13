@@ -9,11 +9,12 @@
 		"check": "bun --bun biome check --write",
 		"otaku:update": "git submodule update --init vendor/otaku",
 		"references:update": "git submodule update --init --recursive reference_repositories/effect-smol reference_repositories/mattpocock-skills",
-		"prepare": "effect-tsgo patch",
-		"chore:update": "bun update --latest && bun add effect@beta"
+		"chore:update": "bun update --latest && bun add effect@beta",
+		"all:update": "bun references:update && bun otaku:update && bun chore:update",
+		"prepare": "effect-tsgo patch"
 	},
 	"dependencies": {
-		"effect": "^4.0.0-beta.97",
+		"effect": "^4.0.0-beta.98",
 		"lit-html": "^3.3.3",
 		"otaku-hmr": "file:vendor/otaku/packages/otaku-hmr",
 		"otaku-state": "file:vendor/otaku/packages/otaku-state"
