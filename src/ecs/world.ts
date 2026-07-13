@@ -1,0 +1,153 @@
+import {
+	Body,
+	Elevation,
+	Obstacle,
+	ObstacleKinds,
+	Position,
+} from "../model/component";
+import type { Direction } from "../model/control";
+import { EntityId } from "../model/entity-id";
+
+export type World = {
+	readonly positions: ReadonlyMap<EntityId, Position>;
+	readonly elevations: ReadonlyMap<EntityId, Elevation>;
+	readonly bodies: ReadonlyMap<EntityId, Body>;
+	readonly obstacles: ReadonlyMap<EntityId, Obstacle>;
+	readonly pressed: ReadonlySet<Direction>;
+	readonly grabbed: EntityId | null;
+	readonly lastFrame: number;
+};
+
+export const playerEntity = EntityId(1);
+export const roomWidth = 1160;
+export const roomDepth = 640;
+export const wallThickness = 36;
+export const groundElevation = 0;
+export const stationaryVelocity = 0;
+export const playerSpawnPosition = Position.make({ x: 210, y: 360 });
+export const playerBody = Body.make({ width: 54, depth: 34 });
+export const crateBody = Body.make({ width: 70, depth: 70 });
+export const playerSpeed = 245;
+export const jumpSpeed = 510;
+export const gravity = 1180;
+export const obstacleHeightTolerance = 5;
+export const cratePushSlowdown = 0.4;
+export const fallResetElevation = -430;
+export const maximumFrameElapsedSeconds = 0.05;
+export const millisecondsPerSecond = 1000;
+export const crateGrabDistance = 72;
+export const wallHeight = 80;
+export const crateHeight = 62;
+
+export const wallEntities = [
+	EntityId(100),
+	EntityId(101),
+	EntityId(102),
+	EntityId(103),
+	EntityId(104),
+] as const;
+export const backgroundWallEntities = [wallEntities[0]] as const;
+export const foregroundWallEntities = [
+	wallEntities[1],
+	wallEntities[2],
+	wallEntities[3],
+	wallEntities[4],
+] as const;
+export const crateEntities = [
+	EntityId(200),
+	EntityId(201),
+	EntityId(202),
+	EntityId(203),
+] as const;
+export const platformEntities = [EntityId(300), EntityId(301)] as const;
+
+const positions = new Map<EntityId, Position>([
+	[playerEntity, playerSpawnPosition],
+	[wallEntities[0], Position.make({ x: roomWidth / 2, y: wallThickness / 2 })],
+	[
+		wallEntities[1],
+		Position.make({
+			x: wallThickness / 2,
+			y: (roomDepth + wallThickness) / 2,
+		}),
+	],
+	[
+		wallEntities[2],
+		Position.make({
+			x: roomWidth - wallThickness / 2,
+			y: (roomDepth + wallThickness) / 2,
+		}),
+	],
+	[
+		wallEntities[3],
+		Position.make({ x: 328, y: roomDepth - wallThickness / 2 }),
+	],
+	[
+		wallEntities[4],
+		Position.make({ x: 957, y: roomDepth - wallThickness / 2 }),
+	],
+	[crateEntities[0], Position.make({ x: 430, y: 350 })],
+	[crateEntities[1], Position.make({ x: 650, y: 445 })],
+	[crateEntities[2], Position.make({ x: 770, y: 270 })],
+	[crateEntities[3], Position.make({ x: 940, y: 485 })],
+	[platformEntities[0], Position.make({ x: 875, y: 125 })],
+	[platformEntities[1], Position.make({ x: 285, y: 130 })],
+]);
+
+const bodies = new Map<EntityId, Body>([
+	[playerEntity, playerBody],
+	[wallEntities[0], Body.make({ width: roomWidth, depth: wallThickness })],
+	[
+		wallEntities[1],
+		Body.make({ width: wallThickness, depth: roomDepth - wallThickness }),
+	],
+	[
+		wallEntities[2],
+		Body.make({ width: wallThickness, depth: roomDepth - wallThickness }),
+	],
+	[wallEntities[3], Body.make({ width: 584, depth: wallThickness })],
+	[wallEntities[4], Body.make({ width: 334, depth: wallThickness })],
+	...crateEntities.map((entity) => [entity, crateBody] as const),
+	[platformEntities[0], Body.make({ width: 260, depth: 160 })],
+	[platformEntities[1], Body.make({ width: 230, depth: 130 })],
+]);
+
+const obstacles = new Map<EntityId, Obstacle>([
+	...wallEntities.map(
+		(entity) =>
+			[
+				entity,
+				Obstacle.make({ height: wallHeight, kind: ObstacleKinds.Wall }),
+			] as const,
+	),
+	...crateEntities.map(
+		(entity) =>
+			[
+				entity,
+				Obstacle.make({ height: crateHeight, kind: ObstacleKinds.Crate }),
+			] as const,
+	),
+	[
+		platformEntities[0],
+		Obstacle.make({ height: 48, kind: ObstacleKinds.Platform }),
+	],
+	[
+		platformEntities[1],
+		Obstacle.make({ height: 32, kind: ObstacleKinds.Platform }),
+	],
+]);
+
+export const initialWorld: World = {
+	positions,
+	elevations: new Map([
+		[
+			playerEntity,
+			Elevation.make({ z: groundElevation, velocity: stationaryVelocity }),
+		],
+	]),
+	bodies,
+	obstacles,
+	pressed: new Set(),
+	grabbed: null,
+	lastFrame: 0,
+};
