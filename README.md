@@ -9,8 +9,9 @@ provides the project's state and hot-module replacement support.
 Install dependencies and start Bun's development server:
 
 ```sh
+bun otaku:update
 bun install
-bun run dev
+bun dev
 ```
 
 ## Production build

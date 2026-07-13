@@ -4,3 +4,6 @@
 [submodule "reference_repositories/mattpocock-skills"]
 	path = reference_repositories/mattpocock-skills
 	url = https://github.com/mattpocock/skills.git
+[submodule "vendor/otaku"]
+	path = vendor/otaku
+	url = https://github.com/jeremyc2/otaku.git

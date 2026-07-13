@@ -6,15 +6,16 @@
 		"dev": "bun --hot index.html",
 		"typecheck": "tsc",
 		"check": "bun --bun biome check --write",
-		"references:update": "git submodule update --init --recursive",
+		"otaku:update": "git submodule update --init vendor/otaku",
+		"references:update": "git submodule update --init --recursive reference_repositories/effect-smol reference_repositories/mattpocock-skills",
 		"prepare": "effect-tsgo patch",
 		"chore:update": "bun update --latest && bun add effect@beta"
 	},
 	"dependencies": {
 		"effect": "^4.0.0-beta.97",
 		"lit-html": "^3.3.3",
-		"otaku-hmr": "file:../../otaku/packages/otaku-hmr",
-		"otaku-state": "file:../../otaku/packages/otaku-state"
+		"otaku-hmr": "file:vendor/otaku/packages/otaku-hmr",
+		"otaku-state": "file:vendor/otaku/packages/otaku-state"
 	},
 	"devDependencies": {
 		"@biomejs/biome": "^2.5.3",
