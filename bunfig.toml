@@ -1,2 +1,5 @@
 [test]
 pathIgnorePatterns = ["reference_repositories/**"]
+
+[serve.static]
+plugins = ["otaku-hmr/plugin", "tailwindcss-bun-plugin"]

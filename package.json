@@ -2,6 +2,7 @@
 	"name": "saishumin",
 	"description": "An Effect v4 project.",
 	"scripts": {
+		"dev": "bun --hot index.html",
 		"typecheck": "tsc",
 		"check": "bun --bun biome check --write",
 		"references:update": "git submodule update --init --recursive",
@@ -9,12 +10,17 @@
 		"chore:update": "bun update --latest && bun add effect@beta"
 	},
 	"dependencies": {
-		"effect": "^4.0.0-beta.97"
+		"effect": "^4.0.0-beta.97",
+		"lit-html": "^3.3.3",
+		"otaku-hmr": "file:../../otaku/packages/otaku-hmr",
+		"otaku-state": "file:../../otaku/packages/otaku-state"
 	},
 	"devDependencies": {
 		"@biomejs/biome": "^2.5.3",
 		"@effect/tsgo": "^0.19.0",
 		"@types/bun": "latest",
+		"tailwindcss": "4.3.2",
+		"tailwindcss-bun-plugin": "^4.3.1",
 		"typescript": "^7.0.2"
 	}
 }
