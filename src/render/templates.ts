@@ -1,7 +1,7 @@
 import { svg, type TemplateResult } from "lit-html";
 import { crateBody, crateHeight } from "../ecs/world";
 import type { Body, Elevation, Position } from "../model/component";
-import { footprint, points, project } from "./projection";
+import { footprint, insetRectangle, points, project } from "./projection";
 
 const boxOutlineWidth = 3;
 
@@ -94,6 +94,15 @@ export const crateTemplate = (
 	const panelTop = frontTop.y + crateVisual.panelTopInset;
 	const panelBottom = frontBottom.y - crateVisual.panelBottomInset;
 	const edge = grabbed ? "#fff0a8" : "#633d2f";
+	const outerOutline = insetRectangle(
+		[
+			top[0],
+			top[1],
+			{ x: right, y: frontBottom.y },
+			{ x: left, y: frontBottom.y },
+		],
+		boxOutlineWidth / 2,
+	);
 	return svg`
 		<polygon points=${points(shadow)} fill="#14212a" opacity=${crateVisual.shadowOpacity} />
 		<polygon points=${points([
@@ -101,8 +110,8 @@ export const crateTemplate = (
 			{ x: right, y: frontBottom.y },
 			{ x: right, y: frontTop.y },
 			{ x: left, y: frontTop.y },
-		])} fill="#945936" stroke=${edge} stroke-width=${boxOutlineWidth} stroke-linejoin="round" />
-		<polygon points=${points(top)} fill="#d6a15d" stroke=${edge} stroke-width=${boxOutlineWidth} stroke-linejoin="round" />
+		])} fill="#945936" />
+		<polygon points=${points(top)} fill="#d6a15d" />
 		<polygon points=${points(topInset)} fill="#c48349" stroke="#70452f" stroke-width="2" stroke-linejoin="round" />
 		${crateVisual.topBoardDepthOffsets.map((depthOffset) => {
 			const y = project(
@@ -119,6 +128,8 @@ export const crateTemplate = (
 		<circle cx=${right - crateVisual.nailSideInset} cy=${panelTop + crateVisual.nailTopInset} r=${crateVisual.nailRadius} fill="#5b4035" />
 		<circle cx=${left + crateVisual.nailSideInset} cy=${panelBottom - crateVisual.nailBottomInset} r=${crateVisual.nailRadius} fill="#5b4035" />
 		<circle cx=${right - crateVisual.nailSideInset} cy=${panelBottom - crateVisual.nailBottomInset} r=${crateVisual.nailRadius} fill="#5b4035" />
+		<line x1=${outerOutline[0].x} y1=${frontTop.y} x2=${outerOutline[1].x} y2=${frontTop.y} stroke=${edge} stroke-width=${boxOutlineWidth} />
+		<polygon points=${points(outerOutline)} fill="none" stroke=${edge} stroke-width=${boxOutlineWidth} stroke-linejoin="round" />
 	`;
 };
 

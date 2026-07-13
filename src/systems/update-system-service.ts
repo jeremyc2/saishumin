@@ -83,7 +83,11 @@ export class UpdateSystemService extends Context.Service<
 									z: elevation.z,
 									velocity: jumpSpeed,
 								});
-								return { ...world, elevations: nextElevations };
+								return {
+									...world,
+									elevations: nextElevations,
+									grabbed: null,
+								};
 							}
 							if (!isDirection(key)) return world;
 							const nextPressed = new Set(world.pressed);

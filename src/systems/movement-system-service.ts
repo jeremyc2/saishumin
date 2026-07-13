@@ -31,33 +31,69 @@ export class MovementSystemService extends Context.Service<
 	}
 >()("saishumin/systems/movement-system-service/MovementSystemService") {
 	static readonly layer = Layer.sync(this, () => {
-		const canPlaceCrate = (
+		const clampCrateAxisDelta = (
 			world: World,
-			crateEntity: EntityId,
-			position: Position,
-		): boolean => {
-			const body = world.bodies.get(crateEntity);
-			if (body === undefined) return false;
-			if (
-				position.x - body.width / 2 < wallThickness ||
-				position.x + body.width / 2 > roomWidth - wallThickness ||
-				position.y - body.depth / 2 < wallThickness ||
-				position.y + body.depth / 2 > roomDepth - wallThickness
-			)
-				return false;
+			crateEntities: ReadonlySet<EntityId>,
+			delta: Position,
+		): Position => {
+			const movingHorizontally = delta.x !== 0;
+			const requested = movingHorizontally ? delta.x : delta.y;
+			if (requested === 0) return delta;
 
-			for (const entity of world.obstacles.keys()) {
-				if (entity === crateEntity) continue;
-				const otherPosition = world.positions.get(entity);
-				const otherBody = world.bodies.get(entity);
-				if (
-					otherPosition !== undefined &&
-					otherBody !== undefined &&
-					overlaps(position, body, otherPosition, otherBody)
-				)
-					return false;
+			let allowed = requested;
+			const movingForward = requested > 0;
+			for (const entity of crateEntities) {
+				const position = world.positions.get(entity);
+				const body = world.bodies.get(entity);
+				if (position === undefined || body === undefined) {
+					return { x: 0, y: 0 };
+				}
+
+				const center = movingHorizontally ? position.x : position.y;
+				const halfExtent = movingHorizontally ? body.width / 2 : body.depth / 2;
+				const roomExtent = movingHorizontally ? roomWidth : roomDepth;
+				const roomContact = movingForward
+					? roomExtent - wallThickness - halfExtent - center
+					: wallThickness + halfExtent - center;
+				allowed = movingForward
+					? Math.max(0, Math.min(allowed, roomContact))
+					: Math.min(0, Math.max(allowed, roomContact));
+
+				for (const otherEntity of world.obstacles.keys()) {
+					if (crateEntities.has(otherEntity)) continue;
+					const otherPosition = world.positions.get(otherEntity);
+					const otherBody = world.bodies.get(otherEntity);
+					if (otherPosition === undefined || otherBody === undefined) continue;
+
+					const perpendicularDistance = movingHorizontally
+						? Math.abs(position.y - otherPosition.y)
+						: Math.abs(position.x - otherPosition.x);
+					const perpendicularExtent = movingHorizontally
+						? (body.depth + otherBody.depth) / 2
+						: (body.width + otherBody.width) / 2;
+					if (perpendicularDistance >= perpendicularExtent) continue;
+
+					const otherCenter = movingHorizontally
+						? otherPosition.x
+						: otherPosition.y;
+					const otherHalfExtent = movingHorizontally
+						? otherBody.width / 2
+						: otherBody.depth / 2;
+					const contactDistance = movingForward
+						? otherCenter - otherHalfExtent - (center + halfExtent)
+						: otherCenter + otherHalfExtent - (center - halfExtent);
+					if (
+						(movingForward && contactDistance >= 0) ||
+						(!movingForward && contactDistance <= 0)
+					) {
+						allowed = movingForward
+							? Math.max(0, Math.min(allowed, contactDistance))
+							: Math.min(0, Math.max(allowed, contactDistance));
+					}
+				}
 			}
-			return true;
+
+			return movingHorizontally ? { x: allowed, y: 0 } : { x: 0, y: allowed };
 		};
 
 		const crateSpeedFactor = (crateCount: number): number =>
@@ -76,14 +112,6 @@ export class MovementSystemService extends Context.Service<
 				const body = world.bodies.get(entity);
 				if (position === undefined || body === undefined) return false;
 				const candidate = { x: position.x + delta.x, y: position.y + delta.y };
-				if (
-					candidate.x - body.width / 2 < wallThickness ||
-					candidate.x + body.width / 2 > roomWidth - wallThickness ||
-					candidate.y - body.depth / 2 < wallThickness ||
-					candidate.y + body.depth / 2 > roomDepth - wallThickness
-				)
-					return false;
-
 				for (const [otherEntity, obstacle] of world.obstacles) {
 					if (otherEntity === entity || chain.has(otherEntity)) continue;
 					const otherPosition = world.positions.get(otherEntity);
@@ -94,7 +122,7 @@ export class MovementSystemService extends Context.Service<
 						!overlaps(candidate, body, otherPosition, otherBody)
 					)
 						continue;
-					if (obstacle.kind !== ObstacleKinds.Crate || !visit(otherEntity))
+					if (obstacle.kind === ObstacleKinds.Crate && !visit(otherEntity))
 						return false;
 				}
 				return true;
@@ -141,20 +169,22 @@ export class MovementSystemService extends Context.Service<
 				x: delta.x * speedFactor,
 				y: delta.y * speedFactor,
 			};
-
+			const crateDelta = clampCrateAxisDelta(
+				world,
+				new Set([grabbed]),
+				weightedDelta,
+			);
 			const playerCandidate = {
-				x: position.x + weightedDelta.x,
-				y: position.y + weightedDelta.y,
+				x: position.x + crateDelta.x,
+				y: position.y + crateDelta.y,
 			};
-			const crateCandidate = {
-				x: cratePosition.x + weightedDelta.x,
-				y: cratePosition.y + weightedDelta.y,
-			};
-			if (
-				!canPlaceCrate(world, grabbed, crateCandidate) ||
-				!canPlacePlayer(world, playerCandidate, elevation, grabbed)
-			)
+			if (!canPlacePlayer(world, playerCandidate, elevation, grabbed)) {
 				return { world, position };
+			}
+			const crateCandidate = {
+				x: cratePosition.x + crateDelta.x,
+				y: cratePosition.y + crateDelta.y,
+			};
 
 			const nextPositions = new Map(world.positions);
 			nextPositions.set(grabbed, crateCandidate);
@@ -222,20 +252,21 @@ export class MovementSystemService extends Context.Service<
 				x: delta.x * speedFactor,
 				y: delta.y * speedFactor,
 			};
+			const crateDelta = clampCrateAxisDelta(world, pushChain, weightedDelta);
 			const nextPositions = new Map(world.positions);
 			for (const entity of pushChain) {
 				const cratePosition = world.positions.get(entity);
 				if (cratePosition === undefined) return { world, position };
 				nextPositions.set(entity, {
-					x: cratePosition.x + weightedDelta.x,
-					y: cratePosition.y + weightedDelta.y,
+					x: cratePosition.x + crateDelta.x,
+					y: cratePosition.y + crateDelta.y,
 				});
 			}
 			return {
 				world: { ...world, positions: nextPositions },
 				position: {
-					x: position.x + weightedDelta.x,
-					y: position.y + weightedDelta.y,
+					x: position.x + crateDelta.x,
+					y: position.y + crateDelta.y,
 				},
 			};
 		};

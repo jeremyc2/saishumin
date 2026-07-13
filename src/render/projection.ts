@@ -35,4 +35,14 @@ export const footprint = (
 	),
 ];
 
+export const insetRectangle = (
+	corners: readonly [Position, Position, Position, Position],
+	inset: number,
+): readonly [Position, Position, Position, Position] => [
+	{ x: corners[0].x + inset, y: corners[0].y + inset },
+	{ x: corners[1].x - inset, y: corners[1].y + inset },
+	{ x: corners[2].x - inset, y: corners[2].y - inset },
+	{ x: corners[3].x + inset, y: corners[3].y - inset },
+];
+
 export const visualDepth = (position: Position): number => position.y;
