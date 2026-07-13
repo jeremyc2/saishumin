@@ -1,5 +1,6 @@
 import { afterAll, describe, expect, test } from "bun:test";
 import { Layer, ManagedRuntime } from "effect";
+import { isPlayerPlacementValid } from "../ecs/player-placement";
 import {
 	crateBody,
 	crateEntities,
@@ -7,6 +8,9 @@ import {
 	groundElevation,
 	initialWorld,
 	jumpSpeed,
+	minimumEntityExtent,
+	minimumFloorDepth,
+	minimumFloorWidth,
 	platformEntities,
 	playerBody,
 	playerEntity,
@@ -16,13 +20,20 @@ import {
 import { Action } from "../model/action";
 import {
 	Body,
+	Decoration,
+	DecorationKinds,
 	Elevation,
 	Obstacle,
 	ObstacleKinds,
 	Position,
 } from "../model/component";
 import { Controls, type Direction } from "../model/control";
-import type { EntityId } from "../model/entity-id";
+import {
+	EditorItemKinds,
+	editorItemHeightLimits,
+	maximumEditorItemBody,
+} from "../model/editor";
+import { EntityId } from "../model/entity-id";
 import { MovementSystemService } from "./movement-system-service";
 import { UpdateSystemService } from "./update-system-service";
 
@@ -46,6 +57,7 @@ const makeWorld = ({
 	readonly pressed: ReadonlySet<Direction>;
 	readonly grabbed: EntityId | null;
 }): World => ({
+	...initialWorld,
 	positions,
 	elevations: new Map([
 		[
@@ -64,6 +76,44 @@ const makeWorld = ({
 });
 
 describe("UpdateSystemService", () => {
+	test("grabs nearby plants and lamps on the player's surface", () => {
+		for (const [kind, height] of [
+			[DecorationKinds.Plant, 84],
+			[DecorationKinds.Lamp, 96],
+		] as const) {
+			const entity = EntityId(700 + height);
+			const world: World = {
+				...initialWorld,
+				positions: new Map([
+					[playerEntity, Position.make({ x: 300, y: 300 })],
+					[entity, Position.make({ x: 350, y: 300 })],
+				]),
+				bodies: new Map([
+					[playerEntity, playerBody],
+					[entity, Body.make({ width: 64, depth: 64 })],
+				]),
+				obstacles: new Map(),
+				decorations: new Map([[entity, Decoration.make({ kind, height })]]),
+				elevations: new Map([
+					[
+						playerEntity,
+						Elevation.make({
+							z: groundElevation,
+							velocity: stationaryVelocity,
+						}),
+					],
+				]),
+			};
+
+			const grabbed = updateSystem.update(
+				world,
+				Action.KeyChanged({ key: Controls.Grab, pressed: true }),
+			);
+
+			expect(grabbed.grabbed).toBe(entity);
+		}
+	});
+
 	test("releases a grabbed crate when the player jumps", () => {
 		const world = { ...initialWorld, grabbed: crateEntities[0] };
 
@@ -140,5 +190,616 @@ describe("UpdateSystemService", () => {
 		expect(thirdFrame.grabbed).toBeNull();
 		expect(thirdFrame.positions.get(playerEntity)?.x).toBe(312.25);
 		expect(thirdFrame.positions.get(crateEntity)?.x).toBe(300);
+	});
+
+	test("pauses controls and movement while the editor is open", () => {
+		const crateEntity = crateEntities[0];
+		const playing = {
+			...initialWorld,
+			pressed: new Set<Direction>([Controls.Right]),
+			grabbed: crateEntity,
+			lastFrame: 1000,
+		};
+
+		const editing = updateSystem.update(playing, Action.EditorToggled());
+		const afterKey = updateSystem.update(
+			editing,
+			Action.KeyChanged({ key: Controls.Right, pressed: true }),
+		);
+		const afterTick = updateSystem.update(
+			afterKey,
+			Action.Tick({ time: 1050 }),
+		);
+
+		expect(editing.editor.open).toBe(true);
+		expect(editing.pressed.size).toBe(0);
+		expect(editing.grabbed).toBeNull();
+		expect(afterKey).toBe(editing);
+		expect(afterTick.positions.get(playerEntity)).toEqual(
+			editing.positions.get(playerEntity),
+		);
+		expect(afterTick.lastFrame).toBe(1050);
+	});
+
+	test("allows editing over the hidden player and relocates them for play", () => {
+		const entity = crateEntities[0];
+		const playerPosition = initialWorld.positions.get(playerEntity);
+		const originalPosition = initialWorld.positions.get(entity);
+		expect(playerPosition).toBeDefined();
+		expect(originalPosition).toBeDefined();
+		if (playerPosition === undefined || originalPosition === undefined) return;
+
+		const editing = updateSystem.update(initialWorld, Action.EditorToggled());
+		const moved = updateSystem.update(
+			editing,
+			Action.EditorEntityMoved({
+				entity,
+				position: playerPosition,
+				preview: true,
+			}),
+		);
+		const finished = updateSystem.update(
+			moved,
+			Action.EditorEntityInteractionFinished({
+				entity,
+				originalPosition,
+				originalBody: crateBody,
+			}),
+		);
+
+		expect(finished.editor.invalidPlacement).toBeNull();
+		expect(finished.positions.get(entity)).toEqual(playerPosition);
+		const playing = updateSystem.update(finished, Action.EditorToggled());
+		const relocatedPlayer = playing.positions.get(playerEntity);
+		expect(playing.editor.open).toBe(false);
+		expect(relocatedPlayer).toBeDefined();
+		expect(relocatedPlayer).not.toEqual(playerPosition);
+		if (relocatedPlayer === undefined) return;
+		expect(
+			isPlayerPlacementValid(playing, relocatedPlayer, groundElevation),
+		).toBe(true);
+	});
+
+	test("updates the dead-zone camera after movement reaches a view edge", () => {
+		const positions = new Map([
+			[playerEntity, Position.make({ x: 1200, y: 320 })],
+		]);
+		const world = {
+			...initialWorld,
+			positions,
+			bodies: new Map([[playerEntity, playerBody]]),
+			obstacles: new Map(),
+			decorations: new Map(),
+			floorPlan: Body.make({ width: 2000, depth: 640 }),
+			gameCamera: Position.make({ x: 0, y: 0 }),
+			pressed: new Set<Direction>([Controls.Right]),
+			lastFrame: 1000,
+		};
+
+		const moved = updateSystem.update(world, Action.Tick({ time: 1050 }));
+
+		expect(moved.positions.get(playerEntity)?.x).toBe(1212.25);
+		expect(moved.gameCamera.x).toBe(-152.25);
+	});
+
+	test("adds, resizes, moves, and deletes editor objects", () => {
+		const editing = updateSystem.update(initialWorld, Action.EditorToggled());
+		const added = updateSystem.update(
+			editing,
+			Action.EditorItemAdded({
+				kind: EditorItemKinds.Wall,
+				position: Position.make({ x: 520, y: 260 }),
+			}),
+		);
+		const entity = added.editor.selected;
+		expect(entity).not.toBeNull();
+		expect(entity).not.toBe("floor");
+		if (entity === null || entity === "floor") return;
+
+		expect(added.obstacles.get(entity)?.kind).toBe(ObstacleKinds.Wall);
+		const resized = updateSystem.update(
+			added,
+			Action.EditorEntityResized({
+				entity,
+				body: Body.make({ width: 8, depth: 90 }),
+			}),
+		);
+		expect(resized.bodies.get(entity)?.width).toBe(minimumEntityExtent);
+
+		const moved = updateSystem.update(
+			resized,
+			Action.EditorEntityMoved({
+				entity,
+				position: Position.make({ x: 710, y: 410 }),
+			}),
+		);
+		expect(moved.positions.get(entity)).toEqual({ x: 710, y: 410 });
+
+		const deleted = updateSystem.update(moved, Action.EditorDeleteSelected());
+		expect(deleted.positions.has(entity)).toBe(false);
+		expect(deleted.bodies.has(entity)).toBe(false);
+		expect(deleted.obstacles.has(entity)).toBe(false);
+		expect(deleted.editor.selected).toBeNull();
+	});
+
+	test("enforces the maximum footprint for every editor object kind", () => {
+		const emptyLargeWorld: World = {
+			...initialWorld,
+			positions: new Map([[playerEntity, Position.make({ x: 100, y: 100 })]]),
+			bodies: new Map([[playerEntity, playerBody]]),
+			obstacles: new Map(),
+			decorations: new Map(),
+			floorPlan: Body.make({ width: 8000, depth: 8000 }),
+		};
+
+		for (const kind of Object.values(EditorItemKinds)) {
+			const editing = updateSystem.update(
+				emptyLargeWorld,
+				Action.EditorToggled(),
+			);
+			const added = updateSystem.update(
+				editing,
+				Action.EditorItemAdded({
+					kind,
+					position: Position.make({ x: 4000, y: 4000 }),
+				}),
+			);
+			const entity = added.editor.selected;
+			expect(entity).not.toBeNull();
+			expect(entity).not.toBe("floor");
+			if (entity === null || entity === "floor") continue;
+
+			const resized = updateSystem.update(
+				added,
+				Action.EditorEntityResized({
+					entity,
+					body: Body.make({ width: 9000, depth: 9000 }),
+				}),
+			);
+
+			expect(resized.bodies.get(entity)).toEqual(maximumEditorItemBody(kind));
+		}
+	});
+
+	test("places crates, plants, and lamps on platform tops", () => {
+		const platformEntity = EntityId(780);
+		for (const kind of [
+			EditorItemKinds.Crate,
+			EditorItemKinds.Plant,
+			EditorItemKinds.Lamp,
+		] as const) {
+			const platformHeight = 50;
+			const base: World = {
+				...initialWorld,
+				positions: new Map([
+					[playerEntity, Position.make({ x: 100, y: 100 })],
+					[platformEntity, Position.make({ x: 500, y: 400 })],
+				]),
+				bodies: new Map([
+					[playerEntity, playerBody],
+					[platformEntity, Body.make({ width: 240, depth: 180 })],
+				]),
+				obstacles: new Map([
+					[
+						platformEntity,
+						Obstacle.make({
+							height: platformHeight,
+							kind: ObstacleKinds.Platform,
+						}),
+					],
+				]),
+				decorations: new Map(),
+			};
+			const editing = updateSystem.update(base, Action.EditorToggled());
+			const added = updateSystem.update(
+				editing,
+				Action.EditorItemAdded({
+					kind,
+					position: Position.make({ x: 500, y: 400 }),
+				}),
+			);
+			const entity = added.editor.selected;
+			expect(entity).not.toBeNull();
+			expect(entity).not.toBe("floor");
+			if (entity === null || entity === "floor") continue;
+
+			expect(added.editor.invalidPlacement).toBeNull();
+			expect(added.elevations.get(entity)?.z).toBe(platformHeight);
+
+			const occupied = updateSystem.update(
+				added,
+				Action.EditorItemAdded({
+					kind,
+					position: Position.make({ x: 500, y: 400 }),
+				}),
+			);
+			expect(occupied.editor.invalidPlacement).toEqual({ kind: "new" });
+			expect(occupied.positions.size).toBe(added.positions.size);
+		}
+	});
+
+	test("restores an occupied platform after a move and prevents deleting it", () => {
+		const platformEntity = EntityId(785);
+		const plantEntity = EntityId(786);
+		const platformPosition = Position.make({ x: 500, y: 400 });
+		const platformBody = Body.make({ width: 240, depth: 180 });
+		const plantBody = Body.make({ width: 64, depth: 64 });
+		const platformHeight = 50;
+		const base: World = {
+			...initialWorld,
+			positions: new Map([
+				[playerEntity, Position.make({ x: 100, y: 100 })],
+				[platformEntity, platformPosition],
+				[plantEntity, Position.make({ x: 500, y: 360 })],
+			]),
+			bodies: new Map([
+				[playerEntity, playerBody],
+				[platformEntity, platformBody],
+				[plantEntity, plantBody],
+			]),
+			obstacles: new Map([
+				[
+					platformEntity,
+					Obstacle.make({
+						height: platformHeight,
+						kind: ObstacleKinds.Platform,
+					}),
+				],
+			]),
+			decorations: new Map([
+				[
+					plantEntity,
+					Decoration.make({
+						kind: DecorationKinds.Plant,
+						height: 84,
+					}),
+				],
+			]),
+			elevations: new Map([
+				[
+					playerEntity,
+					Elevation.make({
+						z: groundElevation,
+						velocity: stationaryVelocity,
+					}),
+				],
+				[
+					plantEntity,
+					Elevation.make({
+						z: platformHeight,
+						velocity: stationaryVelocity,
+					}),
+				],
+			]),
+		};
+		const editing = updateSystem.update(base, Action.EditorToggled());
+		const moved = updateSystem.update(
+			editing,
+			Action.EditorEntityMoved({
+				entity: platformEntity,
+				position: Position.make({ x: 700, y: 400 }),
+				originalPosition: platformPosition,
+				originalBody: platformBody,
+				preview: true,
+			}),
+		);
+		const rejectedMove = updateSystem.update(
+			moved,
+			Action.EditorEntityInteractionFinished({
+				entity: platformEntity,
+				originalPosition: platformPosition,
+				originalBody: platformBody,
+			}),
+		);
+		expect(rejectedMove.editor.invalidPlacement?.kind).toBe("entity");
+
+		const restored = updateSystem.update(
+			rejectedMove,
+			Action.EditorInvalidPlacementDismissed(),
+		);
+		expect(restored.positions.get(platformEntity)).toEqual(platformPosition);
+		expect(restored.elevations.get(plantEntity)?.z).toBe(platformHeight);
+
+		const selected = updateSystem.update(
+			restored,
+			Action.EditorSelectionChanged({ selection: platformEntity }),
+		);
+		const rejectedDelete = updateSystem.update(
+			selected,
+			Action.EditorDeleteSelected(),
+		);
+		expect(rejectedDelete.positions.has(platformEntity)).toBe(true);
+		expect(rejectedDelete.editor.invalidPlacement?.kind).toBe("entity");
+	});
+
+	test("clamps object heights and keeps supported objects on a resized platform", () => {
+		const platformEntity = EntityId(790);
+		const crateEntity = EntityId(791);
+		const platformHeight = 40;
+		const world: World = {
+			...initialWorld,
+			positions: new Map([
+				[playerEntity, Position.make({ x: 100, y: 100 })],
+				[platformEntity, Position.make({ x: 500, y: 400 })],
+				[crateEntity, Position.make({ x: 500, y: 400 })],
+			]),
+			bodies: new Map([
+				[playerEntity, playerBody],
+				[platformEntity, Body.make({ width: 240, depth: 180 })],
+				[crateEntity, crateBody],
+			]),
+			obstacles: new Map([
+				[
+					platformEntity,
+					Obstacle.make({
+						height: platformHeight,
+						kind: ObstacleKinds.Platform,
+					}),
+				],
+				[
+					crateEntity,
+					Obstacle.make({
+						height: crateHeight,
+						kind: ObstacleKinds.Crate,
+					}),
+				],
+			]),
+			decorations: new Map(),
+			elevations: new Map([
+				[
+					playerEntity,
+					Elevation.make({
+						z: groundElevation,
+						velocity: stationaryVelocity,
+					}),
+				],
+				[
+					crateEntity,
+					Elevation.make({
+						z: platformHeight,
+						velocity: stationaryVelocity,
+					}),
+				],
+			]),
+		};
+		const editing = updateSystem.update(world, Action.EditorToggled());
+		const resized = updateSystem.update(
+			editing,
+			Action.EditorEntityHeightChanged({
+				entity: platformEntity,
+				height: 1000,
+			}),
+		);
+		const maximum = editorItemHeightLimits(EditorItemKinds.Platform).maximum;
+
+		expect(resized.obstacles.get(platformEntity)?.height).toBe(maximum);
+		expect(resized.elevations.get(crateEntity)?.z).toBe(maximum);
+	});
+
+	test("rejects an overlapping drag and restores its starting position", () => {
+		const entity = crateEntities[0];
+		const otherEntity = crateEntities[1];
+		const originalPosition = initialWorld.positions.get(entity);
+		const otherPosition = initialWorld.positions.get(otherEntity);
+		expect(originalPosition).toBeDefined();
+		expect(otherPosition).toBeDefined();
+		if (originalPosition === undefined || otherPosition === undefined) return;
+
+		const editing = updateSystem.update(initialWorld, Action.EditorToggled());
+		const moved = updateSystem.update(
+			editing,
+			Action.EditorEntityMoved({
+				entity,
+				position: Position.make({ x: 500, y: 350 }),
+				originalPosition,
+				originalBody: crateBody,
+				preview: true,
+			}),
+		);
+		const invalidPreview = updateSystem.update(
+			moved,
+			Action.EditorEntityMoved({
+				entity,
+				position: otherPosition,
+				originalPosition,
+				originalBody: crateBody,
+				preview: true,
+			}),
+		);
+		const invalid = updateSystem.update(
+			invalidPreview,
+			Action.EditorEntityInteractionFinished({
+				entity,
+				originalPosition,
+				originalBody: crateBody,
+			}),
+		);
+
+		expect(invalidPreview.positions.get(entity)).toEqual(otherPosition);
+		expect(invalidPreview.editor.invalidPlacement).toBeNull();
+		expect(invalid.positions.get(entity)).toEqual(otherPosition);
+		expect(invalid.editor.invalidPlacement?.kind).toBe("entity");
+		const restored = updateSystem.update(
+			invalid,
+			Action.EditorInvalidPlacementDismissed(),
+		);
+		expect(restored.positions.get(entity)).toEqual(originalPosition);
+		expect(restored.editor.invalidPlacement).toBeNull();
+	});
+
+	test("rejects an overlapping resize and restores its starting footprint", () => {
+		const entity = crateEntities[0];
+		const otherEntity = crateEntities[1];
+		const originalPosition = Position.make({ x: 300, y: 300 });
+		const originalBody = Body.make({ width: 40, depth: 40 });
+		const editing = updateSystem.update(
+			makeWorld({
+				positions: new Map([
+					[entity, originalPosition],
+					[otherEntity, Position.make({ x: 400, y: 300 })],
+				]),
+				bodies: new Map([
+					[entity, originalBody],
+					[otherEntity, Body.make({ width: 40, depth: 40 })],
+				]),
+				obstacles: new Map([
+					[
+						entity,
+						Obstacle.make({
+							height: crateHeight,
+							kind: ObstacleKinds.Crate,
+						}),
+					],
+					[
+						otherEntity,
+						Obstacle.make({
+							height: crateHeight,
+							kind: ObstacleKinds.Crate,
+						}),
+					],
+				]),
+				pressed: new Set(),
+				grabbed: null,
+			}),
+			Action.EditorToggled(),
+		);
+		const validIntermediate = updateSystem.update(
+			editing,
+			Action.EditorEntityResized({
+				entity,
+				position: Position.make({ x: 320, y: 300 }),
+				body: Body.make({ width: 80, depth: 40 }),
+				originalPosition,
+				originalBody,
+				preview: true,
+			}),
+		);
+		const invalidPreview = updateSystem.update(
+			validIntermediate,
+			Action.EditorEntityResized({
+				entity,
+				position: Position.make({ x: 340, y: 300 }),
+				body: Body.make({ width: 120, depth: 40 }),
+				originalPosition,
+				originalBody,
+				preview: true,
+			}),
+		);
+		const invalid = updateSystem.update(
+			invalidPreview,
+			Action.EditorEntityInteractionFinished({
+				entity,
+				originalPosition,
+				originalBody,
+			}),
+		);
+
+		expect(invalidPreview.positions.get(entity)).toEqual({ x: 340, y: 300 });
+		expect(invalidPreview.bodies.get(entity)).toEqual({
+			width: 120,
+			depth: 40,
+		});
+		expect(invalidPreview.editor.invalidPlacement).toBeNull();
+		expect(invalid.editor.invalidPlacement?.kind).toBe("entity");
+		const restored = updateSystem.update(
+			invalid,
+			Action.EditorInvalidPlacementDismissed(),
+		);
+		expect(restored.positions.get(entity)).toEqual(originalPosition);
+		expect(restored.bodies.get(entity)).toEqual(originalBody);
+		expect(restored.editor.invalidPlacement).toBeNull();
+	});
+
+	test("does not add an out-of-bounds item", () => {
+		const editing = updateSystem.update(initialWorld, Action.EditorToggled());
+		const result = updateSystem.update(
+			editing,
+			Action.EditorItemAdded({
+				kind: EditorItemKinds.Plant,
+				position: Position.make({ x: 10, y: 10 }),
+			}),
+		);
+
+		expect(result.positions.size).toBe(editing.positions.size);
+		expect(result.editor.invalidPlacement).toEqual({ kind: "new" });
+	});
+
+	test("keeps the opposite floor edges fixed when expanding left and up", () => {
+		const editing = updateSystem.update(initialWorld, Action.EditorToggled());
+		const entity = crateEntities[0];
+		const originalPosition = editing.positions.get(entity);
+		expect(originalPosition).toBeDefined();
+		if (originalPosition === undefined) return;
+		const originOffset = Position.make({ x: -100, y: -40 });
+		const preview = updateSystem.update(
+			editing,
+			Action.EditorFloorResized({
+				floorPlan: Body.make({
+					width: editing.floorPlan.width + 100,
+					depth: editing.floorPlan.depth + 40,
+				}),
+				originDelta: originOffset,
+				preview: true,
+			}),
+		);
+
+		expect(preview.positions.get(entity)).toEqual({
+			x: originalPosition.x + 100,
+			y: originalPosition.y + 40,
+		});
+		expect(preview.editor.camera).toEqual({
+			x: editing.editor.camera.x - 100,
+			y: editing.editor.camera.y - 40 * Math.SQRT1_2,
+		});
+		const finished = updateSystem.update(
+			preview,
+			Action.EditorFloorInteractionFinished({
+				originalFloorPlan: editing.floorPlan,
+				originOffset,
+			}),
+		);
+		expect(finished.floorPlan).toEqual({
+			width: editing.floorPlan.width + 100,
+			depth: editing.floorPlan.depth + 40,
+		});
+		expect(finished.editor.invalidPlacement).toBeNull();
+	});
+
+	test("rejects a floor resize that excludes objects after release", () => {
+		const editing = updateSystem.update(initialWorld, Action.EditorToggled());
+		const originOffset = Position.make({ x: 100, y: 60 });
+
+		const preview = updateSystem.update(
+			editing,
+			Action.EditorFloorResized({
+				floorPlan: Body.make({ width: 100, depth: 100 }),
+				originDelta: originOffset,
+				preview: true,
+			}),
+		);
+		const invalid = updateSystem.update(
+			preview,
+			Action.EditorFloorInteractionFinished({
+				originalFloorPlan: editing.floorPlan,
+				originOffset,
+			}),
+		);
+
+		expect(preview.floorPlan).toEqual({
+			width: minimumFloorWidth,
+			depth: minimumFloorDepth,
+		});
+		expect(preview.editor.invalidPlacement).toBeNull();
+		expect(invalid.editor.invalidPlacement?.kind).toBe("floor");
+		const restored = updateSystem.update(
+			invalid,
+			Action.EditorInvalidPlacementDismissed(),
+		);
+		expect(restored.floorPlan).toEqual(editing.floorPlan);
+		expect(restored.positions.get(playerEntity)).toEqual(
+			editing.positions.get(playerEntity),
+		);
+		expect(restored.editor.camera).toEqual(editing.editor.camera);
+		expect(restored.editor.invalidPlacement).toBeNull();
 	});
 });

@@ -1,5 +1,22 @@
 import { Context, Layer } from "effect";
-import { isPositionInsideRoom, overlaps, surfaceAt } from "../ecs/collision";
+import {
+	isPositionInsideRoom,
+	isSolidEntity,
+	overlaps,
+	surfaceAt,
+} from "../ecs/collision";
+import {
+	containsFootprint,
+	entityBaseElevation,
+	entityHeight,
+	entityTopElevation,
+	placementElevationForEntity,
+	verticalRangesOverlap,
+} from "../ecs/elevation";
+import {
+	isPlayerPlacementValid,
+	nearestValidPlayerPosition,
+} from "../ecs/player-placement";
 import {
 	cratePushSlowdown,
 	fallResetElevation,
@@ -10,13 +27,11 @@ import {
 	playerEntity,
 	playerSpawnPosition,
 	playerSpeed,
-	roomDepth,
-	roomWidth,
 	stationaryVelocity,
 	type World,
-	wallThickness,
 } from "../ecs/world";
 import {
+	DecorationKinds,
 	type Elevation,
 	ObstacleKinds,
 	type Position,
@@ -31,6 +46,62 @@ export class MovementSystemService extends Context.Service<
 	}
 >()("saishumin/systems/movement-system-service/MovementSystemService") {
 	static readonly layer = Layer.sync(this, () => {
+		const isDirectlyPushableEntity = (
+			world: World,
+			entity: EntityId,
+		): boolean => world.obstacles.get(entity)?.kind === ObstacleKinds.Crate;
+
+		const raisedSupportContact = (
+			world: World,
+			entity: EntityId,
+			position: Position,
+			body: { readonly width: number; readonly depth: number },
+			movingHorizontally: boolean,
+			movingForward: boolean,
+		): number | undefined => {
+			const baseElevation = entityBaseElevation(world, entity);
+			if (baseElevation <= groundElevation + obstacleHeightTolerance)
+				return undefined;
+
+			let contact: number | undefined;
+			for (const [supportEntity, obstacle] of world.obstacles) {
+				if (
+					supportEntity === entity ||
+					obstacle.kind !== ObstacleKinds.Platform ||
+					Math.abs(entityTopElevation(world, supportEntity) - baseElevation) >
+						obstacleHeightTolerance
+				)
+					continue;
+				const supportPosition = world.positions.get(supportEntity);
+				const supportBody = world.bodies.get(supportEntity);
+				if (
+					supportPosition === undefined ||
+					supportBody === undefined ||
+					!containsFootprint(supportPosition, supportBody, position, body)
+				)
+					continue;
+
+				const center = movingHorizontally ? position.x : position.y;
+				const halfExtent = movingHorizontally ? body.width / 2 : body.depth / 2;
+				const supportCenter = movingHorizontally
+					? supportPosition.x
+					: supportPosition.y;
+				const supportHalfExtent = movingHorizontally
+					? supportBody.width / 2
+					: supportBody.depth / 2;
+				const nextContact = movingForward
+					? supportCenter + supportHalfExtent - halfExtent - center
+					: supportCenter - supportHalfExtent + halfExtent - center;
+				contact =
+					contact === undefined
+						? nextContact
+						: movingForward
+							? Math.max(contact, nextContact)
+							: Math.min(contact, nextContact);
+			}
+			return contact;
+		};
+
 		const clampCrateAxisDelta = (
 			world: World,
 			crateEntities: ReadonlySet<EntityId>,
@@ -51,19 +122,48 @@ export class MovementSystemService extends Context.Service<
 
 				const center = movingHorizontally ? position.x : position.y;
 				const halfExtent = movingHorizontally ? body.width / 2 : body.depth / 2;
-				const roomExtent = movingHorizontally ? roomWidth : roomDepth;
+				const roomExtent = movingHorizontally
+					? world.floorPlan.width
+					: world.floorPlan.depth;
 				const roomContact = movingForward
-					? roomExtent - wallThickness - halfExtent - center
-					: wallThickness + halfExtent - center;
+					? roomExtent - halfExtent - center
+					: halfExtent - center;
 				allowed = movingForward
 					? Math.max(0, Math.min(allowed, roomContact))
 					: Math.min(0, Math.max(allowed, roomContact));
 
-				for (const otherEntity of world.obstacles.keys()) {
-					if (crateEntities.has(otherEntity)) continue;
+				const supportContact = raisedSupportContact(
+					world,
+					entity,
+					position,
+					body,
+					movingHorizontally,
+					movingForward,
+				);
+				if (supportContact !== undefined) {
+					allowed = movingForward
+						? Math.max(0, Math.min(allowed, supportContact))
+						: Math.min(0, Math.max(allowed, supportContact));
+				}
+
+				for (const otherEntity of world.positions.keys()) {
+					if (
+						crateEntities.has(otherEntity) ||
+						!isSolidEntity(world, otherEntity)
+					)
+						continue;
 					const otherPosition = world.positions.get(otherEntity);
 					const otherBody = world.bodies.get(otherEntity);
 					if (otherPosition === undefined || otherBody === undefined) continue;
+					if (
+						!verticalRangesOverlap(
+							entityBaseElevation(world, entity),
+							entityHeight(world, entity),
+							entityBaseElevation(world, otherEntity),
+							entityHeight(world, otherEntity),
+						)
+					)
+						continue;
 
 					const perpendicularDistance = movingHorizontally
 						? Math.abs(position.y - otherPosition.y)
@@ -99,6 +199,47 @@ export class MovementSystemService extends Context.Service<
 		const crateSpeedFactor = (crateCount: number): number =>
 			1 / (1 + crateCount * cratePushSlowdown);
 
+		const slideOffDecorationTop = (
+			world: World,
+			position: Position,
+			fromElevation: number,
+			toElevation: number,
+		):
+			| { readonly position: Position; readonly elevation: number }
+			| undefined => {
+			if (toElevation >= fromElevation) return undefined;
+			let highestCrossedTop = Number.NEGATIVE_INFINITY;
+			for (const [entity, decoration] of world.decorations) {
+				if (
+					decoration.kind !== DecorationKinds.Plant &&
+					decoration.kind !== DecorationKinds.Lamp
+				)
+					continue;
+				const otherPosition = world.positions.get(entity);
+				const otherBody = world.bodies.get(entity);
+				const top = entityTopElevation(world, entity);
+				if (
+					otherPosition === undefined ||
+					otherBody === undefined ||
+					!overlaps(position, playerBody, otherPosition, otherBody) ||
+					fromElevation < top - obstacleHeightTolerance ||
+					toElevation > top
+				)
+					continue;
+				highestCrossedTop = Math.max(highestCrossedTop, top);
+			}
+			if (!Number.isFinite(highestCrossedTop)) return undefined;
+
+			const positionBelowTop = nearestValidPlayerPosition(
+				world,
+				position,
+				highestCrossedTop - obstacleHeightTolerance * 2,
+			);
+			return positionBelowTop === undefined
+				? undefined
+				: { position: positionBelowTop, elevation: highestCrossedTop };
+		};
+
 		const collectPushChain = (
 			world: World,
 			initialCrate: EntityId,
@@ -112,17 +253,31 @@ export class MovementSystemService extends Context.Service<
 				const body = world.bodies.get(entity);
 				if (position === undefined || body === undefined) return false;
 				const candidate = { x: position.x + delta.x, y: position.y + delta.y };
-				for (const [otherEntity, obstacle] of world.obstacles) {
-					if (otherEntity === entity || chain.has(otherEntity)) continue;
+				for (const otherEntity of world.positions.keys()) {
+					if (
+						otherEntity === entity ||
+						chain.has(otherEntity) ||
+						!isSolidEntity(world, otherEntity)
+					)
+						continue;
 					const otherPosition = world.positions.get(otherEntity);
 					const otherBody = world.bodies.get(otherEntity);
 					if (
 						otherPosition === undefined ||
 						otherBody === undefined ||
-						!overlaps(candidate, body, otherPosition, otherBody)
+						!overlaps(candidate, body, otherPosition, otherBody) ||
+						!verticalRangesOverlap(
+							entityBaseElevation(world, entity),
+							entityHeight(world, entity),
+							entityBaseElevation(world, otherEntity),
+							entityHeight(world, otherEntity),
+						)
 					)
 						continue;
-					if (obstacle.kind === ObstacleKinds.Crate && !visit(otherEntity))
+					if (
+						isDirectlyPushableEntity(world, otherEntity) &&
+						!visit(otherEntity)
+					)
 						return false;
 				}
 				return true;
@@ -137,17 +292,18 @@ export class MovementSystemService extends Context.Service<
 			elevation: Elevation,
 			ignoredEntity: EntityId,
 		): boolean => {
-			if (!isPositionInsideRoom(position)) return false;
+			if (!isPositionInsideRoom(world, position)) return false;
 
-			for (const [entity, obstacle] of world.obstacles) {
-				if (entity === ignoredEntity) continue;
+			for (const entity of world.positions.keys()) {
+				if (entity === ignoredEntity || !isSolidEntity(world, entity)) continue;
 				const obstaclePosition = world.positions.get(entity);
 				const obstacleBody = world.bodies.get(entity);
 				if (
 					obstaclePosition !== undefined &&
 					obstacleBody !== undefined &&
 					overlaps(position, playerBody, obstaclePosition, obstacleBody) &&
-					elevation.z < obstacle.height - obstacleHeightTolerance
+					elevation.z <
+						entityTopElevation(world, entity) - obstacleHeightTolerance
 				)
 					return false;
 			}
@@ -187,9 +343,23 @@ export class MovementSystemService extends Context.Service<
 			};
 
 			const nextPositions = new Map(world.positions);
+			const nextElevations = new Map(world.elevations);
 			nextPositions.set(grabbed, crateCandidate);
+			nextElevations.set(grabbed, {
+				z: placementElevationForEntity(
+					world,
+					grabbed,
+					crateCandidate,
+					world.bodies.get(grabbed) ?? playerBody,
+				),
+				velocity: stationaryVelocity,
+			});
 			return {
-				world: { ...world, positions: nextPositions },
+				world: {
+					...world,
+					positions: nextPositions,
+					elevations: nextElevations,
+				},
 				position: playerCandidate,
 			};
 		};
@@ -206,7 +376,7 @@ export class MovementSystemService extends Context.Service<
 				x: position.x + delta.x,
 				y: position.y + delta.y,
 			};
-			if (!isPositionInsideRoom(fullSpeedCandidate)) {
+			if (!isPositionInsideRoom(world, fullSpeedCandidate)) {
 				return { world, position };
 			}
 			const supportingHeight = surfaceAt(world, position, playerBody);
@@ -215,7 +385,8 @@ export class MovementSystemService extends Context.Service<
 				elevation.z === supportingHeight;
 			let pushChain: ReadonlySet<EntityId> | undefined;
 
-			for (const [entity, obstacle] of world.obstacles) {
+			for (const entity of world.positions.keys()) {
+				if (!isSolidEntity(world, entity)) continue;
 				const obstaclePosition = world.positions.get(entity);
 				const obstacleBody = world.bodies.get(entity);
 				if (
@@ -226,12 +397,16 @@ export class MovementSystemService extends Context.Service<
 						playerBody,
 						obstaclePosition,
 						obstacleBody,
-					) ||
-					elevation.z >= obstacle.height - obstacleHeightTolerance
+					)
+				)
+					continue;
+				if (
+					elevation.z >=
+					entityTopElevation(world, entity) - obstacleHeightTolerance
 				)
 					continue;
 
-				if (obstacle.kind !== ObstacleKinds.Crate || !isSupported) {
+				if (!isDirectlyPushableEntity(world, entity) || !isSupported) {
 					return { world, position };
 				}
 
@@ -254,16 +429,29 @@ export class MovementSystemService extends Context.Service<
 			};
 			const crateDelta = clampCrateAxisDelta(world, pushChain, weightedDelta);
 			const nextPositions = new Map(world.positions);
+			const nextElevations = new Map(world.elevations);
 			for (const entity of pushChain) {
 				const cratePosition = world.positions.get(entity);
-				if (cratePosition === undefined) return { world, position };
-				nextPositions.set(entity, {
+				const body = world.bodies.get(entity);
+				if (cratePosition === undefined || body === undefined)
+					return { world, position };
+				const nextPosition = {
 					x: cratePosition.x + crateDelta.x,
 					y: cratePosition.y + crateDelta.y,
+				};
+				nextPositions.set(entity, nextPosition);
+				nextElevations.set(entity, {
+					z: placementElevationForEntity(world, entity, nextPosition, body),
+					velocity: stationaryVelocity,
 				});
 			}
 			return {
-				world: { ...world, positions: nextPositions },
+				world: {
+					...world,
+					positions: nextPositions,
+					elevations: nextElevations,
+					pushing: pushChain.values().next().value ?? null,
+				},
 				position: {
 					x: position.x + crateDelta.x,
 					y: position.y + crateDelta.y,
@@ -275,6 +463,24 @@ export class MovementSystemService extends Context.Service<
 			const position = world.positions.get(playerEntity);
 			const elevation = world.elevations.get(playerEntity);
 			if (position === undefined || elevation === undefined) return world;
+			if (
+				elevation.velocity === stationaryVelocity &&
+				!isPlayerPlacementValid(world, position, elevation.z)
+			) {
+				const safePosition = nearestValidPlayerPosition(
+					world,
+					position,
+					elevation.z,
+				);
+				if (safePosition !== undefined) {
+					const safePositions = new Map(world.positions);
+					safePositions.set(playerEntity, safePosition);
+					return updateMovement(
+						{ ...world, positions: safePositions },
+						elapsed,
+					);
+				}
+			}
 
 			const horizontal =
 				Number(world.pressed.has(Controls.Right)) -
@@ -311,15 +517,26 @@ export class MovementSystemService extends Context.Service<
 				elevation,
 				{ x: 0, y: vertical * distance },
 			);
-			const movedPosition = verticalMove.position;
+			let movedPosition = verticalMove.position;
 
 			let velocity = elevation.velocity - gravity * elapsed;
 			let z = elevation.z + velocity * elapsed;
-			const nextSurface = surfaceAt(
+			let nextSurface = surfaceAt(
 				verticalMove.world,
 				movedPosition,
 				playerBody,
 			);
+			const slipperyTop = slideOffDecorationTop(
+				verticalMove.world,
+				movedPosition,
+				elevation.z,
+				z,
+			);
+			if (slipperyTop !== undefined) {
+				movedPosition = slipperyTop.position;
+				z = Math.max(z, slipperyTop.elevation);
+				nextSurface = surfaceAt(verticalMove.world, movedPosition, playerBody);
+			}
 			const isStanding =
 				elevation.velocity === stationaryVelocity &&
 				elevation.z === currentSurface;
@@ -331,13 +548,44 @@ export class MovementSystemService extends Context.Service<
 				z <= nextSurface &&
 				elevation.z >= nextSurface
 			) {
+				if (
+					!isPlayerPlacementValid(
+						verticalMove.world,
+						movedPosition,
+						nextSurface,
+					)
+				) {
+					const safePosition = nearestValidPlayerPosition(
+						verticalMove.world,
+						movedPosition,
+						nextSurface,
+					);
+					if (safePosition !== undefined) {
+						movedPosition = safePosition;
+						nextSurface = surfaceAt(
+							verticalMove.world,
+							movedPosition,
+							playerBody,
+						);
+					}
+				}
 				z = nextSurface;
 				velocity = stationaryVelocity;
 			}
 
 			if (z < fallResetElevation) {
+				const resetPosition = {
+					x: Math.min(
+						playerSpawnPosition.x,
+						verticalMove.world.floorPlan.width,
+					),
+					y: Math.min(
+						playerSpawnPosition.y,
+						verticalMove.world.floorPlan.depth,
+					),
+				};
 				const resetPositions = new Map(verticalMove.world.positions);
-				resetPositions.set(playerEntity, playerSpawnPosition);
+				resetPositions.set(playerEntity, resetPosition);
 				const resetElevations = new Map(verticalMove.world.elevations);
 				resetElevations.set(playerEntity, {
 					z: groundElevation,
@@ -360,6 +608,12 @@ export class MovementSystemService extends Context.Service<
 				elevations: nextElevations,
 			};
 		};
-		return { update: updateMovement };
+		return {
+			update: (world, elapsed) =>
+				updateMovement(
+					world.pushing === null ? world : { ...world, pushing: null },
+					elapsed,
+				),
+		};
 	});
 }

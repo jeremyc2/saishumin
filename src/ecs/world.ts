@@ -1,26 +1,39 @@
 import {
 	Body,
+	Decoration,
+	DecorationKinds,
 	Elevation,
 	Obstacle,
 	ObstacleKinds,
 	Position,
 } from "../model/component";
 import type { Direction } from "../model/control";
+import type { EditorState } from "../model/editor";
 import { EntityId } from "../model/entity-id";
+import { cameraForFloor } from "../render/projection";
 
 export type World = {
 	readonly positions: ReadonlyMap<EntityId, Position>;
 	readonly elevations: ReadonlyMap<EntityId, Elevation>;
 	readonly bodies: ReadonlyMap<EntityId, Body>;
 	readonly obstacles: ReadonlyMap<EntityId, Obstacle>;
+	readonly decorations: ReadonlyMap<EntityId, Decoration>;
+	readonly floorPlan: Body;
+	readonly gameCamera: Position;
+	readonly editor: EditorState;
 	readonly pressed: ReadonlySet<Direction>;
 	readonly grabbed: EntityId | null;
+	readonly pushing: EntityId | null;
 	readonly lastFrame: number;
 };
 
 export const playerEntity = EntityId(1);
 export const roomWidth = 1160;
 export const roomDepth = 640;
+export const minimumFloorWidth = 360;
+export const minimumFloorDepth = 280;
+export const maximumFloorExtent = 8000;
+export const minimumEntityExtent = 24;
 export const wallThickness = 36;
 export const groundElevation = 0;
 export const stationaryVelocity = 0;
@@ -60,6 +73,12 @@ export const crateEntities = [
 	EntityId(203),
 ] as const;
 export const platformEntities = [EntityId(300), EntityId(301)] as const;
+export const decorationEntities = [EntityId(400)] as const;
+
+export const defaultFloorPlan = Body.make({
+	width: roomWidth,
+	depth: roomDepth,
+});
 
 const positions = new Map<EntityId, Position>([
 	[playerEntity, playerSpawnPosition],
@@ -137,6 +156,16 @@ const obstacles = new Map<EntityId, Obstacle>([
 	],
 ]);
 
+const decorations = new Map<EntityId, Decoration>([
+	[
+		decorationEntities[0],
+		Decoration.make({ kind: DecorationKinds.Rug, height: 0 }),
+	],
+]);
+
+positions.set(decorationEntities[0], Position.make({ x: 570, y: 330 }));
+bodies.set(decorationEntities[0], Body.make({ width: 330, depth: 190 }));
+
 export const initialWorld: World = {
 	positions,
 	elevations: new Map([
@@ -147,7 +176,17 @@ export const initialWorld: World = {
 	]),
 	bodies,
 	obstacles,
+	decorations,
+	floorPlan: defaultFloorPlan,
+	gameCamera: cameraForFloor(defaultFloorPlan),
+	editor: {
+		open: false,
+		camera: Position.make({ x: 0, y: 0 }),
+		selected: null,
+		invalidPlacement: null,
+	},
 	pressed: new Set(),
 	grabbed: null,
+	pushing: null,
 	lastFrame: 0,
 };

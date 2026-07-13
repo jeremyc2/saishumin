@@ -1,6 +1,6 @@
+import { defaultEditorItemHeight, isEditorItemKind } from "../model/editor";
 import { surfaceAt } from "./collision";
 import {
-	crateEntities,
 	groundElevation,
 	initialWorld,
 	obstacleHeightTolerance,
@@ -12,25 +12,60 @@ import {
 } from "./world";
 
 /**
- * Restored world state, e.g. HMR or persisted save state, can outlive the static
- * definitions that created it, leaving physics and rendering with different
- * geometry. Reconciliation applies the current definitions and repairs invalid
- * transient state while preserving movable entity positions.
+ * HMR state can outlive the module definitions that created it. Reconciliation
+ * repairs required player state and transient inputs while preserving geometry
+ * authored in the world editor.
  */
 export const reconcileWorld = (world: World): World => {
-	const positions = new Map(initialWorld.positions);
-	for (const entity of [playerEntity, ...crateEntities]) {
-		const position = world.positions.get(entity);
-		if (position !== undefined) positions.set(entity, position);
+	const floorPlan = world.floorPlan ?? initialWorld.floorPlan;
+	const positions = new Map(world.positions ?? initialWorld.positions);
+	const bodies = new Map(world.bodies ?? initialWorld.bodies);
+	const elevations = new Map(world.elevations ?? initialWorld.elevations);
+	const obstacles = new Map(world.obstacles ?? initialWorld.obstacles);
+	const decorations = new Map(world.decorations ?? initialWorld.decorations);
+	for (const [entity, decoration] of decorations) {
+		if (Number.isFinite(decoration.height)) continue;
+		decorations.set(entity, {
+			...decoration,
+			height: isEditorItemKind(decoration.kind)
+				? defaultEditorItemHeight(decoration.kind)
+				: 0,
+		});
+	}
+	const editor = world.editor ?? initialWorld.editor;
+	bodies.set(playerEntity, playerBody);
+
+	if (!positions.has(playerEntity)) {
+		positions.set(playerEntity, {
+			x: Math.min(playerSpawnPosition.x, floorPlan.width),
+			y: Math.min(playerSpawnPosition.y, floorPlan.depth),
+		});
+	}
+	if (!elevations.has(playerEntity)) {
+		elevations.set(playerEntity, {
+			z: groundElevation,
+			velocity: stationaryVelocity,
+		});
 	}
 
 	let reconciled: World = {
 		...world,
 		positions,
-		bodies: initialWorld.bodies,
-		obstacles: initialWorld.obstacles,
+		bodies,
+		elevations,
+		obstacles,
+		decorations,
+		floorPlan,
+		gameCamera: world.gameCamera ?? initialWorld.gameCamera,
+		editor: {
+			...editor,
+			open: false,
+			selected: null,
+			invalidPlacement: null,
+		},
 		pressed: new Set(),
 		grabbed: null,
+		pushing: null,
 		lastFrame: 0,
 	};
 	const playerPosition = reconciled.positions.get(playerEntity);
@@ -42,7 +77,10 @@ export const reconcileWorld = (world: World): World => {
 	const supportHeight = surfaceAt(reconciled, playerPosition, playerBody);
 	if (!Number.isFinite(supportHeight)) {
 		const resetPositions = new Map(reconciled.positions);
-		resetPositions.set(playerEntity, playerSpawnPosition);
+		resetPositions.set(playerEntity, {
+			x: Math.min(playerSpawnPosition.x, floorPlan.width),
+			y: Math.min(playerSpawnPosition.y, floorPlan.depth),
+		});
 		const resetElevations = new Map(reconciled.elevations);
 		resetElevations.set(playerEntity, {
 			z: groundElevation,
@@ -60,12 +98,12 @@ export const reconcileWorld = (world: World): World => {
 		(playerElevation.velocity === stationaryVelocity &&
 			playerElevation.z !== supportHeight)
 	) {
-		const elevations = new Map(reconciled.elevations);
-		elevations.set(playerEntity, {
+		const nextElevations = new Map(reconciled.elevations);
+		nextElevations.set(playerEntity, {
 			z: supportHeight,
 			velocity: stationaryVelocity,
 		});
-		reconciled = { ...reconciled, elevations };
+		reconciled = { ...reconciled, elevations: nextElevations };
 	}
 
 	return reconciled;

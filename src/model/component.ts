@@ -29,3 +29,18 @@ export const Obstacle = Schema.Struct({
 	kind: ObstacleKind,
 });
 export type Obstacle = typeof Obstacle.Type;
+
+export const DecorationKind = Schema.Literals(["rug", "plant", "lamp"]);
+export type DecorationKind = typeof DecorationKind.Type;
+
+export const DecorationKinds = {
+	Rug: DecorationKind.make("rug"),
+	Plant: DecorationKind.make("plant"),
+	Lamp: DecorationKind.make("lamp"),
+} as const;
+
+export const Decoration = Schema.Struct({
+	kind: DecorationKind,
+	height: NonNegativeFinite,
+});
+export type Decoration = typeof Decoration.Type;

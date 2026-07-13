@@ -1,5 +1,12 @@
-import type { Body, Position } from "../model/component";
-import { groundElevation, roomDepth, roomWidth, type World } from "./world";
+import { type Body, DecorationKinds, type Position } from "../model/component";
+import type { EntityId } from "../model/entity-id";
+import { entityTopElevation } from "./elevation";
+import { groundElevation, type World } from "./world";
+
+export const isSolidEntity = (world: World, entity: EntityId): boolean =>
+	world.obstacles.has(entity) ||
+	(world.decorations.has(entity) &&
+		world.decorations.get(entity)?.kind !== DecorationKinds.Rug);
 
 export const overlaps = (
 	position: Position,
@@ -10,11 +17,14 @@ export const overlaps = (
 	Math.abs(position.x - otherPosition.x) < (body.width + otherBody.width) / 2 &&
 	Math.abs(position.y - otherPosition.y) < (body.depth + otherBody.depth) / 2;
 
-export const isPositionInsideRoom = (position: Position): boolean =>
+export const isPositionInsideRoom = (
+	world: World,
+	position: Position,
+): boolean =>
 	position.x >= 0 &&
-	position.x <= roomWidth &&
+	position.x <= world.floorPlan.width &&
 	position.y >= 0 &&
-	position.y <= roomDepth;
+	position.y <= world.floorPlan.depth;
 
 /**
  * Uses the body's full horizontal footprint rather than only its center or foot
@@ -27,10 +37,10 @@ export const surfaceAt = (
 	position: Position,
 	body: Body,
 ): number => {
-	if (!isPositionInsideRoom(position)) return Number.NEGATIVE_INFINITY;
+	if (!isPositionInsideRoom(world, position)) return Number.NEGATIVE_INFINITY;
 
 	let surface = groundElevation;
-	for (const [entity, obstacle] of world.obstacles) {
+	for (const [entity] of world.obstacles) {
 		const obstaclePosition = world.positions.get(entity);
 		const obstacleBody = world.bodies.get(entity);
 		if (
@@ -38,7 +48,7 @@ export const surfaceAt = (
 			obstacleBody !== undefined &&
 			overlaps(position, body, obstaclePosition, obstacleBody)
 		) {
-			surface = Math.max(surface, obstacle.height);
+			surface = Math.max(surface, entityTopElevation(world, entity));
 		}
 	}
 	return surface;

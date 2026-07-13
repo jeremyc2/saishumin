@@ -2,84 +2,1299 @@ import { Context, Layer } from "effect";
 import { html, render, svg, type TemplateResult } from "lit-html";
 import { overlaps, surfaceAt } from "../ecs/collision";
 import {
-	backgroundWallEntities,
-	crateEntities,
-	foregroundWallEntities,
+	isEntityPlacementValid,
+	isFloorPlanPlacementValid,
+	isNewEditorItemPlacementValid,
+} from "../ecs/editor-placement";
+import {
+	editorEntityHeight,
+	editorEntityHeightLimits,
+	editorItemKindForEntity,
+	maximumEditorBody,
+} from "../ecs/editor-sizing";
+import {
+	entityBaseElevation,
+	entityTopElevation,
+	placementElevationForKind,
+} from "../ecs/elevation";
+import { isSupportSurfaceOccupied } from "../ecs/support-surface";
+import {
+	maximumFloorExtent,
+	minimumEntityExtent,
+	minimumFloorDepth,
+	minimumFloorWidth,
 	obstacleHeightTolerance,
-	platformEntities,
 	playerBody,
 	playerEntity,
-	roomDepth,
-	roomWidth,
 	type World,
-	wallHeight,
 } from "../ecs/world";
-import { ObstacleKinds } from "../model/component";
+import { Action } from "../model/action";
+import {
+	type Body,
+	Decoration,
+	DecorationKinds,
+	ObstacleKinds,
+	type Position,
+} from "../model/component";
+import {
+	defaultEditorItemBody,
+	defaultEditorItemHeight,
+	type EditorItemKind,
+	EditorItemKinds,
+} from "../model/editor";
 import type { EntityId } from "../model/entity-id";
-import { footprint, points, project, visualDepth } from "../render/projection";
+import { editorPlacementPositionAtPointer } from "../render/editor-placement-projection";
+import {
+	renderDepthForEntity,
+	supportedObjectDepthOffset,
+} from "../render/entity-render-depth";
+import {
+	footprint,
+	points,
+	project,
+	unproject,
+	viewport,
+	visualDepth,
+} from "../render/projection";
+import { type ResizeDirection, resizeFromHandle } from "../render/resize";
 import {
 	boxTemplate,
 	crateTemplate,
+	decorationTemplate,
 	playerTemplate,
 } from "../render/templates";
+
+type Dispatch = (action: Action) => void;
+
+type ActiveInteraction =
+	| {
+			readonly kind: "pan";
+			readonly pointer: Position;
+			readonly camera: Position;
+	  }
+	| {
+			readonly kind: "move";
+			readonly entity: EntityId;
+			readonly grabOffset: Position;
+			readonly position: Position;
+			readonly body: Body;
+	  }
+	| {
+			readonly kind: "resize";
+			readonly entity: EntityId;
+			readonly pointer: Position;
+			readonly position: Position;
+			readonly body: Body;
+			readonly widthDirection: ResizeDirection;
+			readonly depthDirection: ResizeDirection;
+	  }
+	| {
+			readonly kind: "create";
+			readonly itemKind: EditorItemKind;
+			readonly pointer: Position;
+			readonly position: Position;
+			readonly canDrop: boolean;
+	  }
+	| {
+			readonly kind: "resize-floor";
+			readonly pointer: Position;
+			readonly floorPlan: Body;
+			readonly widthDirection: ResizeDirection;
+			readonly depthDirection: ResizeDirection;
+			readonly originOffset: Position;
+	  };
+
+const floorGridSpacing = { x: 100, y: 80 } as const;
+const floorGridStrokeWidth = 2;
+const floorGridOpacity = 0.32;
+const selectionHandleSize = 16;
+const wheelLinePixels = 16;
+const minimumEntityBody = {
+	width: minimumEntityExtent,
+	depth: minimumEntityExtent,
+} as const;
+const minimumFloorBody = {
+	width: minimumFloorWidth,
+	depth: minimumFloorDepth,
+} as const;
+const maximumFloorBody = {
+	width: maximumFloorExtent,
+	depth: maximumFloorExtent,
+} as const;
+
+const midpoint = (start: Position, end: Position): Position => ({
+	x: (start.x + end.x) / 2,
+	y: (start.y + end.y) / 2,
+});
+
+const paletteItems: ReadonlyArray<{
+	readonly kind: EditorItemKind;
+	readonly label: string;
+	readonly icon: string;
+	readonly description: string;
+}> = [
+	{
+		kind: EditorItemKinds.Rug,
+		label: "Rug",
+		icon: "▱",
+		description: "Soft floor color",
+	},
+	{
+		kind: EditorItemKinds.Plant,
+		label: "Plant",
+		icon: "♧",
+		description: "Leafy decoration",
+	},
+	{
+		kind: EditorItemKinds.Lamp,
+		label: "Lamp",
+		icon: "♢",
+		description: "Warm floor lamp",
+	},
+	{
+		kind: EditorItemKinds.Wall,
+		label: "Wall",
+		icon: "▰",
+		description: "Solid boundary",
+	},
+	{
+		kind: EditorItemKinds.Platform,
+		label: "Platform",
+		icon: "▥",
+		description: "Raised surface",
+	},
+	{
+		kind: EditorItemKinds.Crate,
+		label: "Crate",
+		icon: "□",
+		description: "Pushable object",
+	},
+];
+
+const interiorGridCoordinates = (
+	extent: number,
+	spacing: number,
+): ReadonlyArray<number> =>
+	Array.from(
+		{ length: Math.max(0, Math.ceil(extent / spacing) - 1) },
+		(_, index) => (index + 1) * spacing,
+	);
+
+const entityLabel = (world: World, entity: EntityId): string => {
+	const obstacle = world.obstacles.get(entity);
+	if (obstacle !== undefined) {
+		if (obstacle.kind === ObstacleKinds.Wall) return "Wall";
+		if (obstacle.kind === ObstacleKinds.Platform) return "Platform";
+		return "Crate";
+	}
+	const decoration = world.decorations.get(entity);
+	if (decoration?.kind === DecorationKinds.Rug) return "Rug";
+	if (decoration?.kind === DecorationKinds.Plant) return "Plant";
+	return "Lamp";
+};
 
 export class RenderSystemService extends Context.Service<
 	RenderSystemService,
 	{
-		readonly render: (world: World) => void;
+		readonly render: (world: World, dispatch: Dispatch) => void;
 	}
 >()("saishumin/systems/render-system-service/RenderSystemService") {
 	static readonly layer = Layer.sync(this, () => {
-		const viewport = { width: 1600, height: 900 } as const;
-		const floorGridSpacing = { x: 100, y: 80 } as const;
-		const rugPosition = { x: 570, y: 330 } as const;
-		const rugBody = { width: 330, depth: 190 } as const;
-		const rugBorderWidth = 10;
-		const floorGridStrokeWidth = 2;
-		const floorGridOpacity = 0.32;
-		const supportedObjectDepthOffset = 0.5;
-		const interiorGridCoordinates = (
-			extent: number,
-			spacing: number,
-		): ReadonlyArray<number> =>
-			Array.from(
-				{ length: Math.ceil(extent / spacing) - 1 },
-				(_, index) => (index + 1) * spacing,
-			);
+		let currentWorld: World | undefined;
+		let currentDispatch: Dispatch | undefined;
+		let activeInteraction: ActiveInteraction | undefined;
+		let refreshCreatePreview = (): void => {};
 
-		const renderWorld = (world: World): void => {
+		const svgPosition = (
+			clientX: number,
+			clientY: number,
+		): Position | undefined => {
+			const canvas = document.querySelector("#world-canvas");
+			if (!(canvas instanceof SVGSVGElement)) return undefined;
+			const matrix = canvas.getScreenCTM();
+			if (matrix === null) return undefined;
+			const point = canvas.createSVGPoint();
+			point.x = clientX;
+			point.y = clientY;
+			const transformed = point.matrixTransform(matrix.inverse());
+			return { x: transformed.x, y: transformed.y };
+		};
+
+		const projectedPointerPosition = (
+			event: PointerEvent | DragEvent,
+			camera: Position,
+		): Position | undefined => {
+			const pointer = svgPosition(event.clientX, event.clientY);
+			return pointer === undefined
+				? undefined
+				: { x: pointer.x - camera.x, y: pointer.y - camera.y };
+		};
+
+		const pointerWorldPosition = (
+			event: PointerEvent | DragEvent,
+			camera: Position,
+		): Position | undefined => {
+			const pointer = projectedPointerPosition(event, camera);
+			return pointer === undefined ? undefined : unproject(pointer);
+		};
+
+		const startPan = (event: PointerEvent, world: World): void => {
+			if (event.button !== 0 && event.button !== 1) return;
+			const pointer = svgPosition(event.clientX, event.clientY);
+			if (pointer === undefined) return;
+			event.preventDefault();
+			activeInteraction = {
+				kind: "pan",
+				pointer,
+				camera: world.editor.camera,
+			};
+		};
+
+		const isPanGesture = (event: PointerEvent): boolean =>
+			event.button === 1 || event.metaKey || event.ctrlKey;
+
+		const startEntityMove = (
+			event: PointerEvent,
+			world: World,
+			entity: EntityId,
+			dispatch: Dispatch,
+		): void => {
+			if (!world.editor.open) return;
+			event.stopPropagation();
+			if (isPanGesture(event)) {
+				startPan(event, world);
+				return;
+			}
+			if (event.button !== 0) return;
+			const projectedPointer = projectedPointerPosition(
+				event,
+				world.editor.camera,
+			);
+			const position = world.positions.get(entity);
+			const body = world.bodies.get(entity);
+			if (
+				projectedPointer === undefined ||
+				position === undefined ||
+				body === undefined
+			)
+				return;
+			event.preventDefault();
+			dispatch(Action.EditorSelectionChanged({ selection: entity }));
+			const pointerAtBase = unproject(
+				projectedPointer,
+				entityBaseElevation(world, entity),
+			);
+			activeInteraction = {
+				kind: "move",
+				entity,
+				grabOffset: {
+					x: pointerAtBase.x - position.x,
+					y: pointerAtBase.y - position.y,
+				},
+				position,
+				body,
+			};
+		};
+
+		const startEntityResize = (
+			event: PointerEvent,
+			world: World,
+			entity: EntityId,
+			widthDirection: ResizeDirection,
+			depthDirection: ResizeDirection,
+		): void => {
+			event.stopPropagation();
+			if (isPanGesture(event)) {
+				startPan(event, world);
+				return;
+			}
+			if (event.button !== 0) return;
+			const pointer = pointerWorldPosition(event, world.editor.camera);
+			const position = world.positions.get(entity);
+			const body = world.bodies.get(entity);
+			if (pointer === undefined || position === undefined || body === undefined)
+				return;
+			event.preventDefault();
+			activeInteraction = {
+				kind: "resize",
+				entity,
+				pointer,
+				position,
+				body,
+				widthDirection,
+				depthDirection,
+			};
+		};
+
+		const startFloorResize = (
+			event: PointerEvent,
+			world: World,
+			widthDirection: ResizeDirection,
+			depthDirection: ResizeDirection,
+		): void => {
+			event.stopPropagation();
+			if (isPanGesture(event)) {
+				startPan(event, world);
+				return;
+			}
+			if (event.button !== 0) return;
+			const pointer = svgPosition(event.clientX, event.clientY);
+			if (pointer === undefined) return;
+			event.preventDefault();
+			activeInteraction = {
+				kind: "resize-floor",
+				pointer,
+				floorPlan: world.floorPlan,
+				widthDirection,
+				depthDirection,
+				originOffset: { x: 0, y: 0 },
+			};
+		};
+
+		const startPaletteDrag = (
+			event: PointerEvent,
+			itemKind: EditorItemKind,
+			world: World,
+		): void => {
+			if (event.button !== 0) return;
+			const position = pointerWorldPosition(event, world.editor.camera);
+			if (position === undefined) return;
+			event.preventDefault();
+			activeInteraction = {
+				kind: "create",
+				itemKind,
+				pointer: { x: event.clientX, y: event.clientY },
+				position,
+				canDrop: false,
+			};
+			refreshCreatePreview();
+		};
+
+		window.addEventListener("pointermove", (event) => {
+			const interaction = activeInteraction;
+			const world = currentWorld;
+			const dispatch = currentDispatch;
+			if (
+				interaction === undefined ||
+				world === undefined ||
+				dispatch === undefined
+			)
+				return;
+
+			if (interaction.kind === "pan") {
+				const pointer = svgPosition(event.clientX, event.clientY);
+				if (pointer === undefined) return;
+				dispatch(
+					Action.EditorCameraChanged({
+						camera: {
+							x: interaction.camera.x + pointer.x - interaction.pointer.x,
+							y: interaction.camera.y + pointer.y - interaction.pointer.y,
+						},
+					}),
+				);
+				return;
+			}
+			if (interaction.kind === "create") {
+				const projectedPointer = projectedPointerPosition(
+					event,
+					world.editor.camera,
+				);
+				if (projectedPointer === undefined) return;
+				const body = defaultEditorItemBody(interaction.itemKind);
+				const position = editorPlacementPositionAtPointer(
+					world,
+					interaction.itemKind,
+					body,
+					projectedPointer,
+				);
+				const target = document.elementFromPoint(event.clientX, event.clientY);
+				activeInteraction = {
+					...interaction,
+					position,
+					canDrop:
+						target instanceof Element &&
+						target.closest("#world-canvas") !== null,
+				};
+				refreshCreatePreview();
+				return;
+			}
+
+			if (interaction.kind === "resize-floor") {
+				const pointer = svgPosition(event.clientX, event.clientY);
+				if (pointer === undefined) return;
+				const resized = resizeFromHandle(
+					{
+						x: interaction.floorPlan.width / 2,
+						y: interaction.floorPlan.depth / 2,
+					},
+					interaction.floorPlan,
+					{
+						x: pointer.x - interaction.pointer.x,
+						y: (pointer.y - interaction.pointer.y) / Math.SQRT1_2,
+					},
+					interaction.widthDirection,
+					interaction.depthDirection,
+					minimumFloorBody,
+					maximumFloorBody,
+				);
+				const originOffset = {
+					x: resized.position.x - resized.body.width / 2,
+					y: resized.position.y - resized.body.depth / 2,
+				};
+				const originDelta = {
+					x: originOffset.x - interaction.originOffset.x,
+					y: originOffset.y - interaction.originOffset.y,
+				};
+				activeInteraction = { ...interaction, originOffset };
+				dispatch(
+					Action.EditorFloorResized({
+						floorPlan: resized.body,
+						originDelta,
+						preview: true,
+					}),
+				);
+				return;
+			}
+
+			if (interaction.kind === "move") {
+				const projectedPointer = projectedPointerPosition(
+					event,
+					world.editor.camera,
+				);
+				const itemKind = editorItemKindForEntity(world, interaction.entity);
+				if (projectedPointer === undefined || itemKind === undefined) return;
+				const position = editorPlacementPositionAtPointer(
+					world,
+					itemKind,
+					interaction.body,
+					projectedPointer,
+					interaction.grabOffset,
+					interaction.entity,
+				);
+				dispatch(
+					Action.EditorEntityMoved({
+						entity: interaction.entity,
+						position,
+						originalPosition: interaction.position,
+						originalBody: interaction.body,
+						preview: true,
+					}),
+				);
+			} else if (interaction.kind === "resize") {
+				const pointer = pointerWorldPosition(event, world.editor.camera);
+				if (pointer === undefined) return;
+				const resized = resizeFromHandle(
+					interaction.position,
+					interaction.body,
+					{
+						x: pointer.x - interaction.pointer.x,
+						y: pointer.y - interaction.pointer.y,
+					},
+					interaction.widthDirection,
+					interaction.depthDirection,
+					minimumEntityBody,
+					maximumEditorBody(world, interaction.entity),
+				);
+				dispatch(
+					Action.EditorEntityResized({
+						entity: interaction.entity,
+						body: resized.body,
+						position: resized.position,
+						originalPosition: interaction.position,
+						originalBody: interaction.body,
+						preview: true,
+					}),
+				);
+			}
+		});
+
+		window.addEventListener("pointerup", (event) => {
+			const interaction = activeInteraction;
+			const world = currentWorld;
+			const dispatch = currentDispatch;
+			activeInteraction = undefined;
+			refreshCreatePreview();
+			if (
+				interaction?.kind === "create" &&
+				world?.editor.open === true &&
+				dispatch !== undefined
+			) {
+				const distance = Math.hypot(
+					event.clientX - interaction.pointer.x,
+					event.clientY - interaction.pointer.y,
+				);
+				if (distance > 8) {
+					const dropTarget = document.elementFromPoint(
+						event.clientX,
+						event.clientY,
+					);
+					if (
+						dropTarget instanceof Element &&
+						dropTarget.closest("#world-canvas") !== null
+					) {
+						dispatch(
+							Action.EditorItemAdded({
+								kind: interaction.itemKind,
+								position: interaction.position,
+							}),
+						);
+					}
+				}
+			}
+			if (
+				(interaction?.kind === "move" || interaction?.kind === "resize") &&
+				dispatch !== undefined
+			) {
+				dispatch(
+					Action.EditorEntityInteractionFinished({
+						entity: interaction.entity,
+						originalPosition: interaction.position,
+						originalBody: interaction.body,
+					}),
+				);
+			} else if (
+				interaction?.kind === "resize-floor" &&
+				dispatch !== undefined
+			) {
+				dispatch(
+					Action.EditorFloorInteractionFinished({
+						originalFloorPlan: interaction.floorPlan,
+						originOffset: interaction.originOffset,
+					}),
+				);
+			}
+		});
+		window.addEventListener("pointercancel", () => {
+			const interaction = activeInteraction;
+			const dispatch = currentDispatch;
+			activeInteraction = undefined;
+			refreshCreatePreview();
+			if (
+				(interaction?.kind === "move" || interaction?.kind === "resize") &&
+				dispatch !== undefined
+			) {
+				dispatch(
+					Action.EditorEntityResized({
+						entity: interaction.entity,
+						position: interaction.position,
+						body: interaction.body,
+					}),
+				);
+			} else if (
+				interaction?.kind === "resize-floor" &&
+				dispatch !== undefined
+			) {
+				dispatch(
+					Action.EditorFloorResized({
+						floorPlan: interaction.floorPlan,
+						originDelta: {
+							x: -interaction.originOffset.x,
+							y: -interaction.originOffset.y,
+						},
+					}),
+				);
+			}
+		});
+		window.addEventListener(
+			"wheel",
+			(event) => {
+				const world = currentWorld;
+				const dispatch = currentDispatch;
+				if (world?.editor.open !== true || dispatch === undefined) return;
+				const target = event.target;
+				if (
+					target instanceof Element &&
+					target.closest("[data-editor-panel]") !== null
+				)
+					return;
+				event.preventDefault();
+				const canvas = document.querySelector("#world-canvas");
+				if (!(canvas instanceof SVGSVGElement)) return;
+				const matrix = canvas.getScreenCTM();
+				if (matrix === null) return;
+				const deltaFactor =
+					event.deltaMode === 1
+						? wheelLinePixels
+						: event.deltaMode === 2
+							? window.innerHeight
+							: 1;
+				const scaleX = Math.max(Number.EPSILON, Math.abs(matrix.a));
+				const scaleY = Math.max(Number.EPSILON, Math.abs(matrix.d));
+				dispatch(
+					Action.EditorCameraChanged({
+						camera: {
+							x: world.editor.camera.x - (event.deltaX * deltaFactor) / scaleX,
+							y: world.editor.camera.y - (event.deltaY * deltaFactor) / scaleY,
+						},
+					}),
+				);
+			},
+			{ passive: false },
+		);
+		window.addEventListener("keydown", (event) => {
+			const world = currentWorld;
+			const dispatch = currentDispatch;
+			if (world?.editor.open !== true || dispatch === undefined) return;
+			if (world.editor.invalidPlacement !== null) {
+				if (event.key === "Enter" || event.key === "Escape") {
+					event.preventDefault();
+					dispatch(Action.EditorInvalidPlacementDismissed());
+				}
+				return;
+			}
+			const target = event.target;
+			if (
+				target instanceof HTMLInputElement ||
+				target instanceof HTMLTextAreaElement ||
+				target instanceof HTMLSelectElement
+			)
+				return;
+			if (event.key === "Delete" || event.key === "Backspace") {
+				event.preventDefault();
+				dispatch(Action.EditorDeleteSelected());
+			} else if (event.key === "Escape") {
+				event.preventDefault();
+				dispatch(Action.EditorToggled());
+			}
+		});
+
+		const selectionTemplate = (
+			world: World,
+			invalidPreview: boolean,
+		): TemplateResult => {
+			const selected = world.editor.selected;
+			if (selected === null) return svg``;
+			const accent = invalidPreview ? "#e59a91" : "#fff0a8";
+			if (selected === "floor") {
+				const outline = footprint(
+					{ x: world.floorPlan.width / 2, y: world.floorPlan.depth / 2 },
+					world.floorPlan,
+				);
+				const edges = [
+					{
+						start: outline[0],
+						end: outline[1],
+						widthDirection: 0,
+						depthDirection: -1,
+						cursor: "cursor-ns-resize",
+					},
+					{
+						start: outline[1],
+						end: outline[2],
+						widthDirection: 1,
+						depthDirection: 0,
+						cursor: "cursor-ew-resize",
+					},
+					{
+						start: outline[2],
+						end: outline[3],
+						widthDirection: 0,
+						depthDirection: 1,
+						cursor: "cursor-ns-resize",
+					},
+					{
+						start: outline[3],
+						end: outline[0],
+						widthDirection: -1,
+						depthDirection: 0,
+						cursor: "cursor-ew-resize",
+					},
+				] as const;
+				const handles = [
+					{
+						point: outline[0],
+						widthDirection: -1,
+						depthDirection: -1,
+						cursor: "cursor-nwse-resize",
+					},
+					{
+						point: midpoint(outline[0], outline[1]),
+						widthDirection: 0,
+						depthDirection: -1,
+						cursor: "cursor-ns-resize",
+					},
+					{
+						point: outline[1],
+						widthDirection: 1,
+						depthDirection: -1,
+						cursor: "cursor-nesw-resize",
+					},
+					{
+						point: midpoint(outline[1], outline[2]),
+						widthDirection: 1,
+						depthDirection: 0,
+						cursor: "cursor-ew-resize",
+					},
+					{
+						point: outline[2],
+						widthDirection: 1,
+						depthDirection: 1,
+						cursor: "cursor-nwse-resize",
+					},
+					{
+						point: midpoint(outline[2], outline[3]),
+						widthDirection: 0,
+						depthDirection: 1,
+						cursor: "cursor-ns-resize",
+					},
+					{
+						point: outline[3],
+						widthDirection: -1,
+						depthDirection: 1,
+						cursor: "cursor-nesw-resize",
+					},
+					{
+						point: midpoint(outline[3], outline[0]),
+						widthDirection: -1,
+						depthDirection: 0,
+						cursor: "cursor-ew-resize",
+					},
+				] as const;
+				return svg`
+					<polygon points=${points(outline)} fill="none" stroke=${accent} stroke-width="5" stroke-dasharray="13 9" vector-effect="non-scaling-stroke" />
+					${edges.map(
+						(edge) => svg`<line
+							x1=${edge.start.x}
+							y1=${edge.start.y}
+							x2=${edge.end.x}
+							y2=${edge.end.y}
+							stroke="transparent"
+							stroke-width="18"
+							pointer-events="stroke"
+							class=${edge.cursor}
+							@pointerdown=${(event: PointerEvent) =>
+								startFloorResize(
+									event,
+									world,
+									edge.widthDirection,
+									edge.depthDirection,
+								)}
+						/>`,
+					)}
+					${handles.map(
+						(handle) => svg`<rect
+							x=${handle.point.x - selectionHandleSize / 2}
+							y=${handle.point.y - selectionHandleSize / 2}
+							width=${selectionHandleSize}
+							height=${selectionHandleSize}
+							rx="3"
+							fill=${accent}
+							stroke="#503b37"
+							stroke-width="3"
+							class=${handle.cursor}
+							@pointerdown=${(event: PointerEvent) =>
+								startFloorResize(
+									event,
+									world,
+									handle.widthDirection,
+									handle.depthDirection,
+								)}
+						/>`,
+					)}
+				`;
+			}
+
+			const position = world.positions.get(selected);
+			const body = world.bodies.get(selected);
+			if (position === undefined || body === undefined) return svg``;
+			const outline = footprint(
+				position,
+				body,
+				entityBaseElevation(world, selected),
+			);
+			const edges: ReadonlyArray<{
+				readonly start: Position;
+				readonly end: Position;
+				readonly widthDirection: ResizeDirection;
+				readonly depthDirection: ResizeDirection;
+				readonly cursor: string;
+			}> = [
+				{
+					start: outline[0],
+					end: outline[1],
+					widthDirection: 0,
+					depthDirection: -1,
+					cursor: "cursor-ns-resize",
+				},
+				{
+					start: outline[1],
+					end: outline[2],
+					widthDirection: 1,
+					depthDirection: 0,
+					cursor: "cursor-ew-resize",
+				},
+				{
+					start: outline[2],
+					end: outline[3],
+					widthDirection: 0,
+					depthDirection: 1,
+					cursor: "cursor-ns-resize",
+				},
+				{
+					start: outline[3],
+					end: outline[0],
+					widthDirection: -1,
+					depthDirection: 0,
+					cursor: "cursor-ew-resize",
+				},
+			];
+			const handles: ReadonlyArray<{
+				readonly point: Position;
+				readonly widthDirection: ResizeDirection;
+				readonly depthDirection: ResizeDirection;
+				readonly cursor: string;
+			}> = [
+				{
+					point: outline[0],
+					widthDirection: -1,
+					depthDirection: -1,
+					cursor: "cursor-nwse-resize",
+				},
+				{
+					point: midpoint(outline[0], outline[1]),
+					widthDirection: 0,
+					depthDirection: -1,
+					cursor: "cursor-ns-resize",
+				},
+				{
+					point: outline[1],
+					widthDirection: 1,
+					depthDirection: -1,
+					cursor: "cursor-nesw-resize",
+				},
+				{
+					point: midpoint(outline[1], outline[2]),
+					widthDirection: 1,
+					depthDirection: 0,
+					cursor: "cursor-ew-resize",
+				},
+				{
+					point: outline[2],
+					widthDirection: 1,
+					depthDirection: 1,
+					cursor: "cursor-nwse-resize",
+				},
+				{
+					point: midpoint(outline[2], outline[3]),
+					widthDirection: 0,
+					depthDirection: 1,
+					cursor: "cursor-ns-resize",
+				},
+				{
+					point: outline[3],
+					widthDirection: -1,
+					depthDirection: 1,
+					cursor: "cursor-nesw-resize",
+				},
+				{
+					point: midpoint(outline[3], outline[0]),
+					widthDirection: -1,
+					depthDirection: 0,
+					cursor: "cursor-ew-resize",
+				},
+			];
+			return svg`
+				<polygon points=${points(outline)} fill="none" stroke=${accent} stroke-width="4" stroke-dasharray="10 7" vector-effect="non-scaling-stroke" pointer-events="none" />
+				${edges.map(
+					(edge) => svg`<line
+						x1=${edge.start.x}
+						y1=${edge.start.y}
+						x2=${edge.end.x}
+						y2=${edge.end.y}
+						stroke="transparent"
+						stroke-width="18"
+						pointer-events="stroke"
+						class=${edge.cursor}
+						@pointerdown=${(event: PointerEvent) =>
+							startEntityResize(
+								event,
+								world,
+								selected,
+								edge.widthDirection,
+								edge.depthDirection,
+							)}
+					/>`,
+				)}
+				${handles.map(
+					(handle) => svg`<rect
+							x=${handle.point.x - selectionHandleSize / 2}
+							y=${handle.point.y - selectionHandleSize / 2}
+							width=${selectionHandleSize}
+							height=${selectionHandleSize}
+							rx="3"
+							fill=${accent}
+							stroke="#503b37"
+							stroke-width="3"
+							class=${handle.cursor}
+							@pointerdown=${(event: PointerEvent) =>
+								startEntityResize(
+									event,
+									world,
+									selected,
+									handle.widthDirection,
+									handle.depthDirection,
+								)}
+						/>`,
+				)}
+			`;
+		};
+
+		const numberInput = (
+			label: string,
+			value: number,
+			minimum: number,
+			maximum: number,
+			onChange: (value: number) => void,
+		): TemplateResult => html`
+			<label class="block min-w-0 flex-1 text-[11px] font-bold tracking-[0.14em] text-[#819993] uppercase">
+				${label}
+				<input
+					type="number"
+					.value=${String(Math.round(value))}
+					min=${minimum}
+					max=${maximum}
+					step="10"
+					class="mt-2 block w-full rounded-lg border border-[#3a5157] bg-[#16252c] px-3 py-2 text-[14px] font-semibold text-[#fff1d6] outline-none focus:border-[#e8b875]"
+					@change=${(event: Event) => {
+						const input = event.currentTarget;
+						if (
+							input instanceof HTMLInputElement &&
+							Number.isFinite(input.valueAsNumber)
+						)
+							onChange(input.valueAsNumber);
+					}}
+				/>
+			</label>
+		`;
+
+		const editorPanelTemplate = (
+			world: World,
+			dispatch: Dispatch,
+		): TemplateResult => {
+			const selected = world.editor.selected;
+			const selectedEntity =
+				selected === null || selected === "floor" ? undefined : selected;
+			const selectedBody =
+				selectedEntity === undefined
+					? undefined
+					: world.bodies.get(selectedEntity);
+			const selectedPosition =
+				selectedEntity === undefined
+					? undefined
+					: world.positions.get(selectedEntity);
+			const selectedMaximumBody =
+				selectedEntity === undefined
+					? undefined
+					: maximumEditorBody(world, selectedEntity);
+			const selectedHeight =
+				selectedEntity === undefined
+					? undefined
+					: editorEntityHeight(world, selectedEntity);
+			const selectedHeightLimits =
+				selectedEntity === undefined
+					? undefined
+					: editorEntityHeightLimits(world, selectedEntity);
+			return html`
+				<aside data-editor-panel class="absolute top-0 right-0 z-30 flex h-full w-85 flex-col overscroll-contain border-l border-[#41565a] bg-[#0d181f]/98 text-[#fff1d6] shadow-[-18px_0_44px_rgba(3,9,12,0.38)]">
+					<header class="border-b border-[#30434a] px-5 pt-6 pb-4">
+						<div class="text-[11px] font-bold tracking-[0.2em] text-[#e8b875] uppercase">World editor</div>
+						<div class="mt-1 text-[20px] font-bold">Shape your space</div>
+						<div class="mt-3 text-[11px] leading-relaxed text-[#819993]">Scroll to pan · Command/Control-drag to pan</div>
+					</header>
+
+					<div class="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-5">
+						<section>
+							<div class="flex items-end justify-between">
+								<h2 class="m-0 text-[12px] font-bold tracking-[0.16em] text-[#aebfba] uppercase">Add objects</h2>
+								<span class="text-[10px] text-[#708780]">DRAG TO PLACE</span>
+							</div>
+							<div class="mt-3 grid grid-cols-2 gap-2">
+								${paletteItems.map(
+									(item) => html`
+										<button
+											type="button"
+											class="group cursor-grab touch-none rounded-xl border border-[#30464c] bg-[#17272e] p-3 text-left transition hover:-translate-y-0.5 hover:border-[#d9a969] hover:bg-[#20343b] active:cursor-grabbing"
+											@pointerdown=${(event: PointerEvent) =>
+												startPaletteDrag(event, item.kind, world)}
+										>
+											<span class="text-[22px] text-[#e8b875]">${item.icon}</span>
+											<span class="mt-1 block text-[13px] font-bold">${item.label}</span>
+											<span class="mt-0.5 block text-[10px] leading-snug text-[#819993]">${item.description}</span>
+										</button>
+									`,
+								)}
+							</div>
+						</section>
+
+						<section class="mt-6 border-t border-[#30434a] pt-5">
+							<h2 class="m-0 text-[12px] font-bold tracking-[0.16em] text-[#aebfba] uppercase">Selection</h2>
+							${
+								selected === "floor"
+									? html`
+										<div class="mt-3 rounded-xl bg-[#17272e] p-4">
+											<div class="text-[15px] font-bold">Floor plan</div>
+											<div class="mt-1 text-[11px] leading-relaxed text-[#819993]">Drag any gold edge or handle, or enter exact dimensions.</div>
+											<div class="mt-4 flex gap-3">
+												${numberInput(
+													"Width",
+													world.floorPlan.width,
+													minimumFloorWidth,
+													maximumFloorExtent,
+													(width) =>
+														dispatch(
+															Action.EditorFloorResized({
+																floorPlan: { ...world.floorPlan, width },
+															}),
+														),
+												)}
+												${numberInput(
+													"Depth",
+													world.floorPlan.depth,
+													minimumFloorDepth,
+													maximumFloorExtent,
+													(depth) =>
+														dispatch(
+															Action.EditorFloorResized({
+																floorPlan: { ...world.floorPlan, depth },
+															}),
+														),
+												)}
+												</div>
+										</div>
+									`
+									: selectedEntity !== undefined &&
+											selectedBody !== undefined &&
+											selectedPosition !== undefined &&
+											selectedMaximumBody !== undefined
+										? html`
+											<div class="mt-3 rounded-xl bg-[#17272e] p-4">
+												<div class="flex items-start justify-between gap-3">
+													<div>
+														<div class="text-[15px] font-bold">${entityLabel(world, selectedEntity)}</div>
+														<div class="mt-1 text-[10px] text-[#819993]">X ${Math.round(selectedPosition.x)} · Y ${Math.round(selectedPosition.y)}</div>
+													</div>
+									<button type="button" class="rounded-lg border border-[#704a45] px-2.5 py-1.5 text-[10px] font-bold text-[#ef9f8e] hover:bg-[#3a2425]" @click=${() => dispatch(Action.EditorDeleteSelected())}>DELETE</button>
+												</div>
+												<div class="mt-4 flex gap-3">
+													${numberInput(
+														"Width",
+														selectedBody.width,
+														minimumEntityExtent,
+														selectedMaximumBody.width,
+														(width) =>
+															dispatch(
+																Action.EditorEntityResized({
+																	entity: selectedEntity,
+																	body: { ...selectedBody, width },
+																}),
+															),
+													)}
+											${numberInput(
+												"Depth",
+												selectedBody.depth,
+												minimumEntityExtent,
+												selectedMaximumBody.depth,
+												(depth) =>
+													dispatch(
+														Action.EditorEntityResized({
+															entity: selectedEntity,
+															body: { ...selectedBody, depth },
+														}),
+													),
+											)}
+											${
+												selectedHeight !== undefined &&
+												selectedHeightLimits !== undefined &&
+												selectedHeightLimits.maximum > 0
+													? numberInput(
+															"Height",
+															selectedHeight,
+															selectedHeightLimits.minimum,
+															selectedHeightLimits.maximum,
+															(height) =>
+																dispatch(
+																	Action.EditorEntityHeightChanged({
+																		entity: selectedEntity,
+																		height,
+																	}),
+																),
+														)
+													: html``
+											}
+												</div>
+											</div>
+										`
+										: html`<div class="mt-3 rounded-xl border border-dashed border-[#30464c] px-4 py-5 text-center text-[11px] leading-relaxed text-[#819993]">Select an object to move or resize it.<br />Select the floor to change the plan.</div>`
+							}
+						</section>
+					</div>
+
+					<footer class="border-t border-[#30434a] px-5 py-4 text-[10px] leading-relaxed text-[#718780]">
+						Drag objects to move · Scroll to pan<br />⌘/Ctrl-drag pans · Delete removes a selection
+					</footer>
+				</aside>
+			`;
+		};
+
+		const invalidPlacementTemplate = (
+			world: World,
+			dispatch: Dispatch,
+		): TemplateResult => {
+			const invalidPlacement = world.editor.invalidPlacement;
+			const occupiedSupport =
+				invalidPlacement?.kind === "entity" &&
+				isSupportSurfaceOccupied(
+					world,
+					invalidPlacement.entity,
+					invalidPlacement.position,
+					invalidPlacement.body,
+				);
+			const description =
+				invalidPlacement?.kind === "floor"
+					? "The floor plan must contain every existing object."
+					: occupiedSupport
+						? "Move every object off this platform before moving, shrinking, or deleting it."
+						: "Keep the object inside the floor plan and clear of other objects.";
+			return html`
+				<div class="editor-invalid-cursor absolute inset-0 z-50 flex items-center justify-center bg-[#071015]/48 px-6" role="presentation">
+					<div class="w-full max-w-95 rounded-2xl border border-[#7d4b4b] bg-[#15242b] px-6 py-5 shadow-[0_24px_70px_rgba(0,0,0,0.5)]" role="alertdialog" aria-modal="true" aria-labelledby="invalid-position-title" aria-describedby="invalid-position-description">
+						<div id="invalid-position-title" class="text-[17px] font-bold tracking-[0.04em] text-[#e59a91]">Invalid position</div>
+						<p id="invalid-position-description" class="mt-2 mb-0 text-[12px] leading-relaxed text-[#b9cbc4]">${description}</p>
+						<div class="mt-5 flex justify-end">
+							<button type="button" autofocus class="rounded-lg border border-[#9a625d] bg-[#6f3f3e] px-5 py-2 text-[11px] font-bold tracking-[0.12em] text-[#fff1ed] transition hover:bg-[#80504d]" @click=${() => dispatch(Action.EditorInvalidPlacementDismissed())}>OK</button>
+						</div>
+					</div>
+				</div>
+			`;
+		};
+
+		const activePlacementIsInvalid = (world: World): boolean => {
+			const interaction = activeInteraction;
+			if (interaction?.kind === "create")
+				return (
+					interaction.canDrop &&
+					!isNewEditorItemPlacementValid(
+						world,
+						interaction.itemKind,
+						interaction.position,
+						defaultEditorItemBody(interaction.itemKind),
+					)
+				);
+			if (interaction?.kind === "resize-floor")
+				return !isFloorPlanPlacementValid(world, world.floorPlan);
+			if (interaction?.kind !== "move" && interaction?.kind !== "resize")
+				return false;
+			const position = world.positions.get(interaction.entity);
+			const body = world.bodies.get(interaction.entity);
+			return (
+				position !== undefined &&
+				body !== undefined &&
+				!isEntityPlacementValid(world, interaction.entity, position, body, {
+					position: interaction.position,
+					body: interaction.body,
+				})
+			);
+		};
+
+		const createPreviewTemplate = (
+			world: World,
+			invalidPreview: boolean,
+		): TemplateResult => {
+			const interaction = activeInteraction;
+			if (interaction?.kind !== "create") return html``;
+			const body = defaultEditorItemBody(interaction.itemKind);
+			const position = interaction.position;
+			const baseElevation = placementElevationForKind(
+				world,
+				interaction.itemKind,
+				position,
+				body,
+			);
+			const height = defaultEditorItemHeight(interaction.itemKind);
+			const visual =
+				interaction.itemKind === EditorItemKinds.Crate
+					? crateTemplate(position, body, height, false, baseElevation)
+					: interaction.itemKind === EditorItemKinds.Wall
+						? boxTemplate(
+								position,
+								body,
+								height,
+								{ top: "#426772", front: "#29454f" },
+								"",
+								baseElevation,
+							)
+						: interaction.itemKind === EditorItemKinds.Platform
+							? boxTemplate(
+									position,
+									body,
+									height,
+									{ top: "#77927e", front: "#4f6c61" },
+									"",
+									baseElevation,
+								)
+							: decorationTemplate(
+									position,
+									body,
+									Decoration.make({
+										kind:
+											interaction.itemKind === EditorItemKinds.Rug
+												? DecorationKinds.Rug
+												: interaction.itemKind === EditorItemKinds.Plant
+													? DecorationKinds.Plant
+													: DecorationKinds.Lamp,
+										height,
+									}),
+									baseElevation,
+								);
+			const accent = invalidPreview ? "#e59a91" : "#fff0a8";
+			return html`
+				<svg data-editor-create-preview data-can-drop=${String(interaction.canDrop)} aria-hidden="true" class="pointer-events-none absolute inset-0 z-40 h-full w-full" viewBox=${`0 0 ${viewport.width} ${viewport.height}`} preserveAspectRatio="xMidYMid meet">
+					<g transform=${`translate(${world.editor.camera.x} ${world.editor.camera.y})`}>
+						<g opacity="0.82">${visual}</g>
+						<polygon data-editor-create-outline points=${points(footprint(position, body, baseElevation))} fill="none" stroke=${accent} stroke-width="4" stroke-dasharray="10 7" vector-effect="non-scaling-stroke" />
+					</g>
+				</svg>
+			`;
+		};
+
+		const renderWorld = (world: World, dispatch: Dispatch): void => {
+			currentWorld = world;
+			currentDispatch = dispatch;
+			if (world.editor.invalidPlacement !== null) activeInteraction = undefined;
 			const playerPosition = world.positions.get(playerEntity);
 			const playerElevation = world.elevations.get(playerEntity);
 			if (playerPosition === undefined || playerElevation === undefined) return;
 
+			const camera = world.editor.open ? world.editor.camera : world.gameCamera;
+			const invalidPreview = activePlacementIsInvalid(world);
 			const floor = footprint(
-				{ x: roomWidth / 2, y: roomDepth / 2 },
-				{ width: roomWidth, depth: roomDepth },
+				{ x: world.floorPlan.width / 2, y: world.floorPlan.depth / 2 },
+				world.floorPlan,
 			);
 			const gridLines = interiorGridCoordinates(
-				roomWidth,
+				world.floorPlan.width,
 				floorGridSpacing.x,
 			).map(
 				(x) =>
-					svg`<line x1=${project({ x, y: 0 }).x} y1=${project({ x, y: 0 }).y} x2=${project({ x, y: roomDepth }).x} y2=${project({ x, y: roomDepth }).y} />`,
+					svg`<line x1=${project({ x, y: 0 }).x} y1=${project({ x, y: 0 }).y} x2=${project({ x, y: world.floorPlan.depth }).x} y2=${project({ x, y: world.floorPlan.depth }).y} />`,
 			);
 			const depthLines = interiorGridCoordinates(
-				roomDepth,
+				world.floorPlan.depth,
 				floorGridSpacing.y,
 			).map(
 				(y) =>
-					svg`<line x1=${project({ x: 0, y }).x} y1=${project({ x: 0, y }).y} x2=${project({ x: roomWidth, y }).x} y2=${project({ x: roomWidth, y }).y} />`,
+					svg`<line x1=${project({ x: 0, y }).x} y1=${project({ x: 0, y }).y} x2=${project({ x: world.floorPlan.width, y }).x} y2=${project({ x: world.floorPlan.width, y }).y} />`,
 			);
-			const shadowHeight = surfaceAt(world, playerPosition, playerBody);
+
 			let playerDepth = visualDepth(playerPosition);
-			let shouldRenderPlayerAboveWalls = false;
-			for (const [entity, obstacle] of world.obstacles) {
+			for (const [entity] of world.obstacles) {
 				const obstaclePosition = world.positions.get(entity);
 				const obstacleBody = world.bodies.get(entity);
 				if (
 					obstaclePosition !== undefined &&
 					obstacleBody !== undefined &&
-					playerElevation.z >= obstacle.height - obstacleHeightTolerance &&
+					playerElevation.z >=
+						entityTopElevation(world, entity) - obstacleHeightTolerance &&
 					overlaps(playerPosition, playerBody, obstaclePosition, obstacleBody)
 				) {
 					playerDepth = Math.max(
@@ -87,111 +1302,174 @@ export class RenderSystemService extends Context.Service<
 						visualDepth(obstaclePosition) + supportedObjectDepthOffset,
 					);
 				}
-				if (
-					obstaclePosition !== undefined &&
-					obstacleBody !== undefined &&
-					obstacle.kind === ObstacleKinds.Wall &&
-					playerElevation.z >= obstacle.height - obstacleHeightTolerance &&
-					overlaps(playerPosition, playerBody, obstaclePosition, obstacleBody)
-				) {
-					shouldRenderPlayerAboveWalls = true;
-				}
 			}
-			const player = playerTemplate(
-				playerPosition,
-				playerElevation,
-				shadowHeight,
-			);
-			const wallTemplate = (entity: EntityId): TemplateResult => {
+
+			const objects: Array<{
+				readonly depth: number;
+				readonly entity?: EntityId;
+				readonly template: TemplateResult;
+			}> = [];
+			for (const [entity, obstacle] of world.obstacles) {
 				const position = world.positions.get(entity);
 				const body = world.bodies.get(entity);
-				return position === undefined || body === undefined
-					? svg``
-					: boxTemplate(position, body, wallHeight, {
-							top: "#426772",
-							front: "#29454f",
-						});
-			};
-			const foregroundWalls = foregroundWallEntities.map(wallTemplate);
-			const objects: ReadonlyArray<{
-				readonly depth: number;
-				readonly template: TemplateResult;
-			}> = [
-				...backgroundWallEntities.flatMap((entity) => {
-					const position = world.positions.get(entity);
-					return position === undefined
-						? []
-						: [
-								{
-									depth: visualDepth(position),
-									template: wallTemplate(entity),
-								},
-							];
-				}),
-				...platformEntities.flatMap((entity) => {
-					const position = world.positions.get(entity);
-					const body = world.bodies.get(entity);
-					const obstacle = world.obstacles.get(entity);
-					return position === undefined ||
-						body === undefined ||
-						obstacle === undefined
-						? []
-						: [
-								{
-									depth: visualDepth(position),
-									template: boxTemplate(position, body, obstacle.height, {
+				if (position === undefined || body === undefined) continue;
+				const baseElevation = entityBaseElevation(world, entity);
+				const template =
+					obstacle.kind === ObstacleKinds.Crate
+						? crateTemplate(
+								position,
+								body,
+								obstacle.height,
+								world.grabbed === entity,
+								baseElevation,
+							)
+						: obstacle.kind === ObstacleKinds.Wall
+							? boxTemplate(
+									position,
+									body,
+									obstacle.height,
+									{
+										top: "#426772",
+										front: "#29454f",
+									},
+									"",
+									baseElevation,
+								)
+							: boxTemplate(
+									position,
+									body,
+									obstacle.height,
+									{
 										top: "#77927e",
 										front: "#4f6c61",
-									}),
-								},
-							];
-				}),
-				...crateEntities.flatMap((entity) => {
-					const position = world.positions.get(entity);
-					return position === undefined
-						? []
-						: [
-								{
-									depth: visualDepth(position),
-									template: crateTemplate(position, world.grabbed === entity),
-								},
-							];
-				}),
-				...(shouldRenderPlayerAboveWalls
-					? []
-					: [{ depth: playerDepth, template: player }]),
-			].sort((left, right) => left.depth - right.depth);
+									},
+									"",
+									baseElevation,
+								);
+				objects.push({
+					depth: renderDepthForEntity(world, entity),
+					entity,
+					template,
+				});
+			}
+			for (const [entity, decoration] of world.decorations) {
+				const position = world.positions.get(entity);
+				const body = world.bodies.get(entity);
+				if (position === undefined || body === undefined) continue;
+				objects.push({
+					depth:
+						decoration.kind === DecorationKinds.Rug
+							? Number.NEGATIVE_INFINITY
+							: renderDepthForEntity(world, entity),
+					entity,
+					template: decorationTemplate(
+						position,
+						body,
+						decoration,
+						entityBaseElevation(world, entity),
+						world.grabbed === entity,
+					),
+				});
+			}
+			if (!world.editor.open) {
+				objects.push({
+					depth: playerDepth,
+					template: playerTemplate(
+						playerPosition,
+						playerElevation,
+						surfaceAt(world, playerPosition, playerBody),
+						world.grabbed !== null || world.pushing !== null,
+					),
+				});
+			}
+			objects.sort((left, right) => left.depth - right.depth);
+
+			const floorPointerDown = (event: PointerEvent): void => {
+				if (!world.editor.open) return;
+				event.stopPropagation();
+				if (isPanGesture(event)) {
+					startPan(event, world);
+				} else if (event.button === 0) {
+					dispatch(Action.EditorSelectionChanged({ selection: "floor" }));
+				}
+			};
+			const canvasPointerDown = (event: PointerEvent): void => {
+				if (!world.editor.open) return;
+				if (isPanGesture(event)) {
+					startPan(event, world);
+				} else if (event.button === 0) {
+					dispatch(Action.EditorSelectionChanged({ selection: null }));
+				}
+			};
 
 			render(
 				html`
-		<main class="relative h-screen w-screen overflow-hidden bg-[#14212a]">
-			<svg class="block h-full w-full" viewBox=${`0 0 ${viewport.width} ${viewport.height}`} preserveAspectRatio="xMidYMid meet" role="img" aria-label="45-degree room exploration game with jumping and pushable crates">
-				<polygon points=${points(floor)} fill="#c9b385" />
-				<g stroke="#8f8065" stroke-width=${floorGridStrokeWidth} opacity=${floorGridOpacity}>${gridLines}${depthLines}</g>
-				<polygon points=${points(footprint(rugPosition, rugBody))} fill="#a95848" stroke="#e8b875" stroke-width=${rugBorderWidth} />
-				${objects.map(({ template }) => template)}
-				${foregroundWalls}
-				${shouldRenderPlayerAboveWalls ? player : svg``}
-			</svg>
-			<h1 class="pointer-events-none absolute top-7 left-7 m-0 select-none text-[27px] font-bold tracking-[0.16em] text-[#fff1d6]">SAISHUMIN</h1>
-			<div class="pointer-events-none absolute bottom-7 left-7 flex max-w-[calc(100vw-3.5rem)] flex-wrap gap-x-12 gap-y-3 rounded-[18px] bg-[#0d181f]/90 px-6 py-4 select-none">
-				<div>
-					<div class="text-[15px] font-bold text-[#fff1d6]">ARROW KEYS</div>
-					<div class="mt-1 text-[13px] text-[#aebfba]">MOVE · PUSH CRATES</div>
-				</div>
-				<div>
-					<div class="text-[15px] font-bold text-[#fff1d6]">SPACE</div>
-					<div class="mt-1 text-[13px] text-[#aebfba]">JUMP · CLIMB · FALL</div>
-				</div>
-				<div>
-					<div class="text-[15px] font-bold text-[#fff1d6]">HOLD SHIFT</div>
-					<div class="mt-1 text-[13px] text-[#aebfba]">GRAB · DRAG CRATES</div>
-				</div>
-			</div>
-		</main>
-	`,
+					<main class=${`relative h-screen w-screen overflow-hidden bg-[#14212a] ${activeInteraction?.kind === "create" ? "editor-create-drag" : ""} ${invalidPreview ? "editor-invalid-preview-root" : ""}`}>
+						<svg
+							id="world-canvas"
+							class=${`block h-full w-full ${world.editor.open ? `world-editor-canvas touch-none select-none ${invalidPreview ? "editor-invalid-preview" : ""}` : ""}`}
+							viewBox=${`0 0 ${viewport.width} ${viewport.height}`}
+							preserveAspectRatio="xMidYMid meet"
+							role="img"
+							aria-label=${world.editor.open ? "Infinite canvas world editor" : "Room exploration game"}
+							@pointerdown=${canvasPointerDown}
+						>
+							<defs>
+								<pattern id="editor-dots" width="32" height="32" patternUnits="userSpaceOnUse" patternTransform=${`translate(${camera.x % 32} ${camera.y % 32})`}>
+									<circle cx="2" cy="2" r="1.6" fill="#3b5157" />
+								</pattern>
+							</defs>
+							${world.editor.open ? svg`<rect width="100%" height="100%" fill="url(#editor-dots)" opacity="0.68" />` : svg``}
+							<g transform=${`translate(${camera.x} ${camera.y})`}>
+								<polygon points=${points(floor)} fill="#c9b385" @pointerdown=${floorPointerDown} />
+								<g pointer-events="none" stroke="#8f8065" stroke-width=${floorGridStrokeWidth} opacity=${floorGridOpacity}>${gridLines}${depthLines}</g>
+								${objects.map(({ entity, template }) =>
+									entity === undefined
+										? template
+										: svg`<g class=${world.editor.open ? "cursor-move" : ""} @pointerdown=${(event: PointerEvent) => startEntityMove(event, world, entity, dispatch)}>${template}</g>`,
+								)}
+								${world.editor.open ? selectionTemplate(world, invalidPreview) : svg``}
+							</g>
+						</svg>
+
+						<h1 class="pointer-events-none absolute top-7 left-7 m-0 select-none text-[27px] font-bold tracking-[0.16em] text-[#fff1d6]">SAISHUMIN</h1>
+						<button
+							type="button"
+							class=${`absolute top-6 z-40 rounded-xl border border-[#e8b875]/70 bg-[#0d181f]/92 px-4 py-3 text-[12px] font-bold tracking-[0.12em] text-[#fff1d6] shadow-lg transition hover:-translate-y-0.5 hover:bg-[#1b2d34] ${world.editor.open ? "right-[360px]" : "right-6"}`}
+							@click=${() => dispatch(Action.EditorToggled())}
+						>${world.editor.open ? "▶ PLAY" : "✦ WORLD EDITOR"}</button>
+
+						${
+							world.editor.open
+								? html`<div class="pointer-events-none absolute bottom-6 left-7 rounded-xl bg-[#0d181f]/88 px-4 py-2 text-[11px] font-bold tracking-[0.12em] text-[#e8b875]">CONTROLS PAUSED · INFINITE PAN · FIXED SCALE</div>${editorPanelTemplate(world, dispatch)}`
+								: html`
+									<div class="pointer-events-none absolute bottom-7 left-7 flex max-w-[calc(100vw-3.5rem)] flex-wrap gap-x-12 gap-y-3 rounded-[18px] bg-[#0d181f]/90 px-6 py-4 select-none">
+										<div><div class="text-[15px] font-bold text-[#fff1d6]">ARROW KEYS</div><div class="mt-1 text-[13px] text-[#aebfba]">MOVE · PUSH CRATES</div></div>
+										<div><div class="text-[15px] font-bold text-[#fff1d6]">SPACE</div><div class="mt-1 text-[13px] text-[#aebfba]">JUMP · CLIMB · FALL</div></div>
+						<div><div class="text-[15px] font-bold text-[#fff1d6]">HOLD SHIFT</div><div class="mt-1 text-[13px] text-[#aebfba]">GRAB · DRAG OBJECTS</div></div>
+									</div>
+								`
+						}
+						<div id="editor-create-preview-host" class="contents"></div>
+						${world.editor.invalidPlacement === null ? html`` : invalidPlacementTemplate(world, dispatch)}
+					</main>
+				`,
 				document.body,
 			);
+		};
+		refreshCreatePreview = () => {
+			const world = currentWorld;
+			const host = document.querySelector("#editor-create-preview-host");
+			if (world === undefined || !(host instanceof HTMLElement)) return;
+			const creating = activeInteraction?.kind === "create";
+			const invalid = creating && activePlacementIsInvalid(world);
+			const main = host.closest("main");
+			main?.classList.toggle("editor-create-drag", creating);
+			main?.classList.toggle("editor-invalid-preview-root", invalid);
+			document
+				.querySelector("#world-canvas")
+				?.classList.toggle("editor-invalid-preview", invalid);
+			render(creating ? createPreviewTemplate(world, invalid) : html``, host);
 		};
 		return { render: renderWorld };
 	});

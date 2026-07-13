@@ -27,7 +27,7 @@ const program = Effect.gen(function* () {
 	const updateSystem = yield* UpdateSystemService;
 	const renderSystem = yield* RenderSystemService;
 	const world = yield* state.make({
-		key: "saishumin/world-v2",
+		key: "saishumin/world-v3",
 		initial: initialWorld,
 	});
 	yield* Ref.update(world, reconcileWorld);
@@ -65,7 +65,7 @@ const program = Effect.gen(function* () {
 	};
 	window.requestAnimationFrame(frame);
 
-	renderSystem.render(yield* Ref.get(world));
+	renderSystem.render(yield* Ref.get(world), dispatch);
 	yield* Stream.fromQueue(actions).pipe(
 		Stream.runForEach((action) =>
 			Effect.gen(function* () {
@@ -75,9 +75,15 @@ const program = Effect.gen(function* () {
 				if (
 					next.positions !== current.positions ||
 					next.elevations !== current.elevations ||
+					next.bodies !== current.bodies ||
+					next.obstacles !== current.obstacles ||
+					next.decorations !== current.decorations ||
+					next.floorPlan !== current.floorPlan ||
+					next.gameCamera !== current.gameCamera ||
+					next.editor !== current.editor ||
 					next.grabbed !== current.grabbed
 				)
-					renderSystem.render(next);
+					renderSystem.render(next, dispatch);
 			}),
 		),
 	);
