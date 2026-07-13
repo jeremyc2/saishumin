@@ -1,0 +1,6 @@
+[submodule "reference_repositories/effect-smol"]
+	path = reference_repositories/effect-smol
+	url = https://github.com/Effect-TS/effect-smol.git
+[submodule "reference_repositories/mattpocock-skills"]
+	path = reference_repositories/mattpocock-skills
+	url = https://github.com/mattpocock/skills.git

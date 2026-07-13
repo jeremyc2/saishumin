@@ -1,0 +1,28 @@
+{
+	"css.lint.unknownAtRules": "ignore",
+	"editor.codeActionsOnSave": {
+		"source.fixAll.biome": "explicit",
+		"source.organizeImports.biome": "explicit"
+	},
+	"editor.defaultFormatter": "biomejs.biome",
+	"editor.formatOnSave": true,
+	"files.readonlyInclude": {
+		"reference_repositories/**": true
+	},
+	"files.watcherExclude": {
+		"reference_repositories/**": true
+	},
+	"js/ts.tsdk.promptToUseWorkspaceVersion": true,
+	"js/ts.experimental.useTsgo": true,
+	"js/ts.suggest.autoImports": true,
+	"js/ts.updateImportsOnFileMove.enabled": "always",
+	"json.schemaDownload.enable": true,
+	"search.exclude": {
+		"reference_repositories/**": true
+	},
+	"typescript.enablePromptUseWorkspaceTsdk": true,
+	"typescript.experimental.useTsgo": true,
+	"typescript.native-preview.tsdk": "node_modules/typescript",
+	"typescript.suggest.autoImports": true,
+	"typescript.updateImportsOnFileMove.enabled": "always"
+}
