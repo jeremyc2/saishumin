@@ -74,7 +74,12 @@ export const reconcileWorld = (world: World): World => {
 		return initialWorld;
 	}
 
-	const supportHeight = surfaceAt(reconciled, playerPosition, playerBody);
+	const supportHeight = surfaceAt(
+		reconciled,
+		playerPosition,
+		playerBody,
+		playerElevation.z,
+	);
 	if (!Number.isFinite(supportHeight)) {
 		const resetPositions = new Map(reconciled.positions);
 		resetPositions.set(playerEntity, {

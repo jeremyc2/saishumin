@@ -1,7 +1,7 @@
 import { type Body, DecorationKinds, type Position } from "../model/component";
 import type { EntityId } from "../model/entity-id";
-import { entityTopElevation } from "./elevation";
-import { groundElevation, type World } from "./world";
+import { entityTopElevation, footprintsOverlap } from "./elevation";
+import { groundElevation, obstacleHeightTolerance, type World } from "./world";
 
 export const isSolidEntity = (world: World, entity: EntityId): boolean =>
 	world.obstacles.has(entity) ||
@@ -13,9 +13,7 @@ export const overlaps = (
 	body: Body,
 	otherPosition: Position,
 	otherBody: Body,
-): boolean =>
-	Math.abs(position.x - otherPosition.x) < (body.width + otherBody.width) / 2 &&
-	Math.abs(position.y - otherPosition.y) < (body.depth + otherBody.depth) / 2;
+): boolean => footprintsOverlap(position, body, otherPosition, otherBody);
 
 export const isPositionInsideRoom = (
 	world: World,
@@ -36,6 +34,7 @@ export const surfaceAt = (
 	world: World,
 	position: Position,
 	body: Body,
+	maximumElevation = Number.POSITIVE_INFINITY,
 ): number => {
 	if (!isPositionInsideRoom(world, position)) return Number.NEGATIVE_INFINITY;
 
@@ -46,6 +45,8 @@ export const surfaceAt = (
 		if (
 			obstaclePosition !== undefined &&
 			obstacleBody !== undefined &&
+			entityTopElevation(world, entity) <=
+				maximumElevation + obstacleHeightTolerance &&
 			overlaps(position, body, obstaclePosition, obstacleBody)
 		) {
 			surface = Math.max(surface, entityTopElevation(world, entity));

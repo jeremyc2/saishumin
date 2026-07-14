@@ -1,10 +1,11 @@
 import {
 	canSitOnPlatform,
-	containsFootprint,
+	canSitOnSupport,
 	entityTopElevation,
+	footprintsOverlap,
 } from "../ecs/elevation";
 import { groundElevation, type World } from "../ecs/world";
-import { type Body, ObstacleKinds, type Position } from "../model/component";
+import type { Body, Position } from "../model/component";
 import type { EditorItemKind } from "../model/editor";
 import type { EntityId } from "../model/entity-id";
 import { unproject } from "./projection";
@@ -36,7 +37,7 @@ export const editorPlacementPositionAtPointer = (
 
 	let resolvedElevation = groundElevation;
 	for (const [entity, obstacle] of world.obstacles) {
-		if (entity === excludedEntity || obstacle.kind !== ObstacleKinds.Platform)
+		if (entity === excludedEntity || !canSitOnSupport(kind, obstacle.kind))
 			continue;
 		const platformPosition = world.positions.get(entity);
 		const platformBody = world.bodies.get(entity);
@@ -49,7 +50,7 @@ export const editorPlacementPositionAtPointer = (
 		);
 		if (
 			elevation >= resolvedElevation &&
-			containsFootprint(platformPosition, platformBody, candidate, body)
+			footprintsOverlap(platformPosition, platformBody, candidate, body)
 		) {
 			resolvedElevation = elevation;
 			resolvedPosition = candidate;

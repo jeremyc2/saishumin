@@ -74,7 +74,25 @@ export const isEntityPlacementValid = (
 	)
 		return false;
 	if (!isBlockingEntity(world, entity)) return true;
-	const base = placementElevationForEntity(world, entity, position, body);
+	const resized =
+		originalPlacement !== undefined &&
+		(body.width !== originalPlacement.body.width ||
+			body.depth !== originalPlacement.body.depth);
+	const maximumElevation = resized
+		? placementElevationForEntity(
+				world,
+				entity,
+				originalPlacement.position,
+				originalPlacement.body,
+			)
+		: Number.POSITIVE_INFINITY;
+	const base = placementElevationForEntity(
+		world,
+		entity,
+		position,
+		body,
+		maximumElevation,
+	);
 	const height = entityHeight(world, entity);
 
 	for (const [otherEntity, otherPosition] of world.positions) {

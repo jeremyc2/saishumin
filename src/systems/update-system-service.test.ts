@@ -16,6 +16,7 @@ import {
 	playerEntity,
 	stationaryVelocity,
 	type World,
+	wallEntities,
 } from "../ecs/world";
 import { Action } from "../model/action";
 import {
@@ -413,8 +414,20 @@ describe("UpdateSystemService", () => {
 					position: Position.make({ x: 500, y: 400 }),
 				}),
 			);
-			expect(occupied.editor.invalidPlacement).toEqual({ kind: "new" });
-			expect(occupied.positions.size).toBe(added.positions.size);
+			if (kind === EditorItemKinds.Crate) {
+				const stackedEntity = occupied.editor.selected;
+				expect(stackedEntity).not.toBeNull();
+				expect(stackedEntity).not.toBe("floor");
+				if (stackedEntity === null || stackedEntity === "floor") continue;
+				expect(occupied.editor.invalidPlacement).toBeNull();
+				expect(occupied.positions.size).toBe(added.positions.size + 1);
+				expect(occupied.elevations.get(stackedEntity)?.z).toBe(
+					platformHeight + crateHeight,
+				);
+			} else {
+				expect(occupied.editor.invalidPlacement).toEqual({ kind: "new" });
+				expect(occupied.positions.size).toBe(added.positions.size);
+			}
 		}
 	});
 
@@ -578,7 +591,7 @@ describe("UpdateSystemService", () => {
 
 	test("rejects an overlapping drag and restores its starting position", () => {
 		const entity = crateEntities[0];
-		const otherEntity = crateEntities[1];
+		const otherEntity = wallEntities[3];
 		const originalPosition = initialWorld.positions.get(entity);
 		const otherPosition = initialWorld.positions.get(otherEntity);
 		expect(originalPosition).toBeDefined();

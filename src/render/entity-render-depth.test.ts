@@ -1,5 +1,11 @@
 import { describe, expect, test } from "bun:test";
-import { initialWorld } from "../ecs/world";
+import {
+	crateBody,
+	crateHeight,
+	initialWorld,
+	playerBody,
+	playerEntity,
+} from "../ecs/world";
 import {
 	Body,
 	Decoration,
@@ -10,7 +16,10 @@ import {
 	Position,
 } from "../model/component";
 import { EntityId } from "../model/entity-id";
-import { renderDepthForEntity } from "./entity-render-depth";
+import {
+	renderDepthForEntity,
+	renderDepthForPlayer,
+} from "./entity-render-depth";
 
 const platform = EntityId(920);
 const backPlant = EntityId(921);
@@ -62,6 +71,120 @@ describe("entity render depth", () => {
 	test("retains back-to-front ordering across the platform surface", () => {
 		expect(renderDepthForEntity(world, frontPlant)).toBeGreaterThan(
 			renderDepthForEntity(world, backPlant),
+		);
+	});
+
+	test("draws the player over the entire top of a crate on a platform", () => {
+		const crate = EntityId(923);
+		const cratePosition = Position.make({ x: 470, y: 250 });
+		const stackedWorld = {
+			...world,
+			positions: new Map(world.positions).set(crate, cratePosition),
+			bodies: new Map(world.bodies)
+				.set(crate, crateBody)
+				.set(playerEntity, playerBody),
+			obstacles: new Map(world.obstacles).set(
+				crate,
+				Obstacle.make({ kind: ObstacleKinds.Crate, height: crateHeight }),
+			),
+			elevations: new Map(world.elevations).set(
+				crate,
+				Elevation.make({ z: platformHeight, velocity: 0 }),
+			),
+		};
+
+		for (const offset of [
+			{ x: -8, y: -18 },
+			{ x: 8, y: -18 },
+			{ x: 0, y: 0 },
+			{ x: -8, y: 18 },
+			{ x: 8, y: 18 },
+		]) {
+			const positionedWorld = {
+				...stackedWorld,
+				positions: new Map(stackedWorld.positions).set(
+					playerEntity,
+					Position.make({
+						x: cratePosition.x + offset.x,
+						y: cratePosition.y + offset.y,
+					}),
+				),
+				elevations: new Map(stackedWorld.elevations).set(
+					playerEntity,
+					Elevation.make({
+						z: platformHeight + crateHeight,
+						velocity: 0,
+					}),
+				),
+			};
+
+			expect(renderDepthForPlayer(positionedWorld)).toBeGreaterThan(
+				renderDepthForEntity(positionedWorld, crate),
+			);
+		}
+	});
+
+	test("draws a player beside a supported crate without hiding them behind it", () => {
+		const crate = EntityId(926);
+		const cratePosition = Position.make({ x: 470, y: 250 });
+		const playerPosition = Position.make({
+			x: cratePosition.x + (crateBody.width + playerBody.width) / 2,
+			y: cratePosition.y,
+		});
+		const positionedWorld = {
+			...world,
+			positions: new Map(world.positions)
+				.set(crate, cratePosition)
+				.set(playerEntity, playerPosition),
+			bodies: new Map(world.bodies)
+				.set(crate, crateBody)
+				.set(playerEntity, playerBody),
+			obstacles: new Map(world.obstacles).set(
+				crate,
+				Obstacle.make({ kind: ObstacleKinds.Crate, height: crateHeight }),
+			),
+			elevations: new Map(world.elevations)
+				.set(crate, Elevation.make({ z: platformHeight, velocity: 0 }))
+				.set(playerEntity, Elevation.make({ z: platformHeight, velocity: 0 })),
+		};
+
+		expect(renderDepthForPlayer(positionedWorld)).toBeGreaterThan(
+			renderDepthForEntity(positionedWorld, crate),
+		);
+	});
+
+	test("draws an offset upper crate after its lower crate", () => {
+		const lowerCrate = EntityId(924);
+		const upperCrate = EntityId(925);
+		const lowerPosition = Position.make({ x: 470, y: 250 });
+		const upperPosition = Position.make({ x: 525, y: 250 });
+		const stackedWorld = {
+			...world,
+			positions: new Map(world.positions)
+				.set(lowerCrate, lowerPosition)
+				.set(upperCrate, upperPosition),
+			bodies: new Map(world.bodies)
+				.set(lowerCrate, crateBody)
+				.set(upperCrate, crateBody),
+			obstacles: new Map(world.obstacles)
+				.set(
+					lowerCrate,
+					Obstacle.make({ kind: ObstacleKinds.Crate, height: crateHeight }),
+				)
+				.set(
+					upperCrate,
+					Obstacle.make({ kind: ObstacleKinds.Crate, height: crateHeight }),
+				),
+			elevations: new Map(world.elevations)
+				.set(lowerCrate, Elevation.make({ z: platformHeight, velocity: 0 }))
+				.set(
+					upperCrate,
+					Elevation.make({ z: platformHeight + crateHeight, velocity: 0 }),
+				),
+		};
+
+		expect(renderDepthForEntity(stackedWorld, upperCrate)).toBeGreaterThan(
+			renderDepthForEntity(stackedWorld, lowerCrate),
 		);
 	});
 });

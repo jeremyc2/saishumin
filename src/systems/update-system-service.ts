@@ -286,6 +286,8 @@ export class UpdateSystemService extends Context.Service<
 						decoration?.kind === DecorationKinds.Lamp;
 					if (
 						!isGrabbable ||
+						(world.elevations.get(entity)?.velocity ?? stationaryVelocity) !==
+							stationaryVelocity ||
 						Math.abs(entityBaseElevation(world, entity) - elevation.z) >
 							obstacleHeightTolerance
 					)
@@ -322,7 +324,12 @@ export class UpdateSystemService extends Context.Service<
 									position === undefined
 								)
 									return world;
-								const surface = surfaceAt(world, position, playerBody);
+								const surface = surfaceAt(
+									world,
+									position,
+									playerBody,
+									elevation.z,
+								);
 								if (
 									elevation.velocity !== stationaryVelocity ||
 									elevation.z !== surface
@@ -492,12 +499,21 @@ export class UpdateSystemService extends Context.Service<
 							const bodies = new Map(world.bodies);
 							const elevations = new Map(world.elevations);
 							bodies.set(entity, nextBody);
+							const interactionPosition = originalPosition ?? currentPosition;
+							const interactionBody = originalBody ?? currentBody;
+							const originalElevation = placementElevationForEntity(
+								world,
+								entity,
+								interactionPosition,
+								interactionBody,
+							);
 							elevations.set(entity, {
 								z: placementElevationForEntity(
 									world,
 									entity,
 									nextPosition,
 									nextBody,
+									originalElevation,
 								),
 								velocity: stationaryVelocity,
 							});
@@ -540,7 +556,7 @@ export class UpdateSystemService extends Context.Service<
 								const obstacles = new Map(world.obstacles);
 								obstacles.set(entity, { ...obstacle, height: nextHeight });
 								let updated: World = { ...world, obstacles };
-								if (obstacle.kind !== ObstacleKinds.Platform) return updated;
+								if (obstacle.kind === ObstacleKinds.Wall) return updated;
 
 								const oldTop =
 									entityBaseElevation(world, entity) + obstacle.height;

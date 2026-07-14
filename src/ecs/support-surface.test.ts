@@ -9,6 +9,7 @@ import {
 	Position,
 } from "../model/component";
 import { EntityId } from "../model/entity-id";
+import { shadowElevationForEntity, shadowSectionsForEntity } from "./elevation";
 import {
 	entitiesSupportedBy,
 	isSupportSurfaceTransformValid,
@@ -56,6 +57,98 @@ describe("support surfaces", () => {
 		).toEqual([plant]);
 	});
 
+	test("keeps an offset crate supported while any footprint still overlaps", () => {
+		const lowerCrate = EntityId(942);
+		const upperCrate = EntityId(943);
+		const lowerPosition = Position.make({ x: 500, y: 400 });
+		const upperPosition = Position.make({ x: 569, y: 400 });
+		const crateBody = Body.make({ width: 70, depth: 70 });
+		const crateHeight = 62;
+		const stackedWorld = {
+			...world,
+			positions: new Map([
+				[lowerCrate, lowerPosition],
+				[upperCrate, upperPosition],
+			]),
+			bodies: new Map([
+				[lowerCrate, crateBody],
+				[upperCrate, crateBody],
+			]),
+			obstacles: new Map([
+				[
+					lowerCrate,
+					Obstacle.make({ kind: ObstacleKinds.Crate, height: crateHeight }),
+				],
+				[
+					upperCrate,
+					Obstacle.make({ kind: ObstacleKinds.Crate, height: crateHeight }),
+				],
+			]),
+			decorations: new Map(),
+			elevations: new Map([
+				[upperCrate, Elevation.make({ z: crateHeight, velocity: 0 })],
+			]),
+		};
+
+		expect(
+			entitiesSupportedBy(stackedWorld, lowerCrate, lowerPosition, crateBody),
+		).toEqual([upperCrate]);
+	});
+
+	test("projects an overhanging crate shadow onto the surface below", () => {
+		const crate = EntityId(944);
+		const crateBody = Body.make({ width: 70, depth: 70 });
+		const overhangingPosition = Position.make({ x: 654, y: 400 });
+		const overhangingWorld = {
+			...world,
+			positions: new Map([
+				[platform, platformPosition],
+				[crate, overhangingPosition],
+			]),
+			bodies: new Map([
+				[platform, platformBody],
+				[crate, crateBody],
+			]),
+			obstacles: new Map([
+				[
+					platform,
+					Obstacle.make({
+						kind: ObstacleKinds.Platform,
+						height: platformHeight,
+					}),
+				],
+				[crate, Obstacle.make({ kind: ObstacleKinds.Crate, height: 62 })],
+			]),
+			decorations: new Map(),
+			elevations: new Map([
+				[crate, Elevation.make({ z: platformHeight, velocity: 0 })],
+			]),
+		};
+
+		expect(
+			shadowElevationForEntity(
+				overhangingWorld,
+				crate,
+				overhangingPosition,
+				crateBody,
+			),
+		).toBe(0);
+		const sections = shadowSectionsForEntity(
+			overhangingWorld,
+			crate,
+			overhangingPosition,
+			crateBody,
+		);
+		expect(
+			sections.some((section) => section.elevation === platformHeight),
+		).toBe(true);
+		expect(sections.some((section) => section.elevation === 0)).toBe(true);
+		expect(
+			sections.find((section) => section.elevation === platformHeight)?.body
+				.width,
+		).toBe(1);
+	});
+
 	test("blocks moving an occupied platform", () => {
 		expect(
 			isSupportSurfaceTransformValid(
@@ -85,7 +178,7 @@ describe("support surfaces", () => {
 				world,
 				platform,
 				platformPosition,
-				Body.make({ width: 100, depth: 60 }),
+				Body.make({ width: 100, depth: 16 }),
 				platformPosition,
 				platformBody,
 			),

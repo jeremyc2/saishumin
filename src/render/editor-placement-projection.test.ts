@@ -1,6 +1,12 @@
 import { describe, expect, test } from "bun:test";
 import { initialWorld } from "../ecs/world";
-import { Body, Obstacle, ObstacleKinds, Position } from "../model/component";
+import {
+	Body,
+	Elevation,
+	Obstacle,
+	ObstacleKinds,
+	Position,
+} from "../model/component";
 import { EditorItemKinds } from "../model/editor";
 import { EntityId } from "../model/entity-id";
 import { editorPlacementPositionAtPointer } from "./editor-placement-projection";
@@ -55,6 +61,40 @@ describe("editor placement projection", () => {
 				itemBody,
 				pointer,
 				grabOffset,
+			),
+		).toEqual(desiredPosition);
+	});
+
+	test("inverse-projects an offset crate onto another crate", () => {
+		const lowerCrate = EntityId(901);
+		const lowerPosition = Position.make({ x: 520, y: 300 });
+		const lowerBody = Body.make({ width: 70, depth: 70 });
+		const lowerHeight = 62;
+		const stackedWorld = {
+			...world,
+			positions: new Map(world.positions).set(lowerCrate, lowerPosition),
+			bodies: new Map(world.bodies).set(lowerCrate, lowerBody),
+			obstacles: new Map(world.obstacles).set(
+				lowerCrate,
+				Obstacle.make({ kind: ObstacleKinds.Crate, height: lowerHeight }),
+			),
+			elevations: new Map(world.elevations).set(
+				lowerCrate,
+				Elevation.make({ z: platformHeight, velocity: 0 }),
+			),
+		};
+		const desiredPosition = Position.make({ x: 575, y: 300 });
+		const pointer = project(
+			desiredPosition,
+			platformHeight + lowerHeight,
+		);
+
+		expect(
+			editorPlacementPositionAtPointer(
+				stackedWorld,
+				EditorItemKinds.Crate,
+				itemBody,
+				pointer,
 			),
 		).toEqual(desiredPosition);
 	});

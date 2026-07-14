@@ -359,27 +359,21 @@ describe("MovementSystemService", () => {
 		});
 	});
 
-	test("keeps a raised crate on its platform when there is no gap behind it", () => {
+	test("holds a crate over a ledge until its entire footprint leaves", () => {
 		const crateEntity = EntityId(942);
 		const platformEntity = EntityId(943);
-		const wallEntity = EntityId(944);
 		const platformHeight = 40;
-		const platformPosition = Position.make({ x: 400, y: 120 });
-		const platformBody = Body.make({ width: 240, depth: 140 });
-		const platformBackEdge = platformPosition.y - platformBody.depth / 2;
-		const crateContact = platformBackEdge + crateBody.depth / 2;
+		const platformPosition = Position.make({ x: 400, y: 300 });
 		let world = makeWorld({
 			positions: new Map([
-				[playerEntity, Position.make({ x: 400, y: 160 })],
-				[crateEntity, Position.make({ x: 400, y: crateContact + 4 })],
+				[playerEntity, Position.make({ x: 418, y: 300 })],
+				[crateEntity, Position.make({ x: 480, y: 300 })],
 				[platformEntity, platformPosition],
-				[wallEntity, Position.make({ x: 400, y: 18 })],
 			]),
 			bodies: new Map([
 				[playerEntity, playerBody],
 				[crateEntity, crateBody],
-				[platformEntity, platformBody],
-				[wallEntity, Body.make({ width: 800, depth: 36 })],
+				[platformEntity, Body.make({ width: 240, depth: 180 })],
 			]),
 			obstacles: new Map([
 				[
@@ -393,15 +387,14 @@ describe("MovementSystemService", () => {
 						kind: ObstacleKinds.Platform,
 					}),
 				],
-				[wallEntity, Obstacle.make({ height: 80, kind: ObstacleKinds.Wall })],
 			]),
 			decorations: new Map(),
 			elevation: Elevation.make({
 				z: platformHeight,
 				velocity: stationaryVelocity,
 			}),
-			pressed: new Set([Controls.Up]),
-			grabbed: crateEntity,
+			pressed: new Set([Controls.Right]),
+			grabbed: null,
 		});
 		world = {
 			...world,
@@ -411,10 +404,189 @@ describe("MovementSystemService", () => {
 			),
 		};
 
-		world = movementSystem.update(world, 0.05);
+		for (let frame = 0; frame < 8; frame += 1) {
+			world = movementSystem.update(world, 0.05);
+		}
+		expect(world.positions.get(crateEntity)?.x).toBe(550);
+		expect(world.elevations.get(crateEntity)).toEqual({
+			z: platformHeight,
+			velocity: stationaryVelocity,
+		});
 
-		expect(world.positions.get(crateEntity)?.y).toBe(crateContact);
-		expect(world.elevations.get(crateEntity)?.z).toBe(platformHeight);
+		world = movementSystem.update(world, 0.05);
+		expect(world.positions.get(crateEntity)?.x).toBe(558.75);
+		expect(world.elevations.get(crateEntity)?.z).toBeLessThan(platformHeight);
+		expect(world.elevations.get(crateEntity)?.velocity).toBeLessThan(0);
+
+		for (let frame = 0; frame < 6; frame += 1) {
+			world = movementSystem.update(world, 0.05);
+		}
+		expect(world.positions.get(crateEntity)?.x).toBeGreaterThan(558.75);
+		expect(world.positions.get(playerEntity)?.x).toBeGreaterThan(520);
+		expect(world.elevations.get(playerEntity)?.z).toBeLessThan(platformHeight);
+
+		for (let frame = 0; frame < 5; frame += 1) {
+			world = movementSystem.update(world, 0.05);
+		}
+		expect(world.elevations.get(crateEntity)).toEqual({
+			z: groundElevation,
+			velocity: stationaryVelocity,
+		});
+	});
+
+	test("moves an airborne player out from beneath an overhanging crate", () => {
+		const crateEntity = EntityId(947);
+		const platformEntity = EntityId(948);
+		const platformHeight = 100;
+		const cratePosition = Position.make({ x: 480, y: 300 });
+		let world = makeWorld({
+			positions: new Map([
+				[playerEntity, Position.make({ x: 485, y: 300 })],
+				[crateEntity, cratePosition],
+				[platformEntity, Position.make({ x: 400, y: 300 })],
+			]),
+			bodies: new Map([
+				[playerEntity, playerBody],
+				[crateEntity, crateBody],
+				[platformEntity, Body.make({ width: 100, depth: 180 })],
+			]),
+			obstacles: new Map([
+				[
+					crateEntity,
+					Obstacle.make({ height: crateHeight, kind: ObstacleKinds.Crate }),
+				],
+				[
+					platformEntity,
+					Obstacle.make({
+						height: platformHeight,
+						kind: ObstacleKinds.Platform,
+					}),
+				],
+			]),
+			decorations: new Map(),
+			elevation: Elevation.make({ z: 25, velocity: 200 }),
+			pressed: new Set([Controls.Right]),
+			grabbed: null,
+		});
+		world = {
+			...world,
+			elevations: new Map(world.elevations).set(
+				crateEntity,
+				Elevation.make({
+					z: platformHeight,
+					velocity: stationaryVelocity,
+				}),
+			),
+		};
+
+		const moved = movementSystem.update(world, 0.05);
+
+		expect(
+			overlaps(
+				moved.positions.get(playerEntity) ?? cratePosition,
+				playerBody,
+				cratePosition,
+				crateBody,
+			),
+		).toBe(false);
+		expect(moved.elevations.get(playerEntity)?.z).not.toBe(
+			platformHeight + crateHeight,
+		);
+	});
+
+	test("blocks movement beneath an overhanging crate even when the gap is tall enough", () => {
+		const crateEntity = EntityId(949);
+		const cratePosition = Position.make({ x: 480, y: 300 });
+		const start = Position.make({
+			x: cratePosition.x + (crateBody.width + playerBody.width) / 2,
+			y: cratePosition.y,
+		});
+		let world = makeWorld({
+			positions: new Map([
+				[playerEntity, start],
+				[crateEntity, cratePosition],
+			]),
+			bodies: new Map([
+				[playerEntity, playerBody],
+				[crateEntity, crateBody],
+			]),
+			obstacles: new Map([
+				[
+					crateEntity,
+					Obstacle.make({ height: crateHeight, kind: ObstacleKinds.Crate }),
+				],
+			]),
+			decorations: new Map(),
+			elevation: Elevation.make({
+				z: groundElevation,
+				velocity: stationaryVelocity,
+			}),
+			pressed: new Set([Controls.Left]),
+			grabbed: null,
+		});
+		world = {
+			...world,
+			elevations: new Map(world.elevations).set(
+				crateEntity,
+				Elevation.make({ z: 100, velocity: stationaryVelocity }),
+			),
+		};
+
+		const moved = movementSystem.update(world, 0.05);
+
+		expect(moved.positions.get(playerEntity)).toEqual(start);
+	});
+
+	test("pushes an offset upper crate while the player stands on its lower crate", () => {
+		const lowerCrate = EntityId(945);
+		const upperCrate = EntityId(946);
+		const lowerBody = Body.make({ width: 180, depth: 100 });
+		let world = makeWorld({
+			positions: new Map([
+				[playerEntity, Position.make({ x: 388, y: 300 })],
+				[lowerCrate, Position.make({ x: 400, y: 300 })],
+				[upperCrate, Position.make({ x: 450, y: 300 })],
+			]),
+			bodies: new Map([
+				[playerEntity, playerBody],
+				[lowerCrate, lowerBody],
+				[upperCrate, crateBody],
+			]),
+			obstacles: new Map([
+				[
+					lowerCrate,
+					Obstacle.make({ height: crateHeight, kind: ObstacleKinds.Crate }),
+				],
+				[
+					upperCrate,
+					Obstacle.make({ height: crateHeight, kind: ObstacleKinds.Crate }),
+				],
+			]),
+			decorations: new Map(),
+			elevation: Elevation.make({
+				z: crateHeight,
+				velocity: stationaryVelocity,
+			}),
+			pressed: new Set([Controls.Right]),
+			grabbed: null,
+		});
+		world = {
+			...world,
+			elevations: new Map(world.elevations).set(
+				upperCrate,
+				Elevation.make({ z: crateHeight, velocity: stationaryVelocity }),
+			),
+		};
+
+		for (let frame = 0; frame < 8; frame += 1) {
+			world = movementSystem.update(world, 0.05);
+		}
+		expect(world.positions.get(upperCrate)?.x).toBe(520);
+		expect(world.elevations.get(upperCrate)?.z).toBe(crateHeight);
+
+		world = movementSystem.update(world, 0.05);
+		expect(world.positions.get(upperCrate)?.x).toBe(528.75);
+		expect(world.elevations.get(upperCrate)?.z).toBeLessThan(crateHeight);
 	});
 
 	test("moves grabbed plants and lamps", () => {

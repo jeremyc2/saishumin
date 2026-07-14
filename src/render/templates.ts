@@ -1,4 +1,5 @@
 import { svg, type TemplateResult } from "lit-html";
+import type { ShadowSection } from "../ecs/elevation";
 import {
 	type Body,
 	type Decoration,
@@ -93,6 +94,9 @@ export const crateTemplate = (
 	height: number,
 	grabbed: boolean,
 	baseElevation = 0,
+	shadowSections: ReadonlyArray<ShadowSection> = [
+		{ position, body, elevation: baseElevation },
+	],
 ): TemplateResult => {
 	const top = footprint(position, body, baseElevation + height);
 	const topInset = footprint(
@@ -111,11 +115,6 @@ export const crateTemplate = (
 		{ x: position.x, y: position.y + body.depth / 2 },
 		baseElevation,
 	);
-	const shadow = footprint(
-		{ x: position.x, y: position.y + crateVisual.shadowDepthOffset },
-		body,
-		baseElevation,
-	);
 	const left = frontTop.x - body.width / 2;
 	const right = frontTop.x + body.width / 2;
 	const panelTop = frontTop.y + crateVisual.panelTopInset;
@@ -131,7 +130,19 @@ export const crateTemplate = (
 		boxOutlineWidth / 2,
 	);
 	return svg`
-		<polygon points=${points(shadow)} fill="#14212a" opacity=${crateVisual.shadowOpacity} />
+		${shadowSections.map(
+			(section) =>
+				svg`<polygon points=${points(
+					footprint(
+						{
+							x: section.position.x,
+							y: section.position.y + crateVisual.shadowDepthOffset,
+						},
+						section.body,
+						section.elevation,
+					),
+				)} fill="#14212a" opacity=${crateVisual.shadowOpacity} />`,
+		)}
 		<polygon points=${points([
 			{ x: left, y: frontBottom.y },
 			{ x: right, y: frontBottom.y },

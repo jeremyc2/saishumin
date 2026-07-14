@@ -39,6 +39,7 @@ export const groundElevation = 0;
 export const stationaryVelocity = 0;
 export const playerSpawnPosition = Position.make({ x: 210, y: 360 });
 export const playerBody = Body.make({ width: 54, depth: 34 });
+export const playerCollisionHeight = 68;
 export const crateBody = Body.make({ width: 70, depth: 70 });
 export const playerSpeed = 245;
 export const jumpSpeed = 510;

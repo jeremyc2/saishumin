@@ -2,10 +2,10 @@ import type { Body, Position } from "../model/component";
 import type { EntityId } from "../model/entity-id";
 import { editorItemKindForEntity } from "./editor-sizing";
 import {
-	canSitOnPlatform,
-	containsFootprint,
+	canSitOnSupport,
 	entityBaseElevation,
 	entityTopElevation,
+	footprintsOverlap,
 } from "./elevation";
 import { obstacleHeightTolerance, type World } from "./world";
 
@@ -15,8 +15,12 @@ export const entitiesSupportedBy = (
 	surfacePosition: Position,
 	surfaceBody: Body,
 ): ReadonlyArray<EntityId> => {
-	const surfaceKind = editorItemKindForEntity(world, surfaceEntity);
-	if (surfaceKind !== "platform") return [];
+	const surfaceObstacle = world.obstacles.get(surfaceEntity);
+	if (
+		surfaceObstacle === undefined ||
+		(surfaceObstacle.kind !== "platform" && surfaceObstacle.kind !== "crate")
+	)
+		return [];
 
 	const surfaceTop = entityTopElevation(world, surfaceEntity);
 	const supported: Array<EntityId> = [];
@@ -26,11 +30,11 @@ export const entitiesSupportedBy = (
 		const body = world.bodies.get(entity);
 		if (
 			kind !== undefined &&
-			canSitOnPlatform(kind) &&
+			canSitOnSupport(kind, surfaceObstacle.kind) &&
 			body !== undefined &&
 			Math.abs(entityBaseElevation(world, entity) - surfaceTop) <=
 				obstacleHeightTolerance &&
-			containsFootprint(surfacePosition, surfaceBody, position, body)
+			footprintsOverlap(surfacePosition, surfaceBody, position, body)
 		)
 			supported.push(entity);
 	}
@@ -70,7 +74,7 @@ export const isSupportSurfaceTransformValid = (
 		return (
 			supportedPosition !== undefined &&
 			supportedBody !== undefined &&
-			containsFootprint(position, body, supportedPosition, supportedBody)
+			footprintsOverlap(position, body, supportedPosition, supportedBody)
 		);
 	});
 };

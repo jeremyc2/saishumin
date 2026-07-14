@@ -1,6 +1,6 @@
 import { Context, Layer } from "effect";
 import { html, render, svg, type TemplateResult } from "lit-html";
-import { overlaps, surfaceAt } from "../ecs/collision";
+import { surfaceAt } from "../ecs/collision";
 import {
 	isEntityPlacementValid,
 	isFloorPlanPlacementValid,
@@ -14,8 +14,8 @@ import {
 } from "../ecs/editor-sizing";
 import {
 	entityBaseElevation,
-	entityTopElevation,
 	placementElevationForKind,
+	shadowSectionsForEntity,
 } from "../ecs/elevation";
 import { isSupportSurfaceOccupied } from "../ecs/support-surface";
 import {
@@ -23,7 +23,6 @@ import {
 	minimumEntityExtent,
 	minimumFloorDepth,
 	minimumFloorWidth,
-	obstacleHeightTolerance,
 	playerBody,
 	playerEntity,
 	type World,
@@ -46,7 +45,7 @@ import type { EntityId } from "../model/entity-id";
 import { editorPlacementPositionAtPointer } from "../render/editor-placement-projection";
 import {
 	renderDepthForEntity,
-	supportedObjectDepthOffset,
+	renderDepthForPlayer,
 } from "../render/entity-render-depth";
 import {
 	footprint,
@@ -54,7 +53,6 @@ import {
 	project,
 	unproject,
 	viewport,
-	visualDepth,
 } from "../render/projection";
 import { type ResizeDirection, resizeFromHandle } from "../render/resize";
 import {
@@ -1286,23 +1284,7 @@ export class RenderSystemService extends Context.Service<
 					svg`<line x1=${project({ x: 0, y }).x} y1=${project({ x: 0, y }).y} x2=${project({ x: world.floorPlan.width, y }).x} y2=${project({ x: world.floorPlan.width, y }).y} />`,
 			);
 
-			let playerDepth = visualDepth(playerPosition);
-			for (const [entity] of world.obstacles) {
-				const obstaclePosition = world.positions.get(entity);
-				const obstacleBody = world.bodies.get(entity);
-				if (
-					obstaclePosition !== undefined &&
-					obstacleBody !== undefined &&
-					playerElevation.z >=
-						entityTopElevation(world, entity) - obstacleHeightTolerance &&
-					overlaps(playerPosition, playerBody, obstaclePosition, obstacleBody)
-				) {
-					playerDepth = Math.max(
-						playerDepth,
-						visualDepth(obstaclePosition) + supportedObjectDepthOffset,
-					);
-				}
-			}
+			const playerDepth = renderDepthForPlayer(world);
 
 			const objects: Array<{
 				readonly depth: number;
@@ -1322,6 +1304,7 @@ export class RenderSystemService extends Context.Service<
 								obstacle.height,
 								world.grabbed === entity,
 								baseElevation,
+								shadowSectionsForEntity(world, entity, position, body),
 							)
 						: obstacle.kind === ObstacleKinds.Wall
 							? boxTemplate(
@@ -1377,7 +1360,7 @@ export class RenderSystemService extends Context.Service<
 					template: playerTemplate(
 						playerPosition,
 						playerElevation,
-						surfaceAt(world, playerPosition, playerBody),
+						surfaceAt(world, playerPosition, playerBody, playerElevation.z),
 						world.grabbed !== null || world.pushing !== null,
 					),
 				});
