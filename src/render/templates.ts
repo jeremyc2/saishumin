@@ -51,6 +51,12 @@ const playerFaceStrokeWidth = 3.8;
 const playerBodyPath = "M -20 35 Q -27 8 -17 -10 Q 0 -30 17 -10 Q 27 8 20 35 Z";
 const playerBodyClipId = "player-body-clip";
 
+export const crateShadowDepthOffset = (
+	baseElevation: number,
+	shadowElevation: number,
+): number =>
+	shadowElevation < baseElevation ? crateVisual.shadowDepthOffset : 0;
+
 const playerFaceTemplate = (handlingObject: boolean): TemplateResult => {
 	if (handlingObject)
 		return svg`
@@ -136,7 +142,9 @@ export const crateTemplate = (
 					footprint(
 						{
 							x: section.position.x,
-							y: section.position.y + crateVisual.shadowDepthOffset,
+							y:
+								section.position.y +
+								crateShadowDepthOffset(baseElevation, section.elevation),
 						},
 						section.body,
 						section.elevation,

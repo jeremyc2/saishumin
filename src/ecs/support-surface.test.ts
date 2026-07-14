@@ -141,12 +141,50 @@ describe("support surfaces", () => {
 		);
 		expect(
 			sections.some((section) => section.elevation === platformHeight),
-		).toBe(true);
+		).toBe(false);
 		expect(sections.some((section) => section.elevation === 0)).toBe(true);
-		expect(
-			sections.find((section) => section.elevation === platformHeight)?.body
-				.width,
-		).toBe(1);
+		expect(sections).toHaveLength(1);
+		expect(sections[0]?.body.width).toBe(69);
+	});
+
+	test("does not project a rear overhang onto the supporting crate's front", () => {
+		const lowerCrate = EntityId(945);
+		const upperCrate = EntityId(946);
+		const crateBody = Body.make({ width: 70, depth: 70 });
+		const lowerPosition = Position.make({ x: 500, y: 400 });
+		const upperPosition = Position.make({ x: 480, y: 380 });
+		const stackedWorld = {
+			...world,
+			positions: new Map([
+				[lowerCrate, lowerPosition],
+				[upperCrate, upperPosition],
+			]),
+			bodies: new Map([
+				[lowerCrate, crateBody],
+				[upperCrate, crateBody],
+			]),
+			obstacles: new Map([
+				[lowerCrate, Obstacle.make({ kind: ObstacleKinds.Crate, height: 62 })],
+				[upperCrate, Obstacle.make({ kind: ObstacleKinds.Crate, height: 62 })],
+			]),
+			decorations: new Map(),
+			elevations: new Map([
+				[upperCrate, Elevation.make({ z: 62, velocity: 0 })],
+			]),
+		};
+
+		const sections = shadowSectionsForEntity(
+			stackedWorld,
+			upperCrate,
+			upperPosition,
+			crateBody,
+		);
+
+		expect(sections).toHaveLength(1);
+		expect(sections[0]?.body).toEqual({ width: 20, depth: 70 });
+		expect(sections[0]?.position.x).toBeLessThan(
+			lowerPosition.x - crateBody.width / 2,
+		);
 	});
 
 	test("blocks moving an occupied platform", () => {

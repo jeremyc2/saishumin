@@ -229,23 +229,11 @@ export const shadowSectionsForEntity = (
 	if (largestIntersection === undefined)
 		return [{ position, body, elevation: lowerElevation }];
 	const intersection = largestIntersection;
+	// A rear overhang is hidden behind its support in this projection. Projecting
+	// it onto a lower plane would make it appear across the support's front face.
 	return [
-		shadowSection(
-			intersection.left,
-			intersection.right,
-			intersection.back,
-			intersection.front,
-			base,
-		),
 		shadowSection(left, intersection.left, back, front, lowerElevation),
 		shadowSection(intersection.right, right, back, front, lowerElevation),
-		shadowSection(
-			intersection.left,
-			intersection.right,
-			back,
-			intersection.back,
-			lowerElevation,
-		),
 		shadowSection(
 			intersection.left,
 			intersection.right,
