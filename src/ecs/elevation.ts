@@ -53,7 +53,9 @@ export const bodyBoundsOverlap = (
 export const canSitOnPlatform = (kind: EditorItemKind): boolean =>
 	kind === EditorItemKinds.Crate ||
 	kind === EditorItemKinds.Plant ||
-	kind === EditorItemKinds.Lamp;
+	kind === EditorItemKinds.Lamp ||
+	kind === EditorItemKinds.Sign ||
+	kind === EditorItemKinds.Chest;
 
 export const canSitOnSupport = (
 	kind: EditorItemKind,

@@ -2,6 +2,7 @@ import {
 	Body,
 	Decoration,
 	DecorationKinds,
+	defaultSignContent,
 	Elevation,
 	Obstacle,
 	ObstacleKinds,
@@ -85,6 +86,7 @@ export const crateEntities = [
 ] as const;
 export const platformEntities = [EntityId(300), EntityId(301)] as const;
 export const decorationEntities = [EntityId(400)] as const;
+export const signEntities = [EntityId(401)] as const;
 
 export const defaultFloorPlan = Body.make({
 	width: roomWidth,
@@ -122,6 +124,7 @@ const positions = new Map<EntityId, Position>([
 	[crateEntities[3], Position.make({ x: 940, y: 485 })],
 	[platformEntities[0], Position.make({ x: 875, y: 125 })],
 	[platformEntities[1], Position.make({ x: 285, y: 130 })],
+	[signEntities[0], Position.make({ x: roomWidth / 2, y: 150 })],
 ]);
 
 const bodies = new Map<EntityId, Body>([
@@ -140,6 +143,7 @@ const bodies = new Map<EntityId, Body>([
 	...crateEntities.map((entity) => [entity, crateBody] as const),
 	[platformEntities[0], Body.make({ width: 260, depth: 160 })],
 	[platformEntities[1], Body.make({ width: 230, depth: 130 })],
+	[signEntities[0], Body.make({ width: 88, depth: 56 })],
 ]);
 
 const obstacles = new Map<EntityId, Obstacle>([
@@ -172,6 +176,10 @@ const decorations = new Map<EntityId, Decoration>([
 		decorationEntities[0],
 		Decoration.make({ kind: DecorationKinds.Rug, height: 0 }),
 	],
+	[
+		signEntities[0],
+		Decoration.make({ kind: DecorationKinds.Sign, height: 104 }),
+	],
 ]);
 
 positions.set(decorationEntities[0], Position.make({ x: 570, y: 330 }));
@@ -201,7 +209,7 @@ export const initialWorld: World = {
 	playerTrail: [],
 	tireTracksEnabled: true,
 	openedChests: new Set(),
-	signContents: new Map(),
+	signContents: new Map([[signEntities[0], defaultSignContent]]),
 	readingSign: null,
 	grabbed: null,
 	pushing: null,

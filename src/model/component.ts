@@ -59,6 +59,6 @@ export const SignContent = Schema.Struct({
 export type SignContent = typeof SignContent.Type;
 
 export const defaultSignContent = SignContent.make({
-	title: "Wooden sign",
-	body: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Donec vitae sapien sit amet nunc tincidunt pellentesque.",
+	title: "Notice",
+	body: "Scientists at the University of Camebrood are sounding the alarm, suggesting the increased volcanic activity in the region may have been initiated by a tactical nuclear strike on the north-east corner of Mount Egg. High-powered lasers were likely used to drill what is now believed to be the deepest egg-made hole in egg history. The detonation depth and the smaller size of the warhead resulted in none of the usual signs of a nuclear attack, which was first believed to be natural, albeit powerful, seismic activity. As previously stated, all eggs are advised to begin evacuating the island immediately.",
 });

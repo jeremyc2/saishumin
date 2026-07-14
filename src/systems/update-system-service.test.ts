@@ -591,12 +591,14 @@ describe("UpdateSystemService", () => {
 		}
 	});
 
-	test("places crates, plants, and lamps on platform tops", () => {
+	test("places crates, plants, lamps, signs, and chests on platform tops", () => {
 		const platformEntity = EntityId(780);
 		for (const kind of [
 			EditorItemKinds.Crate,
 			EditorItemKinds.Plant,
 			EditorItemKinds.Lamp,
+			EditorItemKinds.Sign,
+			EditorItemKinds.Chest,
 		] as const) {
 			const platformHeight = 50;
 			const base: World = {
