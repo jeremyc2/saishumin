@@ -1027,15 +1027,14 @@ export class RenderSystemService extends Context.Service<
 			return html`
 				<aside data-editor-panel class="absolute top-0 right-0 z-30 flex h-full w-85 flex-col overscroll-contain border-l border-[#41565a] bg-[#0d181f]/98 text-[#fff1d6] shadow-[-18px_0_44px_rgba(3,9,12,0.38)]">
 					<header class="border-b border-[#30434a] px-5 pt-6 pb-4">
-						<div class="text-[11px] font-bold tracking-[0.2em] text-[#e8b875] uppercase">World editor</div>
-						<div class="mt-1 text-[20px] font-bold">Shape your space</div>
-						<div class="mt-3 text-[11px] leading-relaxed text-[#819993]">Scroll to pan · Command/Control-drag to pan</div>
+						<div class="text-lg font-heading font-bold tracking-[0.2em] text-[#e8b875] uppercase">World editor</div>
+						<div class="text-[11px] leading-relaxed text-[#819993]">Scroll to pan · Command/Control-drag to pan</div>
 					</header>
 
 					<div class="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-5">
 						<section>
 							<div class="flex items-end justify-between">
-								<h2 class="m-0 text-[12px] font-bold tracking-[0.16em] text-[#aebfba] uppercase">Add objects</h2>
+								<h2 class="m-0 text-[12px] font-heading font-bold tracking-[0.16em] text-[#aebfba] uppercase">Add objects</h2>
 								<span class="text-[10px] text-[#708780]">DRAG TO PLACE</span>
 							</div>
 							<div class="mt-3 grid grid-cols-2 gap-2">
@@ -1057,7 +1056,7 @@ export class RenderSystemService extends Context.Service<
 						</section>
 
 						<section class="mt-6 border-t border-[#30434a] pt-5">
-							<h2 class="m-0 text-[12px] font-bold tracking-[0.16em] text-[#aebfba] uppercase">Selection</h2>
+							<h2 class="m-0 text-[12px] font-heading font-bold tracking-[0.16em] text-[#aebfba] uppercase">Selection</h2>
 							${
 								selected === "floor"
 									? html`
@@ -1240,8 +1239,8 @@ export class RenderSystemService extends Context.Service<
 			return html`
 				<div class="editor-invalid-cursor absolute inset-0 z-50 flex items-center justify-center bg-[#071015]/48 px-6" role="presentation">
 					<div class="w-full max-w-95 rounded-2xl border border-[#7d4b4b] bg-[#15242b] px-6 py-5 shadow-[0_24px_70px_rgba(0,0,0,0.5)]" role="alertdialog" aria-modal="true" aria-labelledby="invalid-position-title" aria-describedby="invalid-position-description">
-						<div id="invalid-position-title" class="text-[17px] font-bold tracking-[0.04em] text-[#e59a91]">Invalid position</div>
-						<p id="invalid-position-description" class="mt-2 mb-0 text-[12px] leading-relaxed text-[#b9cbc4]">${description}</p>
+						<div id="invalid-position-title" class="text-[17px] font-heading font-bold tracking-[0.04em] text-[#e59a91]">Invalid position</div>
+						<p id="invalid-position-description" class="mt-2 mb-0 text-base leading-relaxed text-[#b9cbc4]">${description}</p>
 						<div class="mt-5 flex justify-end">
 							<button type="button" autofocus class="rounded-lg border border-[#9a625d] bg-[#6f3f3e] px-5 py-2 text-[11px] font-bold tracking-[0.12em] text-[#fff1ed] transition hover:bg-[#80504d]" @click=${() => dispatch(Action.EditorInvalidPlacementDismissed())}>OK</button>
 						</div>
@@ -1260,10 +1259,10 @@ export class RenderSystemService extends Context.Service<
 					: (world.signContents.get(world.readingSign) ?? defaultSignContent);
 			return html`
 			<div class="absolute inset-0 z-50 flex items-center justify-center bg-[#071015]/48 px-6" role="presentation">
-				<div class="flex max-h-[calc(100vh-3rem)] w-full max-w-95 flex-col rounded-2xl border border-[#8b633c] bg-[#ecd19e] px-6 py-5 shadow-[0_24px_70px_rgba(0,0,0,0.5)]" role="alertdialog" aria-modal="true" aria-labelledby="sign-title" aria-describedby="sign-description">
+				<div class="flex max-h-[calc(100vh-3rem)] w-full max-w-95 flex-col border border-[#8b633c] bg-[#ecd19e] px-6 py-5 shadow-[0_24px_70px_rgba(0,0,0,0.5)]" role="alertdialog" aria-modal="true" aria-labelledby="sign-title" aria-describedby="sign-description">
 					<div class="max-h-[calc(100vh-10rem)] overflow-y-auto overscroll-contain pr-2">
-						<div id="sign-title" class="break-words text-[17px] font-bold tracking-[0.04em] text-[#4b2f1e]">${content.title}</div>
-						<p id="sign-description" class="mt-2 mb-0 break-words whitespace-pre-wrap text-[12px] leading-relaxed text-[#5d3b24]">${content.body}</p>
+						<div id="sign-title" class="wrap-break-word text-[17px] font-heading font-bold tracking-[0.04em] text-[#4b2f1e]">${content.title}</div>
+						<p id="sign-description" class="mt-2 mb-0 wrap-break-word whitespace-pre-wrap text-base leading-relaxed text-[#5d3b24]">${content.body}</p>
 					</div>
 					<div class="mt-5 flex justify-end">
 						<button type="button" autofocus class="rounded-lg border border-[#5d3b24] bg-[#70462b] px-5 py-2 text-[11px] font-bold tracking-[0.12em] text-[#fff3dc] transition hover:bg-[#845535]" @click=${() => dispatch(Action.SignDismissed())}>DISMISS</button>
@@ -1656,15 +1655,47 @@ export class RenderSystemService extends Context.Service<
 							</g>
 						</svg>
 
-						<h1 class="pointer-events-none absolute top-7 left-7 m-0 select-none text-[27px] font-bold tracking-[0.16em] text-[#fff1d6]">SAISHUMIN</h1>
+						<h1 class="pointer-events-none absolute top-7 left-7 m-0 select-none text-[27px] font-heading font-bold tracking-[0.16em] text-[#fff1d6]">SAISHUMIN</h1>
 						<div
 							class=${`absolute top-6 z-40 flex flex-col items-end gap-2 ${world.editor.open ? "right-[360px]" : "right-6"}`}
 						>
 							<button
 								type="button"
-								class="rounded-xl border border-[#e8b875]/70 bg-[#0d181f]/92 px-4 py-3 text-[12px] font-bold tracking-[0.12em] text-[#fff1d6] shadow-lg transition-colors hover:bg-[#1b2d34] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#fff1d6]"
+								class="inline-flex items-center gap-2 rounded-xl border border-[#e8b875]/70 bg-[#0d181f]/92 px-4 py-3 text-[12px] font-bold tracking-[0.12em] text-[#fff1d6] shadow-lg transition-colors hover:bg-[#1b2d34] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#fff1d6]"
 								@click=${() => dispatch(Action.EditorToggled())}
-							>${world.editor.open ? "▶ PLAY" : "✦ WORLD EDITOR"}</button>
+							>${
+								world.editor.open
+									? svg`<svg
+										class="size-4"
+										xmlns="http://www.w3.org/2000/svg"
+										viewBox="0 0 24 24"
+										fill="none"
+										stroke="currentColor"
+										stroke-width="2"
+										stroke-linecap="round"
+										stroke-linejoin="round"
+										aria-hidden="true"
+									>
+										<path d="M5 5a2 2 0 0 1 3.008-1.728l11.997 6.998a2 2 0 0 1 .003 3.458l-12 7A2 2 0 0 1 5 19z" />
+									</svg>
+									PLAY`
+									: svg`<svg
+									class="size-4"
+									xmlns="http://www.w3.org/2000/svg"
+									viewBox="0 0 24 24"
+									fill="none"
+									stroke="currentColor"
+									stroke-width="2"
+									stroke-linecap="round"
+									stroke-linejoin="round"
+									aria-hidden="true"
+								>
+									<path d="m15 12-9.373 9.373a1 1 0 0 1-3.001-3L12 9" />
+									<path d="m18 15 4-4" />
+									<path d="m21.5 11.5-1.914-1.914A2 2 0 0 1 19 8.172v-.344a2 2 0 0 0-.586-1.414l-1.657-1.657A6 6 0 0 0 12.516 3H9l1.243 1.243A6 6 0 0 1 12 8.485V10l2 2h1.172a2 2 0 0 1 1.414.586L18.5 14.5" />
+								</svg>
+								WORLD EDITOR`
+							}</button>
 							<button
 								type="button"
 								aria-label=${world.tireTracksEnabled ? "Hide tracks" : "Show tracks"}
@@ -1689,10 +1720,10 @@ export class RenderSystemService extends Context.Service<
 								? html`<div class="pointer-events-none absolute bottom-6 left-7 rounded-xl bg-[#0d181f]/88 px-4 py-2 text-[11px] font-bold tracking-[0.12em] text-[#e8b875]">CONTROLS PAUSED · INFINITE PAN · FIXED SCALE</div>${editorPanelTemplate(world, dispatch)}`
 								: html`
 									<div class="pointer-events-none absolute bottom-7 left-7 flex max-w-[calc(100vw-3.5rem)] flex-wrap gap-x-12 gap-y-3 rounded-[18px] bg-[#0d181f]/90 px-6 py-4 select-none">
-										<div><div class="text-[15px] font-bold text-[#fff1d6]">ARROW KEYS</div><div class="mt-1 text-[13px] text-[#aebfba]">MOVE · PUSH CRATES</div></div>
-										<div><div class="text-[15px] font-bold text-[#fff1d6]">SPACE</div><div class="mt-1 text-[13px] text-[#aebfba]">JUMP · CLIMB · FALL</div></div>
-										<div><div class="text-[15px] font-bold text-[#fff1d6]">HOLD SHIFT</div><div class="mt-1 text-[13px] text-[#aebfba]">GRAB · DRAG OBJECTS</div></div>
-										<div><div class="text-[15px] font-bold text-[#fff1d6]">X</div><div class="mt-1 text-[13px] text-[#aebfba]">OPEN CHESTS · READ SIGNS</div></div>
+										<div><div class="text-[15px] font-heading font-bold text-[#fff1d6]">ARROW KEYS</div><div class="mt-1 text-[13px] text-[#aebfba]">MOVE · PUSH CRATES</div></div>
+										<div><div class="text-[15px] font-heading font-bold text-[#fff1d6]">SPACE</div><div class="mt-1 text-[13px] text-[#aebfba]">JUMP · CLIMB · FALL</div></div>
+										<div><div class="text-[15px] font-heading font-bold text-[#fff1d6]">HOLD SHIFT</div><div class="mt-1 text-[13px] text-[#aebfba]">GRAB · DRAG OBJECTS</div></div>
+										<div><div class="text-[15px] font-heading font-bold text-[#fff1d6]">X</div><div class="mt-1 text-[13px] text-[#aebfba]">OPEN CHESTS · READ SIGNS</div></div>
 									</div>
 								`
 						}
