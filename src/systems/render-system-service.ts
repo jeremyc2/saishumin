@@ -1208,6 +1208,26 @@ export class RenderSystemService extends Context.Service<
 										: html`<div class="mt-3 rounded-xl border border-dashed border-[#30464c] px-4 py-5 text-center text-[11px] leading-relaxed text-[#819993]">Select an object to move or resize it.<br />Select the floor to change the plan.</div>`
 							}
 						</section>
+
+						<section class="mt-6 border-t border-[#30434a] pt-5">
+							<button
+								type="button"
+								aria-label=${world.tireTracksEnabled ? "Disable mud wheels" : "Enable mud wheels"}
+								aria-pressed=${String(world.tireTracksEnabled)}
+								class="mt-3 flex w-full items-center justify-between rounded-xl border border-[#819993]/70 bg-[#17272e] py-2 pr-2 pl-3 text-left text-[11px] font-bold tracking-[0.12em] text-[#fff1d6] transition-colors hover:border-[#e8b875] hover:bg-[#20343b] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#fff1d6]"
+								@click=${() => dispatch(Action.TireTracksToggled())}
+							>
+								<span class="uppercase">Mud wheels</span>
+								<span
+									aria-hidden="true"
+									class=${`relative h-6 w-11 rounded-full border shadow-inner transition-colors ${world.tireTracksEnabled ? "border-[#f3cc86] bg-[#c6833f]" : "border-[#526970] bg-[#253940]"}`}
+								>
+									<span
+										class=${`absolute top-1/2 left-px h-5 w-5 -translate-y-1/2 rounded-full bg-[#fff1d6] shadow-[0_1px_3px_rgba(3,9,12,0.55)] transition-transform ${world.tireTracksEnabled ? "translate-x-5" : "translate-x-0"}`}
+									></span>
+								</span>
+							</button>
+						</section>
 					</div>
 
 					<footer class="border-t border-[#30434a] px-5 py-4 text-[10px] leading-relaxed text-[#718780]">
@@ -1696,23 +1716,6 @@ export class RenderSystemService extends Context.Service<
 								</svg>
 								DESIGN STUDIO`
 							}</button>
-							<button
-								type="button"
-								aria-label=${world.tireTracksEnabled ? "Hide tracks" : "Show tracks"}
-								aria-pressed=${String(world.tireTracksEnabled)}
-								class="flex items-center gap-3 rounded-xl border border-[#819993]/70 bg-[#0d181f]/92 py-2 pr-2 pl-3 text-[11px] font-bold tracking-[0.12em] text-[#fff1d6] shadow-lg transition-colors hover:border-[#e8b875] hover:bg-[#1b2d34] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#fff1d6]"
-								@click=${() => dispatch(Action.TireTracksToggled())}
-							>
-								<span class="w-28 shrink-0 text-right whitespace-nowrap">${world.tireTracksEnabled ? "HIDE TRACKS" : "SHOW TRACKS"}</span>
-								<span
-									aria-hidden="true"
-									class=${`relative h-6 w-11 rounded-full border shadow-inner transition-colors ${world.tireTracksEnabled ? "border-[#f3cc86] bg-[#c6833f]" : "border-[#526970] bg-[#253940]"}`}
-								>
-									<span
-										class=${`absolute top-1/2 left-px h-5 w-5 -translate-y-1/2 rounded-full bg-[#fff1d6] shadow-[0_1px_3px_rgba(3,9,12,0.55)] transition-transform ${world.tireTracksEnabled ? "translate-x-5" : "translate-x-0"}`}
-									></span>
-								</span>
-							</button>
 						</div>
 
 						${
