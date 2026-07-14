@@ -4,9 +4,9 @@ import { Body, Position } from "../model/component";
 import {
 	cameraForFloor,
 	followCamera,
-	footprint,
 	insetRectangle,
 	project,
+	projectedRectangle,
 	unproject,
 	viewport,
 } from "./projection";
@@ -14,7 +14,7 @@ import {
 const outlineWidth = 3;
 
 const crateOutline = (position: Position) => {
-	const top = footprint(position, crateBody, crateHeight);
+	const top = projectedRectangle(position, crateBody, crateHeight);
 	const frontBottom = project(
 		{ x: position.x, y: position.y + crateBody.depth / 2 },
 		0,

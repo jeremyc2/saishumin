@@ -10,6 +10,8 @@ import {
 import type { Direction } from "../model/control";
 import type { EditorState } from "../model/editor";
 import { EntityId } from "../model/entity-id";
+import { type PlayerFacing, PlayerFacings } from "../model/player-facing";
+import type { PlayerTrailMark } from "../model/player-trail";
 import { cameraForFloor } from "../render/projection";
 
 export type World = {
@@ -22,6 +24,8 @@ export type World = {
 	readonly gameCamera: Position;
 	readonly editor: EditorState;
 	readonly pressed: ReadonlySet<Direction>;
+	readonly playerFacing: PlayerFacing;
+	readonly playerTrail: ReadonlyArray<PlayerTrailMark>;
 	readonly grabbed: EntityId | null;
 	readonly pushing: EntityId | null;
 	readonly lastFrame: number;
@@ -187,6 +191,8 @@ export const initialWorld: World = {
 		invalidPlacement: null,
 	},
 	pressed: new Set(),
+	playerFacing: PlayerFacings.Down,
+	playerTrail: [],
 	grabbed: null,
 	pushing: null,
 	lastFrame: 0,

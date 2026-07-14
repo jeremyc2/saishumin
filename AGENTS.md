@@ -1,3 +1,4 @@
 - Avoid using regex where possible. Add a comment above each non-trivial regex breaking it down.
 - Reference the git submodules in `reference_repositories` for best practices, usage examples, and documentation for the frameworks and packages we use.
 - NEVER loosen `diagnosticSeverity` rules in `tsconfig.json`.
+- When you need to run the dev server, use `bun dev:ai` instead of `bun dev` to avoid port conflicts.

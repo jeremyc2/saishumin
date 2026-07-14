@@ -7,7 +7,18 @@ import {
 	type Elevation,
 	type Position,
 } from "../model/component";
-import { footprint, insetRectangle, points, project } from "./projection";
+import type { PlayerFacing } from "../model/player-facing";
+import {
+	type PlayerTrailMark,
+	playerTireTrackFade,
+} from "../model/player-trail";
+import {
+	insetRectangle,
+	points,
+	project,
+	projectedRectangle,
+	projectVector,
+} from "./projection";
 
 const boxOutlineWidth = 3;
 
@@ -48,8 +59,83 @@ const playerShadowVisual = {
 
 const playerSpriteBaseline = 38.5;
 const playerFaceStrokeWidth = 3.8;
-const playerBodyPath = "M -20 35 Q -27 8 -17 -10 Q 0 -30 17 -10 Q 27 8 20 35 Z";
+const playerWheelColor = "#874727";
 const playerBodyClipId = "player-body-clip";
+
+type PlayerView = "front" | "front-quarter" | "side" | "rear-quarter" | "back";
+
+type PlayerDrawing = {
+	readonly view: PlayerView;
+	readonly mirror: boolean;
+	readonly bodyPath: string;
+};
+
+const directionForPlayerFacing = (facing: PlayerFacing): Position => {
+	switch (facing) {
+		case "up":
+			return { x: 0, y: -1 };
+		case "up-right":
+			return { x: 1, y: -1 };
+		case "right":
+			return { x: 1, y: 0 };
+		case "down-right":
+			return { x: 1, y: 1 };
+		case "down":
+			return { x: 0, y: 1 };
+		case "down-left":
+			return { x: -1, y: 1 };
+		case "left":
+			return { x: -1, y: 0 };
+		case "up-left":
+			return { x: -1, y: -1 };
+	}
+};
+
+const playerFrontBodyPath =
+	"M -20 35 Q -27 8 -17 -10 Q 0 -30 17 -10 Q 27 8 20 35 Z";
+const playerQuarterBodyPath =
+	"M -17 35 Q -24 9 -13 -10 Q 2 -30 18 -9 Q 28 8 19 35 Z";
+const playerSideBodyPath =
+	"M -13 35 Q -21 12 -12 -9 Q -4 -27 12 -18 Q 23 -12 24 -2 Q 30 5 23 11 Q 25 24 18 35 Z";
+const playerBackBodyPath =
+	"M -21 35 Q -27 9 -18 -10 Q 0 -29 18 -10 Q 27 9 21 35 Z";
+
+export const playerDrawingForFacing = (facing: PlayerFacing): PlayerDrawing => {
+	switch (facing) {
+		case "down":
+			return { view: "front", mirror: false, bodyPath: playerFrontBodyPath };
+		case "down-right":
+			return {
+				view: "front-quarter",
+				mirror: false,
+				bodyPath: playerQuarterBodyPath,
+			};
+		case "down-left":
+			return {
+				view: "front-quarter",
+				mirror: true,
+				bodyPath: playerQuarterBodyPath,
+			};
+		case "right":
+			return { view: "side", mirror: false, bodyPath: playerSideBodyPath };
+		case "left":
+			return { view: "side", mirror: true, bodyPath: playerSideBodyPath };
+		case "up-right":
+			return {
+				view: "rear-quarter",
+				mirror: false,
+				bodyPath: playerQuarterBodyPath,
+			};
+		case "up-left":
+			return {
+				view: "rear-quarter",
+				mirror: true,
+				bodyPath: playerQuarterBodyPath,
+			};
+		case "up":
+			return { view: "back", mirror: false, bodyPath: playerBackBodyPath };
+	}
+};
 
 export const crateShadowDepthOffset = (
 	baseElevation: number,
@@ -57,7 +143,350 @@ export const crateShadowDepthOffset = (
 ): number =>
 	shadowElevation < baseElevation ? crateVisual.shadowDepthOffset : 0;
 
-const playerFaceTemplate = (handlingObject: boolean): TemplateResult => {
+export type TireTrackSide = "left" | "right";
+
+export type TireTrackClip = {
+	readonly outline: ReadonlyArray<Position>;
+};
+
+const clipPolygonAtBoundary = (
+	polygon: ReadonlyArray<Position>,
+	axis: "x" | "y",
+	boundary: number,
+	keepGreater: boolean,
+): ReadonlyArray<Position> => {
+	if (polygon.length === 0) return polygon;
+	const inside = (point: Position): boolean =>
+		keepGreater ? point[axis] >= boundary : point[axis] <= boundary;
+	const intersection = (start: Position, end: Position): Position => {
+		const distance = end[axis] - start[axis];
+		const progress =
+			Math.abs(distance) <= Number.EPSILON
+				? 0
+				: (boundary - start[axis]) / distance;
+		return axis === "x"
+			? {
+					x: boundary,
+					y: start.y + (end.y - start.y) * progress,
+				}
+			: {
+					x: start.x + (end.x - start.x) * progress,
+					y: boundary,
+				};
+	};
+
+	const clipped: Array<Position> = [];
+	let previous = polygon.at(-1);
+	if (previous === undefined) return clipped;
+	for (const current of polygon) {
+		const previousInside = inside(previous);
+		const currentInside = inside(current);
+		if (previousInside && currentInside) clipped.push(current);
+		else if (previousInside) clipped.push(intersection(previous, current));
+		else if (currentInside) {
+			clipped.push(intersection(previous, current));
+			clipped.push(current);
+		}
+		previous = current;
+	}
+	return clipped;
+};
+
+export const clipTireTrackPolygonToSurface = (
+	polygon: ReadonlyArray<Position>,
+	outline: ReadonlyArray<Position>,
+): ReadonlyArray<Position> => {
+	if (outline.length === 0) return [];
+	const left = Math.min(...outline.map(({ x }) => x));
+	const right = Math.max(...outline.map(({ x }) => x));
+	const top = Math.min(...outline.map(({ y }) => y));
+	const bottom = Math.max(...outline.map(({ y }) => y));
+	return clipPolygonAtBoundary(
+		clipPolygonAtBoundary(
+			clipPolygonAtBoundary(
+				clipPolygonAtBoundary(polygon, "x", left, true),
+				"x",
+				right,
+				false,
+			),
+			"y",
+			top,
+			true,
+		),
+		"y",
+		bottom,
+		false,
+	);
+};
+
+const normalizedDirection = (direction: Position): Position | undefined => {
+	const magnitude = Math.hypot(direction.x, direction.y);
+	return magnitude <= Number.EPSILON
+		? undefined
+		: { x: direction.x / magnitude, y: direction.y / magnitude };
+};
+
+const directionBetweenTrailMarks = (
+	start: PlayerTrailMark,
+	end: PlayerTrailMark,
+): Position | undefined =>
+	normalizedDirection({
+		x: end.position.x - start.position.x,
+		y: end.position.y - start.position.y,
+	});
+
+export const playerTireTrackDirection = (
+	previous: PlayerTrailMark | undefined,
+	mark: PlayerTrailMark,
+	next: PlayerTrailMark | undefined,
+): Position => {
+	const incoming =
+		previous === undefined
+			? undefined
+			: directionBetweenTrailMarks(previous, mark);
+	const outgoing =
+		next === undefined ? undefined : directionBetweenTrailMarks(mark, next);
+	const blended =
+		incoming === undefined || outgoing === undefined
+			? undefined
+			: normalizedDirection({
+					x: incoming.x + outgoing.x,
+					y: incoming.y + outgoing.y,
+				});
+	return (
+		blended ??
+		outgoing ??
+		incoming ??
+		normalizedDirection(directionForPlayerFacing(mark.facing)) ?? { x: 1, y: 0 }
+	);
+};
+
+const tireTrackCenter = (
+	mark: PlayerTrailMark,
+	direction: Position,
+	side: TireTrackSide,
+): Position => {
+	const sideDirection = side === "left" ? -1 : 1;
+	const trackOffset = 10;
+	return project(
+		{
+			x: mark.position.x + -direction.y * sideDirection * trackOffset,
+			y: mark.position.y + direction.x * sideDirection * trackOffset,
+		},
+		mark.elevation + 0.5,
+	);
+};
+
+export const playerTireTrackCenter = (
+	previous: PlayerTrailMark | undefined,
+	mark: PlayerTrailMark,
+	next: PlayerTrailMark | undefined,
+	side: TireTrackSide,
+): Position =>
+	tireTrackCenter(mark, playerTireTrackDirection(previous, mark, next), side);
+
+export const playerTireTrackIsTurning = (
+	previous: PlayerTrailMark | undefined,
+	mark: PlayerTrailMark,
+	next: PlayerTrailMark | undefined,
+): boolean => {
+	if (previous === undefined || next === undefined) return false;
+	const incoming = directionBetweenTrailMarks(previous, mark);
+	const outgoing = directionBetweenTrailMarks(mark, next);
+	if (incoming === undefined || outgoing === undefined) return false;
+	return incoming.x * outgoing.x + incoming.y * outgoing.y < 0.95;
+};
+
+const localTreadPoint = (
+	center: Position,
+	direction: Position,
+	along: number,
+	across: number,
+): Position => ({
+	x: center.x + direction.x * along - direction.y * across,
+	y: center.y + direction.y * along + direction.x * across,
+});
+
+const treadBlock = (
+	center: Position,
+	direction: Position,
+	acrossSign: -1 | 1,
+	lengthScale: number,
+): ReadonlyArray<Position> => {
+	const outer = acrossSign * 5;
+	const inner = acrossSign * 0.9;
+	return [
+		localTreadPoint(center, direction, -3.8 * lengthScale, outer),
+		localTreadPoint(center, direction, 1.4 * lengthScale, outer),
+		localTreadPoint(center, direction, 3.8 * lengthScale, inner),
+		localTreadPoint(center, direction, -1.4 * lengthScale, inner),
+	];
+};
+
+const distanceBetweenPositions = (start: Position, end: Position): number =>
+	Math.hypot(end.x - start.x, end.y - start.y);
+
+const treadLengthScale = (
+	previous: PlayerTrailMark | undefined,
+	mark: PlayerTrailMark,
+	next: PlayerTrailMark | undefined,
+	direction: Position,
+	side: TireTrackSide,
+): number => {
+	const center = tireTrackCenter(mark, direction, side);
+	const distances: Array<number> = [];
+	if (previous !== undefined) {
+		const incoming = directionBetweenTrailMarks(previous, mark);
+		if (incoming !== undefined) {
+			distances.push(
+				distanceBetweenPositions(
+					tireTrackCenter(previous, incoming, side),
+					center,
+				),
+			);
+		}
+	}
+	if (next !== undefined) {
+		const outgoing = directionBetweenTrailMarks(mark, next);
+		if (outgoing !== undefined) {
+			distances.push(
+				distanceBetweenPositions(center, tireTrackCenter(next, outgoing, side)),
+			);
+		}
+	}
+	const nearestNeighbor = distances.length === 0 ? 12 : Math.min(...distances);
+	return Math.min(1, Math.max(0.45, nearestNeighbor / 10));
+};
+
+export const playerTireTrackTreadTemplate = (
+	previous: PlayerTrailMark | undefined,
+	mark: PlayerTrailMark,
+	next: PlayerTrailMark | undefined,
+	clip: TireTrackClip,
+	side?: TireTrackSide,
+): TemplateResult => {
+	const opacity = 0.62 * playerTireTrackFade(mark.age);
+	const direction = playerTireTrackDirection(previous, mark, next);
+	const screenDirection =
+		normalizedDirection(projectVector(direction)) ?? direction;
+	const sides: ReadonlyArray<TireTrackSide> =
+		side === undefined ? ["left", "right"] : [side];
+	const tracks = sides.map((trackSide) => {
+		const center = tireTrackCenter(mark, direction, trackSide);
+		const lengthScale = treadLengthScale(
+			previous,
+			mark,
+			next,
+			direction,
+			trackSide,
+		);
+		return svg`
+			<g data-player-tire-track=${trackSide}>
+				${([-1, 1] as const).map((acrossSign) => {
+					const clipped = clipTireTrackPolygonToSurface(
+						treadBlock(center, screenDirection, acrossSign, lengthScale),
+						clip.outline,
+					);
+					return clipped.length >= 3
+						? svg`<polygon
+							points=${points(clipped)}
+							fill=${playerWheelColor}
+							stroke="#5e321f"
+							stroke-width="0.55"
+							stroke-linejoin="round"
+						/>`
+						: svg``;
+				})}
+			</g>
+		`;
+	});
+	return svg`
+		<g data-player-tire-tracks="tread" opacity=${opacity}>${tracks}</g>
+	`;
+};
+
+const playerWheelsTemplate = (view: PlayerView): TemplateResult => {
+	if (view === "side")
+		return svg`
+			<ellipse cx="2.5" cy="39" rx="9" ry="7.5" fill=${playerWheelColor} />
+		`;
+	if (view === "front-quarter" || view === "rear-quarter")
+		return svg`
+			<ellipse cx="-6" cy="38" rx="7" ry="7" fill=${playerWheelColor} opacity="0.94" />
+			<ellipse cx="8" cy="39" rx="7" ry="7.5" fill=${playerWheelColor} />
+		`;
+	return svg`
+		<ellipse cx="-10" cy="39" rx="9" ry="7.5" fill=${playerWheelColor} />
+		<ellipse cx="10" cy="39" rx="9" ry="7.5" fill=${playerWheelColor} />
+	`;
+};
+
+const playerBodyInteriorTemplate = (view: PlayerView): TemplateResult => {
+	if (view === "side")
+		return svg`
+			<path d="M -25 -19 H -3 V -11 H -6 V -2 H -9 V 10 H -12 V 24 H -16 V 40 H -25 Z" fill="#f9c267" />
+			<path d="M 11 -20 H 30 V 40 H -25 V 33 H 4 V 28 H 9 V 20 H 13 V 12 H 17 V 5 H 21 V -2 H 18 V -11 H 11 Z" fill="#df8d3f" />
+			<path d="M 18 -7 Q 27 0 22 10" fill="none" stroke="#cd7837" stroke-width="3" opacity="0.7" />
+		`;
+	if (view === "front-quarter")
+		return svg`
+			<path d="M -25 -18 H -2 V -11 H -5 V -3 H -8 V 7 H -11 V 18 H -14 V 31 H -18 V 40 H -25 Z" fill="#f9c267" />
+			<path d="M 10 -18 H 28 V 40 H -25 V 33 H 3 V 28 H 7 V 21 H 10 V 13 H 13 V 4 H 15 V -5 H 13 Z" fill="#df8d3f" />
+		`;
+	if (view === "rear-quarter")
+		return svg`
+			<path d="M -25 -18 H -4 V -10 H -7 V 0 H -10 V 12 H -13 V 25 H -17 V 40 H -25 Z" fill="#f8bd60" />
+			<path d="M 8 -18 H 28 V 40 H -25 V 34 H 2 V 29 H 7 V 21 H 10 V 12 H 13 V 2 H 14 V -7 H 11 Z" fill="#dc883d" />
+			<path d="M 7 -15 Q 15 0 10 22" fill="none" stroke="#c97638" stroke-width="3.2" opacity="0.65" />
+		`;
+	if (view === "back")
+		return svg`
+			<path d="M -26 -18 H -4 V -11 H -7 V -2 H -10 V 9 H -13 V 21 H -17 V 40 H -26 Z" fill="#f8bd60" />
+			<path d="M 12 -18 H 27 V 40 H -27 V 34 H 4 V 28 H 8 V 19 H 11 V 8 H 14 V -4 H 12 Z" fill="#dc883d" />
+			<path d="M 0 -17 Q 6 -1 2 18 Q 1 27 4 35" fill="none" stroke="#d17e3a" stroke-width="3" opacity="0.48" />
+		`;
+	return svg`
+		<path d="M -25 -18 H -3 V -12 H -6 V -5 H -9 V 4 H -12 V 13 H -15 V 23 H -18 V 38 H -25 Z" fill="#f9c267" />
+		<rect x="-7" y="-9" width="3" height="3" fill="#f9c267" />
+		<rect x="-10" y="1" width="3" height="3" fill="#f9c267" />
+		<rect x="-13" y="11" width="3" height="3" fill="#f9c267" />
+		<path d="M 14 -15 H 25 V 38 H -25 V 32 H 5 V 28 H 8 V 22 H 11 V 14 H 13 V 5 H 15 V -5 H 14 Z" fill="#df8d3f" />
+		<rect x="7" y="25" width="3" height="3" fill="#df8d3f" />
+		<rect x="10" y="17" width="3" height="3" fill="#df8d3f" />
+		<rect x="12" y="8" width="3" height="3" fill="#df8d3f" />
+	`;
+};
+
+const playerFaceTemplate = (
+	view: PlayerView,
+	handlingObject: boolean,
+): TemplateResult => {
+	if (view === "back")
+		return svg`<path d="M -7 -8 Q 0 -13 7 -8" fill="none" stroke="#ce7939" stroke-width="3" stroke-linecap="round" opacity="0.56" />`;
+	if (view === "rear-quarter")
+		return svg`
+			<ellipse cx="14" cy="-2" rx=${handlingObject ? 3.4 : 3.1} ry=${handlingObject ? 1.5 : 1.9} fill="#382c31" transform="rotate(18 14 -2)" />
+			<path d="M 17 7 Q 21 9 20 13" fill="none" stroke="#503b37" stroke-width="2.8" stroke-linecap="round" />
+		`;
+	if (view === "side")
+		return svg`
+			<ellipse cx="11" cy="-3" rx="4.6" ry=${handlingObject ? 1.9 : 2.4} fill="#382c31" transform="rotate(10 11 -3)" />
+		${
+			handlingObject
+				? svg`<path d="M 12 9 C 17 7 21 9 21 13 C 18 16 15 17 12 15 Z" fill="#fffaf0" stroke="#382c31" stroke-width=${playerFaceStrokeWidth} stroke-linejoin="round" />`
+				: svg`<path d="M 11 13 Q 17 8 21 12 Q 17 15 11 13 Z" fill="#fffaf0" stroke="#382c31" stroke-width=${playerFaceStrokeWidth} stroke-linejoin="round" />`
+		}
+		`;
+	if (view === "front-quarter")
+		return svg`
+			<ellipse cx="-2" cy="-3" rx="3.5" ry=${handlingObject ? 1.8 : 2.1} fill="#382c31" transform="rotate(-8 -2 -3)" />
+			<ellipse cx="11" cy="-2" rx="4.8" ry=${handlingObject ? 2 : 2.4} fill="#382c31" transform="rotate(15 11 -2)" />
+			${
+				handlingObject
+					? svg`<path d="M -2 9 C 3 7 12 8 16 11 C 15 15 11 18 6 18 C 2 17 -1 14 -2 9 Z" fill="#fffaf0" stroke="#382c31" stroke-width=${playerFaceStrokeWidth} stroke-linejoin="round" />`
+					: svg`<path d="M -3 14 Q 7 6 16 12 Q 8 16 -3 14 Z" fill="#fffaf0" stroke="#382c31" stroke-width=${playerFaceStrokeWidth} stroke-linejoin="round" />`
+			}
+		`;
 	if (handlingObject)
 		return svg`
 			<ellipse cx="-8" cy="-3" rx="4.8" ry="2.1" fill="#382c31" />
@@ -83,8 +512,8 @@ export const boxTemplate = (
 	className = "",
 	baseElevation = 0,
 ): TemplateResult => {
-	const bottom = footprint(position, body, baseElevation);
-	const top = footprint(position, body, baseElevation + height);
+	const bottom = projectedRectangle(position, body, baseElevation);
+	const top = projectedRectangle(position, body, baseElevation + height);
 	const edge = colors.edge ?? "#263942";
 	return svg`
 		<g class=${className} stroke-linejoin="round">
@@ -104,8 +533,8 @@ export const crateTemplate = (
 		{ position, body, elevation: baseElevation },
 	],
 ): TemplateResult => {
-	const top = footprint(position, body, baseElevation + height);
-	const topInset = footprint(
+	const top = projectedRectangle(position, body, baseElevation + height);
+	const topInset = projectedRectangle(
 		position,
 		{
 			width: Math.max(4, body.width - crateVisual.topInsetWidth),
@@ -139,7 +568,7 @@ export const crateTemplate = (
 		${shadowSections.map(
 			(section) =>
 				svg`<polygon points=${points(
-					footprint(
+					projectedRectangle(
 						{
 							x: section.position.x,
 							y:
@@ -188,7 +617,7 @@ export const decorationTemplate = (
 ): TemplateResult => {
 	if (decoration.kind === DecorationKinds.Rug) {
 		const borderWidth = Math.max(4, Math.min(12, body.width / 28));
-		return svg`<polygon points=${points(footprint(position, body))} fill="#a95848" stroke="#e8b875" stroke-width=${borderWidth} />`;
+		return svg`<polygon points=${points(projectedRectangle(position, body))} fill="#cf8677" stroke="#e8b875" stroke-width=${borderWidth} />`;
 	}
 
 	const base = project(position, baseElevation);
@@ -231,10 +660,11 @@ export const playerTemplate = (
 	position: Position,
 	elevation: Elevation,
 	shadowHeight: number,
+	facing: PlayerFacing,
 	handlingObject = false,
 ): TemplateResult => {
 	const shadow = project(position, shadowHeight);
-	const feet = project(position, elevation.z);
+	const wheelContact = project(position, elevation.z);
 	const shadowDistance = Math.max(0, elevation.z - shadowHeight);
 	const shadowScale = Math.max(
 		playerShadowVisual.minimumScale,
@@ -248,35 +678,35 @@ export const playerTemplate = (
 	const hasSurface = Number.isFinite(shadowHeight);
 	const isAirborne =
 		hasSurface && shadowDistance > playerShadowVisual.airborneThreshold;
+	const drawing = playerDrawingForFacing(facing);
 	return svg`
 		${
 			isAirborne
 				? svg`<ellipse cx=${shadow.x} cy=${shadow.y + playerShadowVisual.airborneOffset} rx=${playerShadowVisual.airborneRadius.x * shadowScale} ry=${playerShadowVisual.airborneRadius.y * shadowScale} fill="#14212a" opacity=${shadowOpacity} />`
 				: hasSurface
-					? svg`<ellipse cx=${feet.x} cy=${feet.y} rx=${playerShadowVisual.groundedRadius.x} ry=${playerShadowVisual.groundedRadius.y} fill="#14212a" opacity=${playerShadowVisual.groundedOpacity} />`
+					? svg`<ellipse cx=${wheelContact.x} cy=${wheelContact.y} rx=${playerShadowVisual.groundedRadius.x} ry=${playerShadowVisual.groundedRadius.y} fill="#14212a" opacity=${playerShadowVisual.groundedOpacity} />`
 					: svg``
 		}
-		<g data-player-expression=${handlingObject ? "handling" : "neutral"} transform="translate(${feet.x} ${feet.y - playerSpriteBaseline})">
-			<defs>
-				<clipPath id=${playerBodyClipId}>
-					<path d=${playerBodyPath} />
-				</clipPath>
-			</defs>
-			<ellipse cx="-10" cy="37" rx="9" ry="5" fill="#503b37" />
-			<ellipse cx="10" cy="37" rx="9" ry="5" fill="#503b37" />
-			<path d=${playerBodyPath} fill="#f3ad50" />
-			<g clip-path=${`url(#${playerBodyClipId})`} shape-rendering="crispEdges">
-				<path d="M -25 -18 H -3 V -12 H -6 V -5 H -9 V 4 H -12 V 13 H -15 V 23 H -18 V 38 H -25 Z" fill="#f9c267" />
-				<rect x="-7" y="-9" width="3" height="3" fill="#f9c267" />
-				<rect x="-10" y="1" width="3" height="3" fill="#f9c267" />
-				<rect x="-13" y="11" width="3" height="3" fill="#f9c267" />
-				<path d="M 14 -15 H 25 V 38 H -25 V 32 H 5 V 28 H 8 V 22 H 11 V 14 H 13 V 5 H 15 V -5 H 14 Z" fill="#df8d3f" />
-				<rect x="7" y="25" width="3" height="3" fill="#df8d3f" />
-				<rect x="10" y="17" width="3" height="3" fill="#df8d3f" />
-				<rect x="12" y="8" width="3" height="3" fill="#df8d3f" />
+		<g
+			data-player-expression=${handlingObject ? "handling" : "neutral"}
+			data-player-facing=${facing}
+			data-player-view=${drawing.view}
+			transform="translate(${wheelContact.x} ${wheelContact.y - playerSpriteBaseline})"
+		>
+			<g transform=${drawing.mirror ? "scale(-1 1)" : "scale(1 1)"}>
+				<defs>
+					<clipPath id=${playerBodyClipId}>
+						<path d=${drawing.bodyPath} />
+					</clipPath>
+				</defs>
+				${playerWheelsTemplate(drawing.view)}
+				<path d=${drawing.bodyPath} fill="#f3ad50" />
+				<g clip-path=${`url(#${playerBodyClipId})`} shape-rendering="crispEdges">
+					${playerBodyInteriorTemplate(drawing.view)}
+				</g>
+				<path d=${drawing.bodyPath} fill="none" stroke="#503b37" stroke-width="7" stroke-linejoin="round" />
+				${playerFaceTemplate(drawing.view, handlingObject)}
 			</g>
-			<path d=${playerBodyPath} fill="none" stroke="#503b37" stroke-width="7" />
-			${playerFaceTemplate(handlingObject)}
 		</g>
 	`;
 };

@@ -57,7 +57,7 @@ describe("support surfaces", () => {
 		).toEqual([plant]);
 	});
 
-	test("keeps an offset crate supported while any footprint still overlaps", () => {
+	test("keeps an offset crate supported while any body bounds still overlap", () => {
 		const lowerCrate = EntityId(942);
 		const upperCrate = EntityId(943);
 		const lowerPosition = Position.make({ x: 500, y: 400 });

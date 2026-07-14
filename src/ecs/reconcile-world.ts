@@ -1,4 +1,5 @@
 import { defaultEditorItemHeight, isEditorItemKind } from "../model/editor";
+import { isPlayerFacing, PlayerFacings } from "../model/player-facing";
 import { surfaceAt } from "./collision";
 import {
 	groundElevation,
@@ -64,6 +65,10 @@ export const reconcileWorld = (world: World): World => {
 			invalidPlacement: null,
 		},
 		pressed: new Set(),
+		playerFacing: isPlayerFacing(world.playerFacing)
+			? world.playerFacing
+			: PlayerFacings.Down,
+		playerTrail: [],
 		grabbed: null,
 		pushing: null,
 		lastFrame: 0,

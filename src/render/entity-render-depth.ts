@@ -1,10 +1,10 @@
 import { overlaps } from "../ecs/collision";
 import { editorItemKindForEntity } from "../ecs/editor-sizing";
 import {
+	bodyBoundsOverlap,
 	canSitOnSupport,
 	entityBaseElevation,
 	entityTopElevation,
-	footprintsOverlap,
 } from "../ecs/elevation";
 import {
 	groundElevation,
@@ -19,6 +19,8 @@ import { visualDepth } from "./projection";
 export const supportedObjectDepthOffset = 0.5;
 const supportSurfaceDepthSpan = 0.25;
 const playerDepthTieBreak = 0.001;
+const surfacePointDepthTieBreak = 0.001;
+const surfacePointBody = { width: 1, depth: 1 } as const;
 
 const supportSurfaceProgress = (
 	supportPositionY: number,
@@ -59,7 +61,7 @@ const renderDepthForEntityInternal = (
 		if (
 			supportPosition === undefined ||
 			supportBody === undefined ||
-			!footprintsOverlap(supportPosition, supportBody, position, body)
+			!bodyBoundsOverlap(supportPosition, supportBody, position, body)
 		)
 			continue;
 
@@ -81,6 +83,45 @@ const renderDepthForEntityInternal = (
 
 export const renderDepthForEntity = (world: World, entity: EntityId): number =>
 	renderDepthForEntityInternal(world, entity, new Set());
+
+export const renderDepthForSurfacePoint = (
+	world: World,
+	position: { readonly x: number; readonly y: number },
+	elevation: number,
+): number => {
+	let depth = visualDepth(position);
+	for (const [entity] of world.obstacles) {
+		const obstaclePosition = world.positions.get(entity);
+		const obstacleBody = world.bodies.get(entity);
+		if (
+			obstaclePosition === undefined ||
+			obstacleBody === undefined ||
+			!overlaps(position, surfacePointBody, obstaclePosition, obstacleBody)
+		)
+			continue;
+		const entityDepth = renderDepthForEntity(world, entity);
+		if (
+			elevation <
+			entityTopElevation(world, entity) - obstacleHeightTolerance
+		) {
+			depth = Math.min(depth, entityDepth - surfacePointDepthTieBreak);
+			continue;
+		}
+
+		const surfaceProgress = supportSurfaceProgress(
+			obstaclePosition.y,
+			obstacleBody.depth,
+			position.y,
+		);
+		depth = Math.max(
+			depth,
+			entityDepth +
+				supportedObjectDepthOffset +
+				surfaceProgress * supportSurfaceDepthSpan,
+		);
+	}
+	return depth;
+};
 
 export const renderDepthForPlayer = (world: World): number => {
 	const position = world.positions.get(playerEntity);

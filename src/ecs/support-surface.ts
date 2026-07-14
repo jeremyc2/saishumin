@@ -2,10 +2,10 @@ import type { Body, Position } from "../model/component";
 import type { EntityId } from "../model/entity-id";
 import { editorItemKindForEntity } from "./editor-sizing";
 import {
+	bodyBoundsOverlap,
 	canSitOnSupport,
 	entityBaseElevation,
 	entityTopElevation,
-	footprintsOverlap,
 } from "./elevation";
 import { obstacleHeightTolerance, type World } from "./world";
 
@@ -34,7 +34,7 @@ export const entitiesSupportedBy = (
 			body !== undefined &&
 			Math.abs(entityBaseElevation(world, entity) - surfaceTop) <=
 				obstacleHeightTolerance &&
-			footprintsOverlap(surfacePosition, surfaceBody, position, body)
+			bodyBoundsOverlap(surfacePosition, surfaceBody, position, body)
 		)
 			supported.push(entity);
 	}
@@ -74,7 +74,7 @@ export const isSupportSurfaceTransformValid = (
 		return (
 			supportedPosition !== undefined &&
 			supportedBody !== undefined &&
-			footprintsOverlap(position, body, supportedPosition, supportedBody)
+			bodyBoundsOverlap(position, body, supportedPosition, supportedBody)
 		);
 	});
 };

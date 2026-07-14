@@ -4,6 +4,7 @@
 	"scripts": {
 		"build": "bun scripts/build.ts",
 		"dev": "bun --hot index.html",
+		"dev:ai": "bun --hot --port 4010 index.html",
 		"test": "bun test",
 		"typecheck": "tsc",
 		"check": "bun --bun biome check --write",

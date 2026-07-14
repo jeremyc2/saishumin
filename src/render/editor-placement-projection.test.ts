@@ -84,10 +84,7 @@ describe("editor placement projection", () => {
 			),
 		};
 		const desiredPosition = Position.make({ x: 575, y: 300 });
-		const pointer = project(
-			desiredPosition,
-			platformHeight + lowerHeight,
-		);
+		const pointer = project(desiredPosition, platformHeight + lowerHeight);
 
 		expect(
 			editorPlacementPositionAtPointer(

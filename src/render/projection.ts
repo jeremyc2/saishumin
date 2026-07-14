@@ -61,7 +61,7 @@ export const followCamera = (
 export const points = (corners: ReadonlyArray<Position>): string =>
 	corners.map(({ x, y }) => `${x},${y}`).join(" ");
 
-export const footprint = (
+export const projectedRectangle = (
 	position: Position,
 	body: Body,
 	z = 0,

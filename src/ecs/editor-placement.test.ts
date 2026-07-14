@@ -18,7 +18,7 @@ const wallEntity = wallEntities[0];
 const smallBody = Body.make({ width: 40, depth: 40 });
 
 describe("editor placement", () => {
-	test("requires the entire footprint to stay inside the floor", () => {
+	test("requires the entire body to stay inside the floor", () => {
 		expect(
 			isInsideFloorPlan(
 				initialWorld,

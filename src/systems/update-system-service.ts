@@ -17,6 +17,7 @@ import {
 	isPlayerPlacementValid,
 	nearestValidPlayerPosition,
 } from "../ecs/player-placement";
+import { advancePlayerTrail } from "../ecs/player-trail";
 import { isSupportSurfaceOccupied } from "../ecs/support-surface";
 import {
 	crateGrabDistance,
@@ -54,6 +55,7 @@ import {
 	editorItemHeightLimits,
 } from "../model/editor";
 import { EntityId, type EntityId as EntityIdType } from "../model/entity-id";
+import { playerFacingForDirections } from "../model/player-facing";
 import {
 	cameraForFloor,
 	followCamera,
@@ -351,7 +353,15 @@ export class UpdateSystemService extends Context.Service<
 							const nextPressed = new Set(world.pressed);
 							if (pressed) nextPressed.add(key);
 							else nextPressed.delete(key);
-							return { ...world, pressed: nextPressed, pushing: null };
+							return {
+								...world,
+								pressed: nextPressed,
+								playerFacing: playerFacingForDirections(
+									nextPressed,
+									world.playerFacing,
+								),
+								pushing: null,
+							};
 						},
 						Tick: ({ time }) => {
 							if (world.editor.open) return { ...world, lastFrame: time };
@@ -361,9 +371,10 @@ export class UpdateSystemService extends Context.Service<
 								maximumFrameElapsedSeconds,
 							);
 							const moved = movementSystem.update(world, elapsed);
+							const withTrail = advancePlayerTrail(world, moved, elapsed);
 							return {
-								...moved,
-								gameCamera: cameraFollowingPlayer(moved, world.gameCamera),
+								...withTrail,
+								gameCamera: cameraFollowingPlayer(withTrail, world.gameCamera),
 								lastFrame: time,
 							};
 						},
@@ -372,6 +383,7 @@ export class UpdateSystemService extends Context.Service<
 							let toggled: World = {
 								...world,
 								pressed: new Set<Direction>(),
+								playerTrail: [],
 								grabbed: null,
 								pushing: null,
 								lastFrame: 0,

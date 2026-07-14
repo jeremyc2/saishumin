@@ -359,7 +359,7 @@ describe("MovementSystemService", () => {
 		});
 	});
 
-	test("holds a crate over a ledge until its entire footprint leaves", () => {
+	test("holds a crate over a ledge until its entire body clears", () => {
 		const crateEntity = EntityId(942);
 		const platformEntity = EntityId(943);
 		const platformHeight = 40;

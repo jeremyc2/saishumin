@@ -1,8 +1,8 @@
 import {
+	bodyBoundsOverlap,
 	canSitOnPlatform,
 	canSitOnSupport,
 	entityTopElevation,
-	footprintsOverlap,
 } from "../ecs/elevation";
 import { groundElevation, type World } from "../ecs/world";
 import type { Body, Position } from "../model/component";
@@ -50,7 +50,7 @@ export const editorPlacementPositionAtPointer = (
 		);
 		if (
 			elevation >= resolvedElevation &&
-			footprintsOverlap(platformPosition, platformBody, candidate, body)
+			bodyBoundsOverlap(platformPosition, platformBody, candidate, body)
 		) {
 			resolvedElevation = elevation;
 			resolvedPosition = candidate;

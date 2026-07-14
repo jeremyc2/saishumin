@@ -81,6 +81,8 @@ const program = Effect.gen(function* () {
 					next.floorPlan !== current.floorPlan ||
 					next.gameCamera !== current.gameCamera ||
 					next.editor !== current.editor ||
+					next.playerFacing !== current.playerFacing ||
+					next.playerTrail !== current.playerTrail ||
 					next.grabbed !== current.grabbed
 				)
 					renderSystem.render(next, dispatch);

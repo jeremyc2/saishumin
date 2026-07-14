@@ -27,7 +27,7 @@ export const verticalRangesOverlap = (
 	otherHeight: number,
 ): boolean => base < otherBase + otherHeight && otherBase < base + height;
 
-export const containsFootprint = (
+export const containsBodyBounds = (
 	containerPosition: Position,
 	containerBody: Body,
 	position: Position,
@@ -41,7 +41,7 @@ export const containsFootprint = (
 		containerPosition.y - containerBody.depth / 2 &&
 	position.y + body.depth / 2 <= containerPosition.y + containerBody.depth / 2;
 
-export const footprintsOverlap = (
+export const bodyBoundsOverlap = (
 	position: Position,
 	body: Body,
 	otherPosition: Position,
@@ -83,7 +83,7 @@ export const placementElevationForKind = (
 			platformPosition !== undefined &&
 			platformBody !== undefined &&
 			surfaceTop <= maximumElevation + obstacleHeightTolerance &&
-			footprintsOverlap(platformPosition, platformBody, position, body)
+			bodyBoundsOverlap(platformPosition, platformBody, position, body)
 		)
 			elevation = Math.max(elevation, surfaceTop);
 	}
@@ -133,7 +133,7 @@ export const shadowElevationForEntity = (
 		if (
 			supportPosition !== undefined &&
 			supportBody !== undefined &&
-			containsFootprint(supportPosition, supportBody, position, body)
+			containsBodyBounds(supportPosition, supportBody, position, body)
 		)
 			return base;
 	}

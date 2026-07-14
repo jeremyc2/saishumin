@@ -1,6 +1,6 @@
 import { Context, Layer } from "effect";
 import { html, render, svg, type TemplateResult } from "lit-html";
-import { surfaceAt } from "../ecs/collision";
+import { supportSurfaceAt, surfaceAt } from "../ecs/collision";
 import {
 	isEntityPlacementValid,
 	isFloorPlanPlacementValid,
@@ -23,8 +23,10 @@ import {
 	minimumEntityExtent,
 	minimumFloorDepth,
 	minimumFloorWidth,
+	obstacleHeightTolerance,
 	playerBody,
 	playerEntity,
+	stationaryVelocity,
 	type World,
 } from "../ecs/world";
 import { Action } from "../model/action";
@@ -42,15 +44,21 @@ import {
 	EditorItemKinds,
 } from "../model/editor";
 import type { EntityId } from "../model/entity-id";
+import {
+	type PlayerTrailMark,
+	playerTrailMarkSpacing,
+} from "../model/player-trail";
 import { editorPlacementPositionAtPointer } from "../render/editor-placement-projection";
 import {
 	renderDepthForEntity,
 	renderDepthForPlayer,
+	renderDepthForSurfacePoint,
 } from "../render/entity-render-depth";
+import { playerTireTrackSurfaceOutline } from "../render/player-tire-track";
 import {
-	footprint,
 	points,
 	project,
+	projectedRectangle,
 	unproject,
 	viewport,
 } from "../render/projection";
@@ -60,6 +68,9 @@ import {
 	crateTemplate,
 	decorationTemplate,
 	playerTemplate,
+	playerTireTrackCenter,
+	playerTireTrackIsTurning,
+	playerTireTrackTreadTemplate,
 } from "../render/templates";
 
 type Dispatch = (action: Action) => void;
@@ -664,7 +675,7 @@ export class RenderSystemService extends Context.Service<
 			if (selected === null) return svg``;
 			const accent = invalidPreview ? "#e59a91" : "#fff0a8";
 			if (selected === "floor") {
-				const outline = footprint(
+				const outline = projectedRectangle(
 					{ x: world.floorPlan.width / 2, y: world.floorPlan.depth / 2 },
 					world.floorPlan,
 				);
@@ -795,7 +806,7 @@ export class RenderSystemService extends Context.Service<
 			const position = world.positions.get(selected);
 			const body = world.bodies.get(selected);
 			if (position === undefined || body === undefined) return svg``;
-			const outline = footprint(
+			const outline = projectedRectangle(
 				position,
 				body,
 				entityBaseElevation(world, selected),
@@ -1249,7 +1260,7 @@ export class RenderSystemService extends Context.Service<
 				<svg data-editor-create-preview data-can-drop=${String(interaction.canDrop)} aria-hidden="true" class="pointer-events-none absolute inset-0 z-40 h-full w-full" viewBox=${`0 0 ${viewport.width} ${viewport.height}`} preserveAspectRatio="xMidYMid meet">
 					<g transform=${`translate(${world.editor.camera.x} ${world.editor.camera.y})`}>
 						<g opacity="0.82">${visual}</g>
-						<polygon data-editor-create-outline points=${points(footprint(position, body, baseElevation))} fill="none" stroke=${accent} stroke-width="4" stroke-dasharray="10 7" vector-effect="non-scaling-stroke" />
+						<polygon data-editor-create-outline points=${points(projectedRectangle(position, body, baseElevation))} fill="none" stroke=${accent} stroke-width="4" stroke-dasharray="10 7" vector-effect="non-scaling-stroke" />
 					</g>
 				</svg>
 			`;
@@ -1262,10 +1273,16 @@ export class RenderSystemService extends Context.Service<
 			const playerPosition = world.positions.get(playerEntity);
 			const playerElevation = world.elevations.get(playerEntity);
 			if (playerPosition === undefined || playerElevation === undefined) return;
+			const playerSurface = surfaceAt(
+				world,
+				playerPosition,
+				playerBody,
+				playerElevation.z,
+			);
 
 			const camera = world.editor.open ? world.editor.camera : world.gameCamera;
 			const invalidPreview = activePlacementIsInvalid(world);
-			const floor = footprint(
+			const floor = projectedRectangle(
 				{ x: world.floorPlan.width / 2, y: world.floorPlan.depth / 2 },
 				world.floorPlan,
 			);
@@ -1355,12 +1372,126 @@ export class RenderSystemService extends Context.Service<
 				});
 			}
 			if (!world.editor.open) {
+				const trailPoints: Array<PlayerTrailMark> = [...world.playerTrail];
+				const lastPoint = trailPoints.at(-1);
+				if (lastPoint !== undefined) {
+					const playerDistance = Math.hypot(
+						playerPosition.x - lastPoint.position.x,
+						playerPosition.y - lastPoint.position.y,
+					);
+					if (
+						playerDistance > 0.1 &&
+						playerDistance <= playerTrailMarkSpacing * 2 &&
+						playerElevation.velocity === stationaryVelocity &&
+						playerElevation.z === playerSurface &&
+						Math.abs(lastPoint.elevation - playerSurface) <=
+							obstacleHeightTolerance
+					) {
+						trailPoints.push({
+							position: playerPosition,
+							elevation: playerSurface,
+							supportEntity: supportSurfaceAt(
+								world,
+								playerPosition,
+								playerBody,
+								playerElevation.z,
+							).entity,
+							facing: world.playerFacing,
+							age: lastPoint.age,
+						});
+					}
+				}
+				const marksAreConnected = (
+					start: PlayerTrailMark | undefined,
+					end: PlayerTrailMark | undefined,
+				): boolean =>
+					start !== undefined &&
+					end !== undefined &&
+					Math.hypot(
+						end.position.x - start.position.x,
+						end.position.y - start.position.y,
+					) <=
+						playerTrailMarkSpacing * 2 &&
+					Math.abs(end.elevation - start.elevation) <= obstacleHeightTolerance;
+				const trailContexts = trailPoints.map((mark, index) => {
+					const candidatePrevious = trailPoints[index - 1];
+					const candidateNext = trailPoints[index + 1];
+					const previous = marksAreConnected(candidatePrevious, mark)
+						? candidatePrevious
+						: undefined;
+					const next = marksAreConnected(mark, candidateNext)
+						? candidateNext
+						: undefined;
+					return {
+						mark,
+						previous,
+						next,
+						turning: playerTireTrackIsTurning(previous, mark, next),
+					};
+				});
+				const minimumTreadSpacing = 9;
+				for (let index = 0; index < trailContexts.length; index++) {
+					const context = trailContexts[index];
+					if (context === undefined) continue;
+					const clipOutline = playerTireTrackSurfaceOutline(
+						world,
+						context.mark,
+					);
+					if (clipOutline === undefined) continue;
+					for (const side of ["left", "right"] as const) {
+						const center = playerTireTrackCenter(
+							context.previous,
+							context.mark,
+							context.next,
+							side,
+						);
+						const adjacentTurnIsTooClose = (
+							adjacent: (typeof trailContexts)[number] | undefined,
+						): boolean => {
+							if (context.turning || adjacent?.turning !== true) return false;
+							const adjacentCenter = playerTireTrackCenter(
+								adjacent.previous,
+								adjacent.mark,
+								adjacent.next,
+								side,
+							);
+							return (
+								Math.hypot(
+									center.x - adjacentCenter.x,
+									center.y - adjacentCenter.y,
+								) < minimumTreadSpacing
+							);
+						};
+						if (
+							adjacentTurnIsTooClose(trailContexts[index - 1]) ||
+							adjacentTurnIsTooClose(trailContexts[index + 1])
+						)
+							continue;
+						objects.push({
+							depth: renderDepthForSurfacePoint(
+								world,
+								context.mark.position,
+								context.mark.elevation,
+							),
+							template: playerTireTrackTreadTemplate(
+								context.previous,
+								context.mark,
+								context.next,
+								{
+									outline: clipOutline,
+								},
+								side,
+							),
+						});
+					}
+				}
 				objects.push({
 					depth: playerDepth,
 					template: playerTemplate(
 						playerPosition,
 						playerElevation,
-						surfaceAt(world, playerPosition, playerBody, playerElevation.z),
+						playerSurface,
+						world.playerFacing,
 						world.grabbed !== null || world.pushing !== null,
 					),
 				});

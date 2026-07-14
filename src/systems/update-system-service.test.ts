@@ -35,6 +35,7 @@ import {
 	maximumEditorItemBody,
 } from "../model/editor";
 import { EntityId } from "../model/entity-id";
+import { PlayerFacings } from "../model/player-facing";
 import { MovementSystemService } from "./movement-system-service";
 import { UpdateSystemService } from "./update-system-service";
 
@@ -77,6 +78,28 @@ const makeWorld = ({
 });
 
 describe("UpdateSystemService", () => {
+	test("faces movement input and keeps facing after release", () => {
+		const facingUp = updateSystem.update(
+			initialWorld,
+			Action.KeyChanged({ key: Controls.Up, pressed: true }),
+		);
+		const facingUpLeft = updateSystem.update(
+			facingUp,
+			Action.KeyChanged({ key: Controls.Left, pressed: true }),
+		);
+		const stopped = updateSystem.update(
+			updateSystem.update(
+				facingUpLeft,
+				Action.KeyChanged({ key: Controls.Up, pressed: false }),
+			),
+			Action.KeyChanged({ key: Controls.Left, pressed: false }),
+		);
+
+		expect(facingUp.playerFacing).toBe(PlayerFacings.Up);
+		expect(facingUpLeft.playerFacing).toBe(PlayerFacings.UpLeft);
+		expect(stopped.playerFacing).toBe(PlayerFacings.Left);
+	});
+
 	test("grabs nearby plants and lamps on the player's surface", () => {
 		for (const [kind, height] of [
 			[DecorationKinds.Plant, 84],
@@ -323,7 +346,7 @@ describe("UpdateSystemService", () => {
 		expect(deleted.editor.selected).toBeNull();
 	});
 
-	test("enforces the maximum footprint for every editor object kind", () => {
+	test("enforces the maximum bounds for every editor object kind", () => {
 		const emptyLargeWorld: World = {
 			...initialWorld,
 			positions: new Map([[playerEntity, Position.make({ x: 100, y: 100 })]]),
@@ -640,7 +663,7 @@ describe("UpdateSystemService", () => {
 		expect(restored.editor.invalidPlacement).toBeNull();
 	});
 
-	test("rejects an overlapping resize and restores its starting footprint", () => {
+	test("rejects an overlapping resize and restores its starting bounds", () => {
 		const entity = crateEntities[0];
 		const otherEntity = crateEntities[1];
 		const originalPosition = Position.make({ x: 300, y: 300 });
