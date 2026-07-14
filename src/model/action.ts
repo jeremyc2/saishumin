@@ -8,6 +8,7 @@ export type Action = Data.TaggedEnum<{
 	KeyChanged: { readonly key: Control; readonly pressed: boolean };
 	Tick: { readonly time: number };
 	EditorToggled: Record<never, never>;
+	TireTracksToggled: Record<never, never>;
 	EditorSelectionChanged: { readonly selection: EditorSelection };
 	EditorItemAdded: {
 		readonly kind: EditorItemKind;

@@ -41,7 +41,6 @@ const crateVisual = {
 	nailRadius: 2,
 	shadowOpacity: 0.24,
 	verticalStripOpacity: 0.7,
-	topBoardDepthOffsets: [-8, 9],
 } as const;
 
 const playerShadowVisual = {
@@ -142,6 +141,13 @@ export const crateShadowDepthOffset = (
 	shadowElevation: number,
 ): number =>
 	shadowElevation < baseElevation ? crateVisual.shadowDepthOffset : 0;
+
+export const crateTopBoardDepthOffsets = (
+	depth: number,
+): readonly [number, number] => {
+	const insetDepth = Math.max(4, depth - crateVisual.topInsetDepth);
+	return [-insetDepth / 6, insetDepth / 6];
+};
 
 export type TireTrackSide = "left" | "right";
 
@@ -588,7 +594,7 @@ export const crateTemplate = (
 		])} fill="#945936" />
 		<polygon points=${points(top)} fill="#d6a15d" />
 		<polygon points=${points(topInset)} fill="#c48349" stroke="#70452f" stroke-width="2" stroke-linejoin="round" />
-		${crateVisual.topBoardDepthOffsets.map((depthOffset) => {
+		${crateTopBoardDepthOffsets(body.depth).map((depthOffset) => {
 			const y = project(
 				{ x: position.x, y: position.y + depthOffset },
 				baseElevation + height + crateVisual.topLift,

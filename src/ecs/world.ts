@@ -26,6 +26,7 @@ export type World = {
 	readonly pressed: ReadonlySet<Direction>;
 	readonly playerFacing: PlayerFacing;
 	readonly playerTrail: ReadonlyArray<PlayerTrailMark>;
+	readonly tireTracksEnabled: boolean;
 	readonly grabbed: EntityId | null;
 	readonly pushing: EntityId | null;
 	readonly lastFrame: number;
@@ -193,6 +194,7 @@ export const initialWorld: World = {
 	pressed: new Set(),
 	playerFacing: PlayerFacings.Down,
 	playerTrail: [],
+	tireTracksEnabled: true,
 	grabbed: null,
 	pushing: null,
 	lastFrame: 0,

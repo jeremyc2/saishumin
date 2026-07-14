@@ -79,6 +79,16 @@ describe("advancePlayerTrail", () => {
 		expect(airborne.playerTrail).toEqual([]);
 	});
 
+	test("does not leave marks while tire tracks are disabled", () => {
+		const disabled = advancePlayerTrail(
+			worldAt(300, 300),
+			{ ...worldAt(310, 300), tireTracksEnabled: false },
+			0.05,
+		);
+
+		expect(disabled.playerTrail).toEqual([]);
+	});
+
 	test("removes marks after the configured lifetime", () => {
 		const mark: PlayerTrailMark = {
 			position: Position.make({ x: 280, y: 300 }),

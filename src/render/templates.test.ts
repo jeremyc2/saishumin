@@ -5,6 +5,7 @@ import type { PlayerTrailMark } from "../model/player-trail";
 import {
 	clipTireTrackPolygonToSurface,
 	crateShadowDepthOffset,
+	crateTopBoardDepthOffsets,
 	playerDrawingForFacing,
 	playerTireTrackDirection,
 	playerTireTrackIsTurning,
@@ -14,6 +15,24 @@ describe("crate shadows", () => {
 	test("only offsets shadow sections below the supporting surface", () => {
 		expect(crateShadowDepthOffset(62, 62)).toBe(0);
 		expect(crateShadowDepthOffset(62, 0)).toBeGreaterThan(0);
+	});
+});
+
+describe("crate top boards", () => {
+	test("splits a deep crate top into three equal boards", () => {
+		const [firstDivider, secondDivider] = crateTopBoardDepthOffsets(240);
+		const insetDepth = 240 - 18;
+		const boardDepths = [
+			firstDivider + insetDepth / 2,
+			secondDivider - firstDivider,
+			insetDepth / 2 - secondDivider,
+		];
+
+		expect(boardDepths).toEqual([
+			insetDepth / 3,
+			insetDepth / 3,
+			insetDepth / 3,
+		]);
 	});
 });
 

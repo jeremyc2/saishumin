@@ -423,6 +423,11 @@ export class UpdateSystemService extends Context.Service<
 								gameCamera: cameraFollowingPlayer(toggled, world.gameCamera),
 							};
 						},
+						TireTracksToggled: () => ({
+							...world,
+							tireTracksEnabled: !world.tireTracksEnabled,
+							playerTrail: [],
+						}),
 						EditorSelectionChanged: ({ selection }) =>
 							world.editor.open
 								? { ...world, editor: { ...world.editor, selected: selection } }

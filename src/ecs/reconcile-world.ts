@@ -69,6 +69,8 @@ export const reconcileWorld = (world: World): World => {
 			? world.playerFacing
 			: PlayerFacings.Down,
 		playerTrail: [],
+		tireTracksEnabled:
+			world.tireTracksEnabled ?? initialWorld.tireTracksEnabled,
 		grabbed: null,
 		pushing: null,
 		lastFrame: 0,

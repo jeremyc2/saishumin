@@ -21,6 +21,11 @@ export const advancePlayerTrail = (
 	moved: World,
 	elapsed: number,
 ): World => {
+	if (!moved.tireTracksEnabled) {
+		return moved.playerTrail.length === 0
+			? moved
+			: { ...moved, playerTrail: [] };
+	}
 	const aged = previous.playerTrail
 		.map((mark) => ({ ...mark, age: mark.age + elapsed }))
 		.filter((mark) => mark.age < playerTrailLifetimeSeconds);

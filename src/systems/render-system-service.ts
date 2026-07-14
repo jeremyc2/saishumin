@@ -1372,7 +1372,9 @@ export class RenderSystemService extends Context.Service<
 				});
 			}
 			if (!world.editor.open) {
-				const trailPoints: Array<PlayerTrailMark> = [...world.playerTrail];
+				const trailPoints: Array<PlayerTrailMark> = world.tireTracksEnabled
+					? [...world.playerTrail]
+					: [];
 				const lastPoint = trailPoints.at(-1);
 				if (lastPoint !== undefined) {
 					const playerDistance = Math.hypot(
@@ -1547,11 +1549,32 @@ export class RenderSystemService extends Context.Service<
 						</svg>
 
 						<h1 class="pointer-events-none absolute top-7 left-7 m-0 select-none text-[27px] font-bold tracking-[0.16em] text-[#fff1d6]">SAISHUMIN</h1>
-						<button
-							type="button"
-							class=${`absolute top-6 z-40 rounded-xl border border-[#e8b875]/70 bg-[#0d181f]/92 px-4 py-3 text-[12px] font-bold tracking-[0.12em] text-[#fff1d6] shadow-lg transition hover:-translate-y-0.5 hover:bg-[#1b2d34] ${world.editor.open ? "right-[360px]" : "right-6"}`}
-							@click=${() => dispatch(Action.EditorToggled())}
-						>${world.editor.open ? "▶ PLAY" : "✦ WORLD EDITOR"}</button>
+						<div
+							class=${`absolute top-6 z-40 flex flex-col items-end gap-2 ${world.editor.open ? "right-[360px]" : "right-6"}`}
+						>
+							<button
+								type="button"
+								class="rounded-xl border border-[#e8b875]/70 bg-[#0d181f]/92 px-4 py-3 text-[12px] font-bold tracking-[0.12em] text-[#fff1d6] shadow-lg transition-colors hover:bg-[#1b2d34] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#fff1d6]"
+								@click=${() => dispatch(Action.EditorToggled())}
+							>${world.editor.open ? "▶ PLAY" : "✦ WORLD EDITOR"}</button>
+							<button
+								type="button"
+								aria-label=${world.tireTracksEnabled ? "Hide tracks" : "Show tracks"}
+								aria-pressed=${String(world.tireTracksEnabled)}
+								class="flex items-center gap-3 rounded-xl border border-[#819993]/70 bg-[#0d181f]/92 py-2 pr-2 pl-3 text-[11px] font-bold tracking-[0.12em] text-[#fff1d6] shadow-lg transition-colors hover:border-[#e8b875] hover:bg-[#1b2d34] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#fff1d6]"
+								@click=${() => dispatch(Action.TireTracksToggled())}
+							>
+								<span class="w-28 shrink-0 text-right whitespace-nowrap">${world.tireTracksEnabled ? "HIDE TRACKS" : "SHOW TRACKS"}</span>
+								<span
+									aria-hidden="true"
+									class=${`relative h-6 w-11 rounded-full border shadow-inner transition-colors ${world.tireTracksEnabled ? "border-[#f3cc86] bg-[#c6833f]" : "border-[#526970] bg-[#253940]"}`}
+								>
+									<span
+										class=${`absolute top-1/2 left-px h-5 w-5 -translate-y-1/2 rounded-full bg-[#fff1d6] shadow-[0_1px_3px_rgba(3,9,12,0.55)] transition-transform ${world.tireTracksEnabled ? "translate-x-5" : "translate-x-0"}`}
+									></span>
+								</span>
+							</button>
+						</div>
 
 						${
 							world.editor.open

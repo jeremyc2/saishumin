@@ -245,6 +245,28 @@ describe("UpdateSystemService", () => {
 		expect(afterTick.lastFrame).toBe(1050);
 	});
 
+	test("toggles tire tracks and clears existing marks", () => {
+		const world = {
+			...initialWorld,
+			playerTrail: [
+				{
+					position: { x: 210, y: 360 },
+					elevation: groundElevation,
+					supportEntity: null,
+					facing: PlayerFacings.Down,
+					age: 0,
+				},
+			],
+		};
+
+		const hidden = updateSystem.update(world, Action.TireTracksToggled());
+		const shown = updateSystem.update(hidden, Action.TireTracksToggled());
+
+		expect(hidden.tireTracksEnabled).toBe(false);
+		expect(hidden.playerTrail).toEqual([]);
+		expect(shown.tireTracksEnabled).toBe(true);
+	});
+
 	test("allows editing over the hidden player and relocates them for play", () => {
 		const entity = crateEntities[0];
 		const playerPosition = initialWorld.positions.get(playerEntity);
