@@ -8,8 +8,8 @@
 		"test": "bun test",
 		"typecheck": "tsc",
 		"check": "bun --bun biome check --write",
-		"otaku:update": "git submodule update --init vendor/otaku",
-		"references:update": "git submodule update --init --recursive reference_repositories/effect-smol reference_repositories/mattpocock-skills",
+		"otaku:update": "git submodule update --init vendor/otaku && git -C vendor/otaku fetch origin && git -C vendor/otaku switch main && git -C vendor/otaku pull --ff-only origin main",
+		"references:update": "git submodule update --init --recursive reference_repositories/effect-smol reference_repositories/mattpocock-skills && git -C reference_repositories/effect-smol fetch origin && git -C reference_repositories/effect-smol switch main && git -C reference_repositories/effect-smol pull --ff-only origin main && git -C reference_repositories/mattpocock-skills fetch origin && git -C reference_repositories/mattpocock-skills switch main && git -C reference_repositories/mattpocock-skills pull --ff-only origin main",
 		"chore:update": "bun update --latest && bun add effect@beta",
 		"all:update": "bun references:update && bun otaku:update && bun chore:update",
 		"prepare": "effect-tsgo patch"
