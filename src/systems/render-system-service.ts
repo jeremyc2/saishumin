@@ -1027,7 +1027,7 @@ export class RenderSystemService extends Context.Service<
 			return html`
 				<aside data-editor-panel class="absolute top-0 right-0 z-30 flex h-full w-85 flex-col overscroll-contain border-l border-[#41565a] bg-[#0d181f]/98 text-[#fff1d6] shadow-[-18px_0_44px_rgba(3,9,12,0.38)]">
 					<header class="border-b border-[#30434a] px-5 pt-6 pb-4">
-						<div class="text-lg font-heading font-bold tracking-[0.2em] text-[#e8b875] uppercase">World editor</div>
+						<div class="text-lg font-heading font-bold tracking-[0.2em] text-[#e8b875] uppercase">Design studio</div>
 						<div class="text-[11px] leading-relaxed text-[#819993]">Scroll to pan · Command/Control-drag to pan</div>
 					</header>
 
@@ -1634,7 +1634,7 @@ export class RenderSystemService extends Context.Service<
 							viewBox=${`0 0 ${viewport.width} ${viewport.height}`}
 							preserveAspectRatio="xMidYMid meet"
 							role="img"
-							aria-label=${world.editor.open ? "Infinite canvas world editor" : "Room exploration game"}
+							aria-label=${world.editor.open ? "Infinite canvas design studio" : "Room exploration game"}
 							@pointerdown=${canvasPointerDown}
 						>
 							<defs>
@@ -1694,7 +1694,7 @@ export class RenderSystemService extends Context.Service<
 									<path d="m18 15 4-4" />
 									<path d="m21.5 11.5-1.914-1.914A2 2 0 0 1 19 8.172v-.344a2 2 0 0 0-.586-1.414l-1.657-1.657A6 6 0 0 0 12.516 3H9l1.243 1.243A6 6 0 0 1 12 8.485V10l2 2h1.172a2 2 0 0 1 1.414.586L18.5 14.5" />
 								</svg>
-								WORLD EDITOR`
+								DESIGN STUDIO`
 							}</button>
 							<button
 								type="button"

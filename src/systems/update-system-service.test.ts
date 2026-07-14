@@ -506,7 +506,7 @@ describe("UpdateSystemService", () => {
 		expect(deleted.editor.selected).toBeNull();
 	});
 
-	test("adds chests and signs in the world editor", () => {
+	test("adds chests and signs in the design studio", () => {
 		const editing = updateSystem.update(initialWorld, Action.EditorToggled());
 		const added = updateSystem.update(
 			editing,

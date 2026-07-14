@@ -16,7 +16,7 @@ import {
 /**
  * HMR state can outlive the module definitions that created it. Reconciliation
  * repairs required player state and transient inputs while preserving geometry
- * authored in the world editor.
+ * authored in the design studio.
  */
 export const reconcileWorld = (world: World): World => {
 	const floorPlan = world.floorPlan ?? initialWorld.floorPlan;
