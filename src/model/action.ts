@@ -1,5 +1,5 @@
 import { Data } from "effect";
-import type { Body, Position } from "./component";
+import type { Body, Position, SignContent } from "./component";
 import type { Control } from "./control";
 import type { EditorItemKind, EditorSelection } from "./editor";
 import type { EntityId } from "./entity-id";
@@ -38,6 +38,10 @@ export type Action = Data.TaggedEnum<{
 		readonly entity: EntityId;
 		readonly height: number;
 	};
+	EditorSignContentChanged: {
+		readonly entity: EntityId;
+		readonly content: SignContent;
+	};
 	EditorFloorResized: {
 		readonly floorPlan: Body;
 		readonly originDelta?: Position;
@@ -49,6 +53,7 @@ export type Action = Data.TaggedEnum<{
 	};
 	EditorCameraChanged: { readonly camera: Position };
 	EditorInvalidPlacementDismissed: Record<never, never>;
+	SignDismissed: Record<never, never>;
 	EditorDeleteSelected: Record<never, never>;
 }>;
 

@@ -7,6 +7,7 @@ import {
 	crateHeight,
 	groundElevation,
 	initialWorld,
+	interactionDistance,
 	jumpSpeed,
 	minimumEntityExtent,
 	minimumFloorDepth,
@@ -30,6 +31,7 @@ import {
 } from "../model/component";
 import { Controls, type Direction } from "../model/control";
 import {
+	defaultEditorItemBody,
 	EditorItemKinds,
 	editorItemHeightLimits,
 	maximumEditorItemBody,
@@ -98,6 +100,142 @@ describe("UpdateSystemService", () => {
 		expect(facingUp.playerFacing).toBe(PlayerFacings.Up);
 		expect(facingUpLeft.playerFacing).toBe(PlayerFacings.UpLeft);
 		expect(stopped.playerFacing).toBe(PlayerFacings.Left);
+	});
+
+	test("opens and closes a chest only from its front", () => {
+		const chest = EntityId(699);
+		const chestPosition = Position.make({ x: 500, y: 400 });
+		const chestBody = defaultEditorItemBody(EditorItemKinds.Chest);
+		const frontPosition = Position.make({
+			x: chestPosition.x,
+			y: chestPosition.y + (chestBody.depth + playerBody.depth) / 2,
+		});
+		const world: World = {
+			...initialWorld,
+			positions: new Map([
+				[playerEntity, frontPosition],
+				[chest, chestPosition],
+			]),
+			bodies: new Map([
+				[playerEntity, playerBody],
+				[chest, chestBody],
+			]),
+			obstacles: new Map([
+				[
+					chest,
+					Obstacle.make({
+						height: 52,
+						kind: ObstacleKinds.Chest,
+					}),
+				],
+			]),
+			decorations: new Map(),
+			elevations: new Map([
+				[
+					playerEntity,
+					Elevation.make({
+						z: groundElevation,
+						velocity: stationaryVelocity,
+					}),
+				],
+			]),
+			playerFacing: PlayerFacings.Up,
+		};
+
+		const opened = updateSystem.update(
+			world,
+			Action.KeyChanged({ key: Controls.Interact, pressed: true }),
+		);
+		expect(opened.openedChests.has(chest)).toBe(true);
+
+		const closed = updateSystem.update(
+			opened,
+			Action.KeyChanged({ key: Controls.Interact, pressed: true }),
+		);
+		expect(closed.openedChests.has(chest)).toBe(false);
+
+		const wrongFacing = updateSystem.update(
+			{ ...world, playerFacing: PlayerFacings.Down },
+			Action.KeyChanged({ key: Controls.Interact, pressed: true }),
+		);
+		expect(wrongFacing.openedChests.has(chest)).toBe(false);
+
+		const tooFar = updateSystem.update(
+			{
+				...world,
+				positions: new Map(world.positions).set(
+					playerEntity,
+					Position.make({
+						x: chestPosition.x,
+						y: frontPosition.y + interactionDistance + 1,
+					}),
+				),
+			},
+			Action.KeyChanged({ key: Controls.Interact, pressed: true }),
+		);
+		expect(tooFar.openedChests.has(chest)).toBe(false);
+	});
+
+	test("reads a sign only from its front and dismisses it with X", () => {
+		const sign = EntityId(698);
+		const signPosition = Position.make({ x: 500, y: 400 });
+		const signBody = defaultEditorItemBody(EditorItemKinds.Sign);
+		const frontPosition = Position.make({
+			x: signPosition.x,
+			y: signPosition.y + (signBody.depth + playerBody.depth) / 2,
+		});
+		const world: World = {
+			...initialWorld,
+			positions: new Map([
+				[playerEntity, frontPosition],
+				[sign, signPosition],
+			]),
+			bodies: new Map([
+				[playerEntity, playerBody],
+				[sign, signBody],
+			]),
+			obstacles: new Map(),
+			decorations: new Map([
+				[
+					sign,
+					Decoration.make({
+						height: 104,
+						kind: DecorationKinds.Sign,
+					}),
+				],
+			]),
+			elevations: new Map([
+				[
+					playerEntity,
+					Elevation.make({
+						z: groundElevation,
+						velocity: stationaryVelocity,
+					}),
+				],
+			]),
+			playerFacing: PlayerFacings.Up,
+		};
+
+		const reading = updateSystem.update(
+			world,
+			Action.KeyChanged({ key: Controls.Interact, pressed: true }),
+		);
+		expect(reading.readingSign).toBe(sign);
+
+		const dismissed = updateSystem.update(
+			reading,
+			Action.KeyChanged({ key: Controls.Interact, pressed: true }),
+		);
+		expect(dismissed.readingSign).toBeNull();
+		expect(
+			updateSystem.update(reading, Action.SignDismissed()).readingSign,
+		).toBeNull();
+
+		const wrongFacing = updateSystem.update(
+			{ ...world, playerFacing: PlayerFacings.Down },
+			Action.KeyChanged({ key: Controls.Interact, pressed: true }),
+		);
+		expect(wrongFacing.readingSign).toBeNull();
 	});
 
 	test("grabs nearby plants and lamps on the player's surface", () => {
@@ -366,6 +504,52 @@ describe("UpdateSystemService", () => {
 		expect(deleted.bodies.has(entity)).toBe(false);
 		expect(deleted.obstacles.has(entity)).toBe(false);
 		expect(deleted.editor.selected).toBeNull();
+	});
+
+	test("adds chests and signs in the world editor", () => {
+		const editing = updateSystem.update(initialWorld, Action.EditorToggled());
+		const added = updateSystem.update(
+			editing,
+			Action.EditorItemAdded({
+				kind: EditorItemKinds.Chest,
+				position: Position.make({ x: 100, y: 250 }),
+			}),
+		);
+		const chest = added.editor.selected;
+		expect(chest).not.toBeNull();
+		expect(chest).not.toBe("floor");
+		if (chest === null || chest === "floor") return;
+
+		expect(added.obstacles.get(chest)?.kind).toBe(ObstacleKinds.Chest);
+		expect(added.openedChests.has(chest)).toBe(false);
+
+		const withSign = updateSystem.update(
+			added,
+			Action.EditorItemAdded({
+				kind: EditorItemKinds.Sign,
+				position: Position.make({ x: 100, y: 400 }),
+			}),
+		);
+		const sign = withSign.editor.selected;
+		expect(sign).not.toBeNull();
+		expect(sign).not.toBe("floor");
+		if (sign === null || sign === "floor") return;
+		expect(withSign.decorations.get(sign)?.kind).toBe(DecorationKinds.Sign);
+
+		const withContent = updateSystem.update(
+			withSign,
+			Action.EditorSignContentChanged({
+				entity: sign,
+				content: {
+					title: "Wayfinder",
+					body: "Follow the lanterns to the village.",
+				},
+			}),
+		);
+		expect(withContent.signContents.get(sign)).toEqual({
+			title: "Wayfinder",
+			body: "Follow the lanterns to the village.",
+		});
 	});
 
 	test("enforces the maximum bounds for every editor object kind", () => {

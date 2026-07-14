@@ -1,14 +1,17 @@
 import { describe, expect, test } from "bun:test";
-import { Position } from "../model/component";
+import { Body, Position } from "../model/component";
 import { PlayerFacings } from "../model/player-facing";
 import type { PlayerTrailMark } from "../model/player-trail";
 import {
 	clipTireTrackPolygonToSurface,
+	closedChestTemplate,
 	crateShadowDepthOffset,
 	crateTopBoardDepthOffsets,
+	openChestTemplate,
 	playerDrawingForFacing,
 	playerTireTrackDirection,
 	playerTireTrackIsTurning,
+	signpostTemplate,
 } from "./templates";
 
 describe("crate shadows", () => {
@@ -33,6 +36,30 @@ describe("crate top boards", () => {
 			insetDepth / 3,
 			insetDepth / 3,
 		]);
+	});
+});
+
+describe("chest templates", () => {
+	test("use distinct open and closed artwork", () => {
+		const position = Position.make({ x: 300, y: 300 });
+		const body = Body.make({ width: 84, depth: 64 });
+		const closed = closedChestTemplate(position, body, 52);
+		const open = openChestTemplate(position, body, 52);
+
+		expect(closed.strings.join("")).toContain('data-chest-state="closed"');
+		expect(open.strings.join("")).toContain('data-chest-state="open"');
+	});
+});
+
+describe("signpost template", () => {
+	test("renders a wooden signpost", () => {
+		const template = signpostTemplate(
+			Position.make({ x: 300, y: 300 }),
+			Body.make({ width: 88, depth: 56 }),
+			104,
+		);
+
+		expect(template.strings.join("")).toContain('data-decoration-kind="sign"');
 	});
 });
 

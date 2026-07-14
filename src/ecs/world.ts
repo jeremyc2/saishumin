@@ -6,6 +6,7 @@ import {
 	Obstacle,
 	ObstacleKinds,
 	Position,
+	type SignContent,
 } from "../model/component";
 import type { Direction } from "../model/control";
 import type { EditorState } from "../model/editor";
@@ -27,6 +28,9 @@ export type World = {
 	readonly playerFacing: PlayerFacing;
 	readonly playerTrail: ReadonlyArray<PlayerTrailMark>;
 	readonly tireTracksEnabled: boolean;
+	readonly openedChests: ReadonlySet<EntityId>;
+	readonly signContents: ReadonlyMap<EntityId, SignContent>;
+	readonly readingSign: EntityId | null;
 	readonly grabbed: EntityId | null;
 	readonly pushing: EntityId | null;
 	readonly lastFrame: number;
@@ -53,6 +57,7 @@ export const obstacleHeightTolerance = 5;
 export const cratePushSlowdown = 0.4;
 export const fallResetElevation = -430;
 export const maximumFrameElapsedSeconds = 0.05;
+export const interactionDistance = playerSpeed * maximumFrameElapsedSeconds;
 export const millisecondsPerSecond = 1000;
 export const crateGrabDistance = 72;
 export const wallHeight = 80;
@@ -195,6 +200,9 @@ export const initialWorld: World = {
 	playerFacing: PlayerFacings.Down,
 	playerTrail: [],
 	tireTracksEnabled: true,
+	openedChests: new Set(),
+	signContents: new Map(),
+	readingSign: null,
 	grabbed: null,
 	pushing: null,
 	lastFrame: 0,

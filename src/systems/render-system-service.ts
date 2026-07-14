@@ -34,6 +34,7 @@ import {
 	type Body,
 	Decoration,
 	DecorationKinds,
+	defaultSignContent,
 	ObstacleKinds,
 	type Position,
 } from "../model/component";
@@ -65,6 +66,7 @@ import {
 import { type ResizeDirection, resizeFromHandle } from "../render/resize";
 import {
 	boxTemplate,
+	chestTemplate,
 	crateTemplate,
 	decorationTemplate,
 	playerTemplate,
@@ -178,6 +180,18 @@ const paletteItems: ReadonlyArray<{
 		icon: "□",
 		description: "Pushable object",
 	},
+	{
+		kind: EditorItemKinds.Chest,
+		label: "Chest",
+		icon: "▣",
+		description: "Open from the front",
+	},
+	{
+		kind: EditorItemKinds.Sign,
+		label: "Sign",
+		icon: "⚐",
+		description: "Read from the front",
+	},
 ];
 
 const interiorGridCoordinates = (
@@ -194,11 +208,13 @@ const entityLabel = (world: World, entity: EntityId): string => {
 	if (obstacle !== undefined) {
 		if (obstacle.kind === ObstacleKinds.Wall) return "Wall";
 		if (obstacle.kind === ObstacleKinds.Platform) return "Platform";
+		if (obstacle.kind === ObstacleKinds.Chest) return "Chest";
 		return "Crate";
 	}
 	const decoration = world.decorations.get(entity);
 	if (decoration?.kind === DecorationKinds.Rug) return "Rug";
 	if (decoration?.kind === DecorationKinds.Plant) return "Plant";
+	if (decoration?.kind === DecorationKinds.Sign) return "Sign";
 	return "Lamp";
 };
 
@@ -1003,6 +1019,11 @@ export class RenderSystemService extends Context.Service<
 				selectedEntity === undefined
 					? undefined
 					: editorEntityHeightLimits(world, selectedEntity);
+			const selectedSignContent =
+				selectedEntity === undefined ||
+				world.decorations.get(selectedEntity)?.kind !== DecorationKinds.Sign
+					? undefined
+					: (world.signContents.get(selectedEntity) ?? defaultSignContent);
 			return html`
 				<aside data-editor-panel class="absolute top-0 right-0 z-30 flex h-full w-85 flex-col overscroll-contain border-l border-[#41565a] bg-[#0d181f]/98 text-[#fff1d6] shadow-[-18px_0_44px_rgba(3,9,12,0.38)]">
 					<header class="border-b border-[#30434a] px-5 pt-6 pb-4">
@@ -1130,8 +1151,60 @@ export class RenderSystemService extends Context.Service<
 														)
 													: html``
 											}
-												</div>
-											</div>
+										</div>
+										${
+											selectedSignContent === undefined
+												? html``
+												: html`
+													<div class="mt-5 border-t border-[#30434a] pt-4">
+														<label class="block text-[11px] font-bold tracking-[0.14em] text-[#819993] uppercase">
+															Title
+															<input
+																type="text"
+																.value=${selectedSignContent.title}
+																class="mt-2 block w-full rounded-lg border border-[#3a5157] bg-[#16252c] px-3 py-2 text-[14px] font-semibold text-[#fff1d6] outline-none focus:border-[#e8b875]"
+																@change=${(event: Event) => {
+																	const input = event.currentTarget;
+																	if (!(input instanceof HTMLInputElement))
+																		return;
+																	dispatch(
+																		Action.EditorSignContentChanged({
+																			entity: selectedEntity,
+																			content: {
+																				...selectedSignContent,
+																				title: input.value,
+																			},
+																		}),
+																	);
+																}}
+															/>
+														</label>
+														<label class="mt-4 block text-[11px] font-bold tracking-[0.14em] text-[#819993] uppercase">
+															Body
+															<textarea
+																.value=${selectedSignContent.body}
+																rows="5"
+																class="mt-2 block w-full resize-y rounded-lg border border-[#3a5157] bg-[#16252c] px-3 py-2 text-[13px] leading-relaxed text-[#fff1d6] outline-none focus:border-[#e8b875]"
+																@change=${(event: Event) => {
+																	const input = event.currentTarget;
+																	if (!(input instanceof HTMLTextAreaElement))
+																		return;
+																	dispatch(
+																		Action.EditorSignContentChanged({
+																			entity: selectedEntity,
+																			content: {
+																				...selectedSignContent,
+																				body: input.value,
+																			},
+																		}),
+																	);
+																}}
+															></textarea>
+														</label>
+													</div>
+												`
+										}
+									</div>
 										`
 										: html`<div class="mt-3 rounded-xl border border-dashed border-[#30464c] px-4 py-5 text-center text-[11px] leading-relaxed text-[#819993]">Select an object to move or resize it.<br />Select the floor to change the plan.</div>`
 							}
@@ -1175,6 +1248,29 @@ export class RenderSystemService extends Context.Service<
 					</div>
 				</div>
 			`;
+		};
+
+		const signDialogTemplate = (
+			world: World,
+			dispatch: Dispatch,
+		): TemplateResult => {
+			const content =
+				world.readingSign === null
+					? defaultSignContent
+					: (world.signContents.get(world.readingSign) ?? defaultSignContent);
+			return html`
+			<div class="absolute inset-0 z-50 flex items-center justify-center bg-[#071015]/48 px-6" role="presentation">
+				<div class="flex max-h-[calc(100vh-3rem)] w-full max-w-95 flex-col rounded-2xl border border-[#8b633c] bg-[#ecd19e] px-6 py-5 shadow-[0_24px_70px_rgba(0,0,0,0.5)]" role="alertdialog" aria-modal="true" aria-labelledby="sign-title" aria-describedby="sign-description">
+					<div class="max-h-[calc(100vh-10rem)] overflow-y-auto overscroll-contain pr-2">
+						<div id="sign-title" class="break-words text-[17px] font-bold tracking-[0.04em] text-[#4b2f1e]">${content.title}</div>
+						<p id="sign-description" class="mt-2 mb-0 break-words whitespace-pre-wrap text-[12px] leading-relaxed text-[#5d3b24]">${content.body}</p>
+					</div>
+					<div class="mt-5 flex justify-end">
+						<button type="button" autofocus class="rounded-lg border border-[#5d3b24] bg-[#70462b] px-5 py-2 text-[11px] font-bold tracking-[0.12em] text-[#fff3dc] transition hover:bg-[#845535]" @click=${() => dispatch(Action.SignDismissed())}>DISMISS</button>
+					</div>
+				</div>
+			</div>
+		`;
 		};
 
 		const activePlacementIsInvalid = (world: World): boolean => {
@@ -1223,38 +1319,42 @@ export class RenderSystemService extends Context.Service<
 			const visual =
 				interaction.itemKind === EditorItemKinds.Crate
 					? crateTemplate(position, body, height, false, baseElevation)
-					: interaction.itemKind === EditorItemKinds.Wall
-						? boxTemplate(
-								position,
-								body,
-								height,
-								{ top: "#426772", front: "#29454f" },
-								"",
-								baseElevation,
-							)
-						: interaction.itemKind === EditorItemKinds.Platform
+					: interaction.itemKind === EditorItemKinds.Chest
+						? chestTemplate(position, body, height, false, baseElevation)
+						: interaction.itemKind === EditorItemKinds.Wall
 							? boxTemplate(
 									position,
 									body,
 									height,
-									{ top: "#77927e", front: "#4f6c61" },
+									{ top: "#426772", front: "#29454f" },
 									"",
 									baseElevation,
 								)
-							: decorationTemplate(
-									position,
-									body,
-									Decoration.make({
-										kind:
-											interaction.itemKind === EditorItemKinds.Rug
-												? DecorationKinds.Rug
-												: interaction.itemKind === EditorItemKinds.Plant
-													? DecorationKinds.Plant
-													: DecorationKinds.Lamp,
+							: interaction.itemKind === EditorItemKinds.Platform
+								? boxTemplate(
+										position,
+										body,
 										height,
-									}),
-									baseElevation,
-								);
+										{ top: "#77927e", front: "#4f6c61" },
+										"",
+										baseElevation,
+									)
+								: decorationTemplate(
+										position,
+										body,
+										Decoration.make({
+											kind:
+												interaction.itemKind === EditorItemKinds.Rug
+													? DecorationKinds.Rug
+													: interaction.itemKind === EditorItemKinds.Plant
+														? DecorationKinds.Plant
+														: interaction.itemKind === EditorItemKinds.Sign
+															? DecorationKinds.Sign
+															: DecorationKinds.Lamp,
+											height,
+										}),
+										baseElevation,
+									);
 			const accent = invalidPreview ? "#e59a91" : "#fff0a8";
 			return html`
 				<svg data-editor-create-preview data-can-drop=${String(interaction.canDrop)} aria-hidden="true" class="pointer-events-none absolute inset-0 z-40 h-full w-full" viewBox=${`0 0 ${viewport.width} ${viewport.height}`} preserveAspectRatio="xMidYMid meet">
@@ -1323,29 +1423,37 @@ export class RenderSystemService extends Context.Service<
 								baseElevation,
 								shadowSectionsForEntity(world, entity, position, body),
 							)
-						: obstacle.kind === ObstacleKinds.Wall
-							? boxTemplate(
+						: obstacle.kind === ObstacleKinds.Chest
+							? chestTemplate(
 									position,
 									body,
 									obstacle.height,
-									{
-										top: "#426772",
-										front: "#29454f",
-									},
-									"",
+									world.openedChests.has(entity),
 									baseElevation,
 								)
-							: boxTemplate(
-									position,
-									body,
-									obstacle.height,
-									{
-										top: "#77927e",
-										front: "#4f6c61",
-									},
-									"",
-									baseElevation,
-								);
+							: obstacle.kind === ObstacleKinds.Wall
+								? boxTemplate(
+										position,
+										body,
+										obstacle.height,
+										{
+											top: "#426772",
+											front: "#29454f",
+										},
+										"",
+										baseElevation,
+									)
+								: boxTemplate(
+										position,
+										body,
+										obstacle.height,
+										{
+											top: "#77927e",
+											front: "#4f6c61",
+										},
+										"",
+										baseElevation,
+									);
 				objects.push({
 					depth: renderDepthForEntity(world, entity),
 					entity,
@@ -1583,12 +1691,14 @@ export class RenderSystemService extends Context.Service<
 									<div class="pointer-events-none absolute bottom-7 left-7 flex max-w-[calc(100vw-3.5rem)] flex-wrap gap-x-12 gap-y-3 rounded-[18px] bg-[#0d181f]/90 px-6 py-4 select-none">
 										<div><div class="text-[15px] font-bold text-[#fff1d6]">ARROW KEYS</div><div class="mt-1 text-[13px] text-[#aebfba]">MOVE · PUSH CRATES</div></div>
 										<div><div class="text-[15px] font-bold text-[#fff1d6]">SPACE</div><div class="mt-1 text-[13px] text-[#aebfba]">JUMP · CLIMB · FALL</div></div>
-						<div><div class="text-[15px] font-bold text-[#fff1d6]">HOLD SHIFT</div><div class="mt-1 text-[13px] text-[#aebfba]">GRAB · DRAG OBJECTS</div></div>
+										<div><div class="text-[15px] font-bold text-[#fff1d6]">HOLD SHIFT</div><div class="mt-1 text-[13px] text-[#aebfba]">GRAB · DRAG OBJECTS</div></div>
+										<div><div class="text-[15px] font-bold text-[#fff1d6]">X</div><div class="mt-1 text-[13px] text-[#aebfba]">OPEN CHESTS · READ SIGNS</div></div>
 									</div>
 								`
 						}
 						<div id="editor-create-preview-host" class="contents"></div>
 						${world.editor.invalidPlacement === null ? html`` : invalidPlacementTemplate(world, dispatch)}
+						${world.readingSign === null ? html`` : signDialogTemplate(world, dispatch)}
 					</main>
 				`,
 				document.body,

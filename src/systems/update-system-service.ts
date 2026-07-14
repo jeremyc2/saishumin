@@ -23,6 +23,7 @@ import {
 	crateGrabDistance,
 	crateHeight,
 	groundElevation,
+	interactionDistance,
 	jumpSpeed,
 	maximumFloorExtent,
 	maximumFrameElapsedSeconds,
@@ -42,6 +43,7 @@ import {
 	Body,
 	Decoration,
 	DecorationKinds,
+	defaultSignContent,
 	Elevation,
 	Obstacle,
 	ObstacleKinds,
@@ -55,7 +57,10 @@ import {
 	editorItemHeightLimits,
 } from "../model/editor";
 import { EntityId, type EntityId as EntityIdType } from "../model/entity-id";
-import { playerFacingForDirections } from "../model/player-facing";
+import {
+	PlayerFacings,
+	playerFacingForDirections,
+} from "../model/player-facing";
 import {
 	cameraForFloor,
 	followCamera,
@@ -127,6 +132,7 @@ const addEditorItem = (
 	const obstacles = new Map(world.obstacles);
 	const decorations = new Map(world.decorations);
 	const elevations = new Map(world.elevations);
+	const signContents = new Map(world.signContents);
 	positions.set(entity, position);
 	bodies.set(entity, defaultEditorItemBody(kind));
 
@@ -145,6 +151,14 @@ const addEditorItem = (
 			entity,
 			Obstacle.make({ height: crateHeight, kind: ObstacleKinds.Crate }),
 		);
+	} else if (kind === EditorItemKinds.Chest) {
+		obstacles.set(
+			entity,
+			Obstacle.make({
+				height: defaultEditorItemHeight(kind),
+				kind: ObstacleKinds.Chest,
+			}),
+		);
 	} else if (kind === EditorItemKinds.Rug) {
 		decorations.set(
 			entity,
@@ -161,6 +175,15 @@ const addEditorItem = (
 				height: defaultEditorItemHeight(kind),
 			}),
 		);
+	} else if (kind === EditorItemKinds.Sign) {
+		decorations.set(
+			entity,
+			Decoration.make({
+				kind: DecorationKinds.Sign,
+				height: defaultEditorItemHeight(kind),
+			}),
+		);
+		signContents.set(entity, defaultSignContent);
 	} else {
 		decorations.set(
 			entity,
@@ -189,6 +212,7 @@ const addEditorItem = (
 		obstacles,
 		decorations,
 		elevations,
+		signContents,
 	};
 	const body = bodies.get(entity);
 	if (
@@ -267,6 +291,45 @@ export class UpdateSystemService extends Context.Service<
 	static readonly layer = Layer.effect(this)(
 		Effect.gen(function* () {
 			const movementSystem = yield* MovementSystemService;
+			const interactableInFrontOfPlayer = (
+				world: World,
+				isInteractable: (entity: EntityIdType) => boolean,
+			): EntityIdType | null => {
+				const playerPosition = world.positions.get(playerEntity);
+				const playerElevation = world.elevations.get(playerEntity);
+				if (
+					playerPosition === undefined ||
+					playerElevation === undefined ||
+					playerElevation.velocity !== stationaryVelocity ||
+					world.playerFacing !== PlayerFacings.Up
+				)
+					return null;
+
+				for (const [entity, objectPosition] of world.positions) {
+					if (!isInteractable(entity)) continue;
+					const objectBody = world.bodies.get(entity);
+					if (
+						objectBody === undefined ||
+						Math.abs(entityBaseElevation(world, entity) - playerElevation.z) >
+							obstacleHeightTolerance
+					)
+						continue;
+					const horizontalOverlap =
+						Math.abs(playerPosition.x - objectPosition.x) <
+						(playerBody.width + objectBody.width) / 2;
+					const frontGap =
+						playerPosition.y -
+						playerBody.depth / 2 -
+						(objectPosition.y + objectBody.depth / 2);
+					if (
+						horizontalOverlap &&
+						frontGap >= 0 &&
+						frontGap <= interactionDistance
+					)
+						return entity;
+				}
+				return null;
+			};
 			const nearestGrabbableObject = (world: World): EntityIdType | null => {
 				const playerPosition = world.positions.get(playerEntity);
 				const elevation = world.elevations.get(playerEntity);
@@ -309,7 +372,41 @@ export class UpdateSystemService extends Context.Service<
 				update: (world: World, action: Action): World =>
 					Action.$match(action, {
 						KeyChanged: ({ key, pressed }) => {
+							if (world.readingSign !== null)
+								return key === Controls.Interact && pressed
+									? { ...world, readingSign: null }
+									: world;
 							if (world.editor.open) return world;
+							if (key === Controls.Interact) {
+								if (!pressed) return world;
+								const chest = interactableInFrontOfPlayer(
+									world,
+									(entity) =>
+										world.obstacles.get(entity)?.kind === ObstacleKinds.Chest,
+								);
+								if (chest !== null) {
+									const openedChests = new Set(world.openedChests);
+									if (openedChests.has(chest)) openedChests.delete(chest);
+									else openedChests.add(chest);
+									return { ...world, openedChests };
+								}
+								const sign = interactableInFrontOfPlayer(
+									world,
+									(entity) =>
+										world.decorations.get(entity)?.kind ===
+										DecorationKinds.Sign,
+								);
+								return sign === null
+									? world
+									: {
+											...world,
+											pressed: new Set<Direction>(),
+											playerTrail: [],
+											grabbed: null,
+											pushing: null,
+											readingSign: sign,
+										};
+							}
 							if (key === Controls.Grab) {
 								return {
 									...world,
@@ -364,7 +461,8 @@ export class UpdateSystemService extends Context.Service<
 							};
 						},
 						Tick: ({ time }) => {
-							if (world.editor.open) return { ...world, lastFrame: time };
+							if (world.editor.open || world.readingSign !== null)
+								return { ...world, lastFrame: time };
 							if (world.lastFrame === 0) return { ...world, lastFrame: time };
 							const elapsed = Math.min(
 								(time - world.lastFrame) / millisecondsPerSecond,
@@ -384,6 +482,7 @@ export class UpdateSystemService extends Context.Service<
 								...world,
 								pressed: new Set<Direction>(),
 								playerTrail: [],
+								readingSign: null,
 								grabbed: null,
 								pushing: null,
 								lastFrame: 0,
@@ -613,6 +712,16 @@ export class UpdateSystemService extends Context.Service<
 							decorations.set(entity, { ...decoration, height: nextHeight });
 							return { ...world, decorations };
 						},
+						EditorSignContentChanged: ({ entity, content }) => {
+							if (
+								!world.editor.open ||
+								world.decorations.get(entity)?.kind !== DecorationKinds.Sign
+							)
+								return world;
+							const signContents = new Map(world.signContents);
+							signContents.set(entity, content);
+							return { ...world, signContents };
+						},
 						EditorFloorResized: ({ floorPlan, originDelta, preview }) => {
 							if (!world.editor.open) return world;
 							const nextFloorPlan = sanitizedFloorPlan(floorPlan);
@@ -707,6 +816,10 @@ export class UpdateSystemService extends Context.Service<
 								editor: { ...world.editor, invalidPlacement: null },
 							};
 						},
+						SignDismissed: () =>
+							world.readingSign === null
+								? world
+								: { ...world, readingSign: null },
 						EditorDeleteSelected: () => {
 							const selected = world.editor.selected;
 							if (
@@ -739,11 +852,15 @@ export class UpdateSystemService extends Context.Service<
 							const obstacles = new Map(world.obstacles);
 							const decorations = new Map(world.decorations);
 							const elevations = new Map(world.elevations);
+							const openedChests = new Set(world.openedChests);
+							const signContents = new Map(world.signContents);
 							positions.delete(selected);
 							bodies.delete(selected);
 							obstacles.delete(selected);
 							decorations.delete(selected);
 							elevations.delete(selected);
+							openedChests.delete(selected);
+							signContents.delete(selected);
 							return {
 								...world,
 								positions,
@@ -751,6 +868,8 @@ export class UpdateSystemService extends Context.Service<
 								obstacles,
 								decorations,
 								elevations,
+								openedChests,
+								signContents,
 								editor: { ...world.editor, selected: null },
 							};
 						},

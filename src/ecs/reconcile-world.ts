@@ -1,3 +1,4 @@
+import { DecorationKinds, defaultSignContent } from "../model/component";
 import { defaultEditorItemHeight, isEditorItemKind } from "../model/editor";
 import { isPlayerFacing, PlayerFacings } from "../model/player-facing";
 import { surfaceAt } from "./collision";
@@ -24,7 +25,14 @@ export const reconcileWorld = (world: World): World => {
 	const elevations = new Map(world.elevations ?? initialWorld.elevations);
 	const obstacles = new Map(world.obstacles ?? initialWorld.obstacles);
 	const decorations = new Map(world.decorations ?? initialWorld.decorations);
+	const openedChests = new Set(world.openedChests ?? initialWorld.openedChests);
+	const signContents = new Map(world.signContents ?? initialWorld.signContents);
+	for (const entity of openedChests) {
+		if (obstacles.get(entity)?.kind !== "chest") openedChests.delete(entity);
+	}
 	for (const [entity, decoration] of decorations) {
+		if (decoration.kind === DecorationKinds.Sign && !signContents.has(entity))
+			signContents.set(entity, defaultSignContent);
 		if (Number.isFinite(decoration.height)) continue;
 		decorations.set(entity, {
 			...decoration,
@@ -32,6 +40,10 @@ export const reconcileWorld = (world: World): World => {
 				? defaultEditorItemHeight(decoration.kind)
 				: 0,
 		});
+	}
+	for (const entity of signContents.keys()) {
+		if (decorations.get(entity)?.kind !== DecorationKinds.Sign)
+			signContents.delete(entity);
 	}
 	const editor = world.editor ?? initialWorld.editor;
 	bodies.set(playerEntity, playerBody);
@@ -71,6 +83,9 @@ export const reconcileWorld = (world: World): World => {
 		playerTrail: [],
 		tireTracksEnabled:
 			world.tireTracksEnabled ?? initialWorld.tireTracksEnabled,
+		openedChests,
+		signContents,
+		readingSign: null,
 		grabbed: null,
 		pushing: null,
 		lastFrame: 0,

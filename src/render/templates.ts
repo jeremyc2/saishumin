@@ -43,6 +43,16 @@ const crateVisual = {
 	verticalStripOpacity: 0.7,
 } as const;
 
+const chestVisual = {
+	topInsetWidth: 12,
+	topInsetDepth: 12,
+	lowerHeightRatio: 0.58,
+	latchWidth: 14,
+	latchHeight: 12,
+	latchBottomInset: 10,
+	lidTopOffset: 8,
+} as const;
+
 const playerShadowVisual = {
 	minimumScale: 0.42,
 	scaleDistance: 220,
@@ -614,6 +624,153 @@ export const crateTemplate = (
 	`;
 };
 
+const chestShadowTemplate = (
+	position: Position,
+	body: Body,
+	baseElevation: number,
+): TemplateResult =>
+	svg`<polygon points=${points(projectedRectangle(position, body, baseElevation))} fill="#14212a" opacity="0.22" />`;
+
+const chestFront = (
+	position: Position,
+	body: Body,
+	baseElevation: number,
+	height: number,
+): {
+	readonly top: ReadonlyArray<Position>;
+	readonly frontTop: Position;
+	readonly frontBottom: Position;
+	readonly left: number;
+	readonly right: number;
+} => {
+	const top = projectedRectangle(position, body, baseElevation + height);
+	const frontTop = project(
+		{ x: position.x, y: position.y + body.depth / 2 },
+		baseElevation + height,
+	);
+	const frontBottom = project(
+		{ x: position.x, y: position.y + body.depth / 2 },
+		baseElevation,
+	);
+	return {
+		top,
+		frontTop,
+		frontBottom,
+		left: frontTop.x - body.width / 2,
+		right: frontTop.x + body.width / 2,
+	};
+};
+
+const chestFrontTemplate = (
+	front: ReturnType<typeof chestFront>,
+): TemplateResult => {
+	const latchX = (front.left + front.right - chestVisual.latchWidth) / 2;
+	const latchY =
+		front.frontBottom.y -
+		chestVisual.latchHeight -
+		chestVisual.latchBottomInset;
+	return svg`
+		<polygon points=${points([
+			{ x: front.left, y: front.frontBottom.y },
+			{ x: front.right, y: front.frontBottom.y },
+			{ x: front.right, y: front.frontTop.y },
+			{ x: front.left, y: front.frontTop.y },
+		])} fill="#855036" stroke="#432f2c" stroke-width=${boxOutlineWidth} stroke-linejoin="round" />
+		<rect x=${front.left + 7} y=${front.frontTop.y + 8} width=${Math.max(2, front.right - front.left - 14)} height=${Math.max(2, front.frontBottom.y - front.frontTop.y - 15)} fill="none" stroke="#b97848" stroke-width="3" />
+		<rect x=${latchX} y=${latchY} width=${chestVisual.latchWidth} height=${chestVisual.latchHeight} rx="2" fill="#d9b55f" stroke="#52382d" stroke-width="2" />
+	`;
+};
+
+export const closedChestTemplate = (
+	position: Position,
+	body: Body,
+	height: number,
+	baseElevation = 0,
+): TemplateResult => {
+	const front = chestFront(position, body, baseElevation, height);
+	const topInset = projectedRectangle(
+		position,
+		{
+			width: Math.max(4, body.width - chestVisual.topInsetWidth),
+			depth: Math.max(4, body.depth - chestVisual.topInsetDepth),
+		},
+		baseElevation + height + chestVisual.lidTopOffset,
+	);
+	return svg`
+		<g data-chest-state="closed">
+			${chestShadowTemplate(position, body, baseElevation)}
+			${chestFrontTemplate(front)}
+			<polygon points=${points(front.top)} fill="#b97647" stroke="#432f2c" stroke-width=${boxOutlineWidth} stroke-linejoin="round" />
+			<polygon points=${points(topInset)} fill="#d59a57" stroke="#6a4230" stroke-width="2" stroke-linejoin="round" />
+			<line x1=${topInset[0].x} y1=${topInset[0].y} x2=${topInset[1].x} y2=${topInset[1].y} stroke="#f0bf72" stroke-width="2" opacity="0.62" />
+		</g>
+	`;
+};
+
+export const openChestTemplate = (
+	position: Position,
+	body: Body,
+	height: number,
+	baseElevation = 0,
+): TemplateResult => {
+	const lowerHeight = Math.max(20, height * chestVisual.lowerHeightRatio);
+	const front = chestFront(position, body, baseElevation, lowerHeight);
+	const hinge = project(
+		{ x: position.x, y: position.y - body.depth / 2 },
+		baseElevation + lowerHeight,
+	);
+	const lidTop = project(
+		{ x: position.x, y: position.y - body.depth / 2 },
+		baseElevation + height + chestVisual.lidTopOffset,
+	);
+	return svg`
+		<g data-chest-state="open">
+			${chestShadowTemplate(position, body, baseElevation)}
+			${chestFrontTemplate(front)}
+			<polygon points=${points(front.top)} fill="#5a392f" stroke="#432f2c" stroke-width=${boxOutlineWidth} stroke-linejoin="round" />
+			<polygon points=${points([
+				{ x: hinge.x - body.width / 2, y: hinge.y },
+				{ x: hinge.x + body.width / 2, y: hinge.y },
+				{ x: lidTop.x + body.width / 2, y: lidTop.y },
+				{ x: lidTop.x - body.width / 2, y: lidTop.y },
+			])} fill="#c9874e" stroke="#432f2c" stroke-width=${boxOutlineWidth} stroke-linejoin="round" />
+			<line x1=${lidTop.x - body.width / 2 + 8} y1=${lidTop.y + 8} x2=${lidTop.x + body.width / 2 - 8} y2=${lidTop.y + 8} stroke="#f0bf72" stroke-width="2" opacity="0.68" />
+		</g>
+	`;
+};
+
+export const chestTemplate = (
+	position: Position,
+	body: Body,
+	height: number,
+	opened: boolean,
+	baseElevation = 0,
+): TemplateResult =>
+	opened
+		? openChestTemplate(position, body, height, baseElevation)
+		: closedChestTemplate(position, body, height, baseElevation);
+
+export const signpostTemplate = (
+	position: Position,
+	body: Body,
+	height: number,
+	baseElevation = 0,
+): TemplateResult => {
+	const base = project(position, baseElevation);
+	const scale = Math.max(0.6, Math.min(2.4, (body.width + body.depth) / 140));
+	const heightScale = height / 104;
+	return svg`
+		<g data-decoration-kind="sign" transform=${`translate(${base.x} ${base.y}) scale(${scale} ${heightScale})`}>
+			<ellipse cx="0" cy="4" rx="29" ry="8" fill="#14212a" opacity="0.22" />
+			<path d="M -7 2 L 7 2 L 6 -58 L -6 -58 Z" fill="#6b432a" stroke="#3f2a23" stroke-width="3" stroke-linejoin="round" />
+			<path d="M -37 -89 L 37 -89 L 33 -49 L -33 -49 Z" fill="#b77a42" stroke="#3f2a23" stroke-width="4" stroke-linejoin="round" />
+			<path d="M -29 -80 H 29 M -29 -69 H 29" stroke="#d89c5d" stroke-width="3" stroke-linecap="round" opacity="0.74" />
+			<circle cx="-25" cy="-69" r="2.5" fill="#4c3026" />
+			<circle cx="25" cy="-69" r="2.5" fill="#4c3026" />
+		</g>
+	`;
+};
+
 export const decorationTemplate = (
 	position: Position,
 	body: Body,
@@ -628,6 +785,9 @@ export const decorationTemplate = (
 
 	const base = project(position, baseElevation);
 	const scale = Math.max(0.55, Math.min(2.6, (body.width + body.depth) / 140));
+	if (decoration.kind === DecorationKinds.Sign)
+		return signpostTemplate(position, body, decoration.height, baseElevation);
+
 	const heightScale =
 		decoration.kind === DecorationKinds.Plant
 			? decoration.height / 84

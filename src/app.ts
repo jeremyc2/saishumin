@@ -37,15 +37,18 @@ const program = Effect.gen(function* () {
 	};
 
 	window.addEventListener("keydown", (event) => {
-		if (!isControl(event.key)) return;
+		const key = event.key === "X" ? Controls.Interact : event.key;
+		if (!isControl(key)) return;
 		event.preventDefault();
-		if (event.repeat && event.key === Controls.Jump) return;
-		dispatch(Action.KeyChanged({ key: event.key, pressed: true }));
+		if (event.repeat && (key === Controls.Jump || key === Controls.Interact))
+			return;
+		dispatch(Action.KeyChanged({ key, pressed: true }));
 	});
 	window.addEventListener("keyup", (event) => {
-		if (!isControl(event.key)) return;
+		const key = event.key === "X" ? Controls.Interact : event.key;
+		if (!isControl(key)) return;
 		event.preventDefault();
-		dispatch(Action.KeyChanged({ key: event.key, pressed: false }));
+		dispatch(Action.KeyChanged({ key, pressed: false }));
 	});
 	window.addEventListener("blur", () => {
 		for (const key of [
@@ -83,6 +86,9 @@ const program = Effect.gen(function* () {
 					next.editor !== current.editor ||
 					next.playerFacing !== current.playerFacing ||
 					next.playerTrail !== current.playerTrail ||
+					next.openedChests !== current.openedChests ||
+					next.signContents !== current.signContents ||
+					next.readingSign !== current.readingSign ||
 					next.grabbed !== current.grabbed
 				)
 					renderSystem.render(next, dispatch);

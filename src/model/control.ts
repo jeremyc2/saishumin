@@ -7,6 +7,7 @@ export const Control = Schema.Literals([
 	"ArrowRight",
 	" ",
 	"Shift",
+	"x",
 ]);
 export type Control = typeof Control.Type;
 
@@ -17,6 +18,7 @@ export const Controls = {
 	Right: Control.make("ArrowRight"),
 	Jump: Control.make(" "),
 	Grab: Control.make("Shift"),
+	Interact: Control.make("x"),
 } as const;
 
 export type Direction =
