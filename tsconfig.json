@@ -6,7 +6,7 @@
 		"module": "Preserve",
 		"moduleDetection": "force",
 		"jsx": "react-jsx",
-		"allowJs": true,
+		"allowJs": false,
 		"types": ["bun"],
 
 		// Bundler mode
@@ -120,5 +120,5 @@
 		]
 	},
 	"$schema": "https://raw.githubusercontent.com/Effect-TS/tsgo/refs/heads/main/schema.json",
-	"exclude": ["reference_repositories/**/*"]
+	"exclude": ["reference_repositories/**/*", "vendor/**/*", "node_modules/**/*", "dist/**/*"]
 }
