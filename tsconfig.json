@@ -120,5 +120,10 @@
 		]
 	},
 	"$schema": "https://raw.githubusercontent.com/Effect-TS/tsgo/refs/heads/main/schema.json",
-	"exclude": ["reference_repositories/**/*", "vendor/**/*", "node_modules/**/*", "dist/**/*"]
+	"exclude": [
+		"reference_repositories/**/*",
+		"vendor/**/*",
+		"node_modules/**/*",
+		"dist/**/*"
+	]
 }
