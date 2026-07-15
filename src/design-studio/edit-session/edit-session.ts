@@ -3,7 +3,7 @@ import {
 	isFloorPlanPlacementValid,
 	isInsideFloorPlan,
 	isNewEditorItemPlacementValid,
-} from "../ecs/editor-placement";
+} from "./placement";
 import {
 	Decoration,
 	DecorationKinds,
@@ -12,20 +12,20 @@ import {
 	Obstacle,
 	ObstacleKinds,
 	type Position,
-} from "../world/components";
-import { EntityId, type EntityId as EntityIdType } from "../world/entity-id";
-import { floorTilesCoveringPlan } from "../world/floor";
+} from "../../world/components";
+import { EntityId, type EntityId as EntityIdType } from "../../world/entity-id";
+import { floorTilesCoveringPlan } from "../../world/floor";
 import {
 	placementElevationForEntity,
 	placementElevationForKind,
-} from "../world/spatial/elevation";
-import { isSupportSurfaceTransformValid } from "../world/spatial/support-surface";
+} from "../../world/spatial/elevation";
+import { isSupportSurfaceTransformValid } from "../../world/spatial/support-surface";
 import {
 	crateHeight,
 	stationaryVelocity,
 	type World,
 	wallHeight,
-} from "../world/world";
+} from "../../world/world";
 import {
 	defaultEditorItemBody,
 	defaultEditorItemHeight,
@@ -35,7 +35,7 @@ import {
 	type EditSessionPreview,
 	type EditSessionRejectionReason,
 	type EditSessionValidity,
-} from "./editor";
+} from "../model";
 
 export type EditSessionPresentation = {
 	readonly active: boolean;
@@ -289,3 +289,17 @@ export const cancelEditSession = (world: World): World => {
 		editor: { ...world.editor, editSession: null },
 	};
 };
+
+export {
+	isEntityPlacementValid,
+	isFloorPlanPlacementValid,
+	isInsideFloorPlan,
+	isNewEditorItemPlacementValid,
+} from "./placement";
+export {
+	defaultEntityHeight,
+	editorEntityHeight,
+	editorEntityHeightLimits,
+	editorItemKindForEntity,
+	maximumEditorBody,
+} from "./sizing";

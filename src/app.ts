@@ -3,7 +3,10 @@ import { run } from "otaku-hmr";
 import { State } from "otaku-state";
 import { Action } from "./model/action";
 import { type Control, Controls, controlForKey } from "./model/control";
-import { editSessionPresentation, editSessionView } from "./model/edit-session";
+import {
+	editSessionPresentation,
+	editSessionView,
+} from "./design-studio/edit-session/edit-session";
 import { MovementSystemService } from "./systems/movement-system-service";
 import { RenderSystemService } from "./systems/render-system-service";
 import { UpdateSystemService } from "./systems/update-system-service";

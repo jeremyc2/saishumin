@@ -1,5 +1,5 @@
 import type { Direction } from "../model/control";
-import type { EditorState } from "../model/editor";
+import type { EditorState } from "../design-studio/model";
 import type { PlayerFacing } from "./components";
 import {
 	Body,

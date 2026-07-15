@@ -1,4 +1,4 @@
-import type { EditorItemKind } from "../model/editor";
+import type { EditorItemKind } from "../design-studio/model";
 import type { Body, Position } from "../world/components";
 import type { EntityId } from "../world/entity-id";
 import {
