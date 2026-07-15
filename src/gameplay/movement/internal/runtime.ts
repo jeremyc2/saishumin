@@ -1,10 +1,12 @@
 import { Context, Layer } from "effect";
-import { findGridPath } from "../ecs/grid-navigation";
+import { updateFallingMovableItems } from "./movable-items";
+import { recoverInvalidPlayerPlacement } from "./player-recovery";
+import { findGridPath } from "../../../ecs/grid-navigation";
 import {
 	isPlayerPlacementValid,
 	nearestValidPlayerPosition,
-} from "../ecs/player-placement";
-import { Controls } from "../model/control";
+} from "../../../ecs/player-placement";
+import { Controls } from "../../../model/control";
 import {
 	type Body,
 	DecorationKinds,
@@ -13,22 +15,22 @@ import {
 	type PlayerFacing,
 	PlayerFacings,
 	type Position,
-} from "../world/components";
-import type { EntityId } from "../world/entity-id";
+} from "../../../world/components";
+import type { EntityId } from "../../../world/entity-id";
 import {
 	isPositionInsideRoom,
 	isSolidEntity,
 	overlaps,
 	surfaceAt,
-} from "../world/spatial/collision";
+} from "../../../world/spatial/collision";
 import {
 	entityBaseElevation,
 	entityHeight,
 	entityTopElevation,
 	placementElevationForEntity,
 	verticalRangesOverlap,
-} from "../world/spatial/elevation";
-import { isSupportSurfaceOccupied } from "../world/spatial/support-surface";
+} from "../../../world/spatial/elevation";
+import { isSupportSurfaceOccupied } from "../../../world/spatial/support-surface";
 import {
 	cratePushSlowdown,
 	fallResetElevation,
@@ -49,14 +51,14 @@ import {
 	playerSpeed,
 	stationaryVelocity,
 	type World,
-} from "../world/world";
+} from "../../../world/world";
 
 export class MovementSystemService extends Context.Service<
 	MovementSystemService,
 	{
 		readonly update: (world: World, elapsed: number) => World;
 	}
->()("saishumin/systems/movement-system-service/MovementSystemService") {
+>()("saishumin/gameplay/movement/internal/runtime/MovementSystemService") {
 	static readonly layer = Layer.sync(this, () => {
 		const isDirectlyPushableEntity = (
 			world: World,
@@ -193,42 +195,6 @@ export class MovementSystemService extends Context.Service<
 				z: current.z,
 				velocity: Math.min(current.velocity, stationaryVelocity),
 			};
-		};
-
-		const updateFallingCrates = (world: World, elapsed: number): World => {
-			const elevations = new Map(world.elevations);
-			let changed = false;
-			for (const [entity, obstacle] of world.obstacles) {
-				if (obstacle.kind !== ObstacleKinds.Crate) continue;
-				const position = world.positions.get(entity);
-				const body = world.bodies.get(entity);
-				if (position === undefined || body === undefined) continue;
-				const current =
-					world.elevations.get(entity) ??
-					({ z: groundElevation, velocity: stationaryVelocity } as const);
-				const support = placementElevationForEntity(
-					world,
-					entity,
-					position,
-					body,
-					current.z,
-				);
-				if (
-					current.velocity === stationaryVelocity &&
-					Math.abs(current.z - support) <= obstacleHeightTolerance
-				)
-					continue;
-
-				const velocity = current.velocity - gravity * elapsed;
-				const z = current.z + velocity * elapsed;
-				const next =
-					velocity <= stationaryVelocity && z <= support
-						? { z: support, velocity: stationaryVelocity }
-						: { z, velocity };
-				elevations.set(entity, next);
-				changed = true;
-			}
-			return changed ? { ...world, elevations } : world;
 		};
 
 		const slideOffDecorationTop = (
@@ -501,26 +467,6 @@ export class MovementSystemService extends Context.Service<
 					y: position.y + crateDelta.y,
 				},
 			};
-		};
-
-		const relocatePlayerIfInvalid = (world: World): World => {
-			const position = world.positions.get(playerEntity);
-			const elevation = world.elevations.get(playerEntity);
-			if (
-				position === undefined ||
-				elevation === undefined ||
-				isPlayerPlacementValid(world, position, elevation.z)
-			)
-				return world;
-			const safePosition = nearestValidPlayerPosition(
-				world,
-				position,
-				elevation.z,
-			);
-			if (safePosition === undefined) return world;
-			const positions = new Map(world.positions);
-			positions.set(playerEntity, safePosition);
-			return { ...world, positions };
 		};
 
 		const canPlaceLavaMonster = (
@@ -925,7 +871,7 @@ export class MovementSystemService extends Context.Service<
 			const position = world.positions.get(playerEntity);
 			const elevation = world.elevations.get(playerEntity);
 			if (position === undefined || elevation === undefined) return world;
-			const relocated = relocatePlayerIfInvalid(world);
+			const relocated = recoverInvalidPlayerPlacement(world);
 			if (relocated !== world) return updateMovement(relocated, elapsed);
 
 			const horizontal =
@@ -1083,9 +1029,9 @@ export class MovementSystemService extends Context.Service<
 		};
 		return {
 			update: (world, elapsed) =>
-				relocatePlayerIfInvalid(
+				recoverInvalidPlayerPlacement(
 					updateLavaMonster(
-						updateFallingCrates(
+						updateFallingMovableItems(
 							updateMovement(
 								world.pushing === null ? world : { ...world, pushing: null },
 								elapsed,

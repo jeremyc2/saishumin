@@ -38,7 +38,7 @@ import {
 	stationaryVelocity,
 	type World,
 } from "../world/world";
-import { MovementSystemService } from "./movement-system-service";
+import { MovementSystemService } from "../gameplay/movement/movement-system";
 import { UpdateSystemService } from "./update-system-service";
 
 const runtime = ManagedRuntime.make(

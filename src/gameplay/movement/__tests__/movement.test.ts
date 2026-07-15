@@ -1,6 +1,6 @@
 import { afterAll, describe, expect, test } from "bun:test";
 import { ManagedRuntime } from "effect";
-import { Controls, type Direction } from "../model/control";
+import { Controls, type Direction } from "../../../model/control";
 import {
 	Body,
 	Decoration,
@@ -9,10 +9,10 @@ import {
 	Obstacle,
 	ObstacleKinds,
 	Position,
-} from "../world/components";
-import { EntityId } from "../world/entity-id";
-import { initialWorld } from "../world/initial-world";
-import { overlaps } from "../world/spatial/collision";
+} from "../../../world/components";
+import { EntityId } from "../../../world/entity-id";
+import { initialWorld } from "../../../world/initial-world";
+import { overlaps } from "../../../world/spatial/collision";
 import {
 	crateBody,
 	crateEntities,
@@ -28,8 +28,8 @@ import {
 	roomDepth,
 	stationaryVelocity,
 	type World,
-} from "../world/world";
-import { MovementSystemService } from "./movement-system-service";
+} from "../../../world/world";
+import { MovementSystemService } from "../movement-system";
 
 const runtime = ManagedRuntime.make(MovementSystemService.layer);
 const movementSystem = runtime.runSync(MovementSystemService);
