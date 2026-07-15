@@ -1,5 +1,5 @@
 import { Graph, Option } from "effect";
-import type { Position } from "../world/components";
+import type { Position } from "../../../world/components";
 
 type GridPoint = {
 	readonly column: number;
@@ -64,7 +64,6 @@ export const findGridPath = (
 				if (column === 0 && row === 0) source = node;
 			}
 		}
-
 		target = Graph.addNode(mutable, {
 			column: 0,
 			row: 0,
@@ -81,7 +80,6 @@ export const findGridPath = (
 				) <= request.arrivalDistance
 			)
 				Graph.addEdge(mutable, node, target, 0);
-
 			for (const direction of directions) {
 				const neighbor = nodes.get(
 					gridKey(point.column + direction.column, point.row + direction.row),
@@ -103,7 +101,6 @@ export const findGridPath = (
 			}
 		}
 	});
-
 	const result = Graph.astar(graph, {
 		source,
 		target,
