@@ -1,8 +1,12 @@
 import { describe, expect, test } from "bun:test";
-import { defaultEditorItemBody, EditorItemKinds } from "../../model";
 import { Body, Position } from "../../../world/components";
 import { initialWorld } from "../../../world/initial-world";
-import { crateEntities, playerEntity, wallEntities } from "../../../world/world";
+import {
+	crateEntities,
+	playerEntity,
+	wallEntities,
+} from "../../../world/world";
+import { defaultEditorItemBody, EditorItemKinds } from "../../model";
 import {
 	isEntityPlacementValid,
 	isFloorPlanPlacementValid,
