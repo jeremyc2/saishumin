@@ -1,14 +1,14 @@
 import { Effect, Layer, ManagedRuntime, Queue, Ref, Stream } from "effect";
 import { run } from "otaku-hmr";
 import { State } from "otaku-state";
-import { Action } from "./model/action";
-import { type Control, Controls, controlForKey } from "./model/control";
 import {
 	editSessionPresentation,
 	editSessionView,
 } from "./design-studio/edit-session/edit-session";
 import { MovementSystemService } from "./gameplay/movement/movement-system";
-import { RenderSystemService } from "./systems/render-system-service";
+import { Action } from "./model/action";
+import { type Control, Controls, controlForKey } from "./model/control";
+import { RenderSystem } from "./rendering/render-system";
 import { UpdateSystemService } from "./systems/update-system-service";
 import { initialWorld } from "./world/initial-world";
 import { reconcileWorld } from "./world/reconcile-world";
@@ -22,7 +22,7 @@ const updateSystemLayer = UpdateSystemService.layer.pipe(
 const applicationLayer = Layer.mergeAll(
 	State.layer,
 	updateSystemLayer,
-	RenderSystemService.layer,
+	RenderSystem.layer,
 );
 const runtime = ManagedRuntime.make(applicationLayer);
 
@@ -31,7 +31,7 @@ const heldControlsByKey = new Map<string, Control>();
 const program = Effect.gen(function* () {
 	const state = yield* State;
 	const updateSystem = yield* UpdateSystemService;
-	const renderSystem = yield* RenderSystemService;
+	const renderSystem = yield* RenderSystem;
 	const world = yield* state.make({
 		key: "saishumin/world-v3",
 		initial: initialWorld,
