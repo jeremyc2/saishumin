@@ -1,0 +1,183 @@
+import { html, type TemplateResult } from "lit-html";
+import { Action, type Action as AppAction } from "../../model/action";
+import { points, projectedRectangle, viewport } from "../../render/projection";
+import {
+	boxTemplate,
+	chestTemplate,
+	crateTemplate,
+	decorationTemplate,
+} from "../../render/templates";
+import {
+	Decoration,
+	DecorationKinds,
+	defaultSignContent,
+} from "../../world/components";
+import { placementElevationForKind } from "../../world/spatial/elevation";
+import { isSupportSurfaceOccupied } from "../../world/spatial/support-surface";
+import type { World } from "../../world/world";
+import type { EditSessionPresentation } from "../edit-session/edit-session";
+import type { DesignStudioInteractionRuntime } from "../interaction/runtime";
+import {
+	defaultEditorItemBody,
+	defaultEditorItemHeight,
+	EditorItemKinds,
+	type InvalidPlacement,
+} from "../model";
+
+type Dispatch = (action: AppAction) => void;
+
+export const invalidPreviewDescription = (input: {
+	readonly rejectionReason: EditSessionPresentation["rejectionReason"];
+	readonly invalidPlacementKind: InvalidPlacement["kind"] | null;
+	readonly occupiedSupport: boolean;
+}): string =>
+	input.rejectionReason === "floor-excludes-editor-item"
+		? "The floor plan must contain every existing object."
+		: input.rejectionReason === "occupied-support"
+			? "Move every object off this platform before moving or shrinking it."
+			: input.invalidPlacementKind === "floor"
+				? "The floor plan must contain every existing object."
+				: input.occupiedSupport
+					? "Move every object off this platform before moving, shrinking, or deleting it."
+					: "Keep the object inside the floor plan and clear of other objects.";
+
+export const makeDesignStudioOverlays = (
+	interactionRuntime: DesignStudioInteractionRuntime,
+) => {
+	const invalidPlacementTemplate = (
+		world: World,
+		presentation: EditSessionPresentation,
+		dispatch: Dispatch,
+	): TemplateResult => {
+		const invalidPlacement = world.editor.invalidPlacement;
+		const occupiedSupport =
+			invalidPlacement?.kind === "entity" &&
+			isSupportSurfaceOccupied(
+				world,
+				invalidPlacement.entity,
+				invalidPlacement.position,
+				invalidPlacement.body,
+			);
+		const description = invalidPreviewDescription({
+			rejectionReason: presentation.rejectionReason,
+			invalidPlacementKind: invalidPlacement?.kind ?? null,
+			occupiedSupport,
+		});
+		return html`
+				<div class="editor-invalid-cursor absolute inset-0 z-50 flex items-center justify-center bg-[#071015]/48 px-6" role="presentation">
+					<div class="w-full max-w-95 rounded-2xl border border-[#7d4b4b] bg-[#15242b] px-6 py-5 shadow-[0_24px_70px_rgba(0,0,0,0.5)]" role="alertdialog" aria-modal="true" aria-labelledby="invalid-position-title" aria-describedby="invalid-position-description">
+						<div id="invalid-position-title" class="text-[17px] font-heading font-bold tracking-[0.04em] text-[#e59a91]">Invalid position</div>
+						<p id="invalid-position-description" class="mt-2 mb-0 text-base leading-relaxed text-[#b9cbc4]">${description}</p>
+						<div class="mt-5 flex justify-end">
+							<button type="button" autofocus class="rounded-lg border border-[#9a625d] bg-[#6f3f3e] px-5 py-2 text-[11px] font-bold tracking-[0.12em] text-[#fff1ed] transition hover:bg-[#80504d]" @click=${() => dispatch(presentation.active ? Action.EditorEditSessionCancelled() : Action.EditorInvalidPlacementDismissed())}>OK</button>
+						</div>
+					</div>
+				</div>
+			`;
+	};
+
+	const signDialogTemplate = (
+		world: World,
+		dispatch: Dispatch,
+	): TemplateResult => {
+		const content =
+			world.readingSign === null
+				? defaultSignContent
+				: (world.signContents.get(world.readingSign) ?? defaultSignContent);
+		return html`
+			<div class="absolute inset-0 z-50 flex items-center justify-center bg-[#071015]/48 px-6" role="presentation">
+				<div class="flex max-h-[calc(100vh-3rem)] w-full max-w-95 flex-col border border-[#8b633c] bg-[#ecd19e] px-6 py-5 shadow-[0_24px_70px_rgba(0,0,0,0.5)]" role="alertdialog" aria-modal="true" aria-labelledby="sign-title" aria-describedby="sign-description">
+					<div class="max-h-[calc(100vh-10rem)] overflow-y-auto overscroll-contain pr-2">
+						<div id="sign-title" class="wrap-break-word text-[17px] font-heading font-bold tracking-[0.04em] text-[#4b2f1e]">${content.title}</div>
+						<p id="sign-description" class="mt-2 mb-0 wrap-break-word whitespace-pre-wrap text-base leading-relaxed text-[#5d3b24]">${content.body}</p>
+					</div>
+					<div class="mt-5 flex justify-end">
+						<button type="button" autofocus class="rounded-lg border border-[#5d3b24] bg-[#70462b] px-5 py-2 text-[11px] font-bold tracking-[0.12em] text-[#fff3dc] transition hover:bg-[#845535]" @click=${() => dispatch(Action.SignDismissed())}>DISMISS</button>
+					</div>
+				</div>
+			</div>
+		`;
+	};
+
+	const createPreviewTemplate = (
+		world: World,
+		invalidPreview: boolean,
+	): TemplateResult => {
+		const interaction = interactionRuntime.createPreview();
+		if (interaction === null) return html``;
+		const body = defaultEditorItemBody(interaction.itemKind);
+		const position = interaction.position;
+		const baseElevation = placementElevationForKind(
+			world,
+			interaction.itemKind,
+			position,
+			body,
+		);
+		const height = defaultEditorItemHeight(interaction.itemKind);
+		const visual =
+			interaction.itemKind === EditorItemKinds.Crate
+				? crateTemplate(position, body, height, false, baseElevation)
+				: interaction.itemKind === EditorItemKinds.Chest
+					? chestTemplate(position, body, height, false, baseElevation)
+					: interaction.itemKind === EditorItemKinds.Wall
+						? boxTemplate(
+								position,
+								body,
+								height,
+								{ top: "#426772", front: "#29454f" },
+								"",
+								baseElevation,
+							)
+						: interaction.itemKind === EditorItemKinds.Platform
+							? boxTemplate(
+									position,
+									body,
+									height,
+									{ top: "#77927e", front: "#4f6c61" },
+									"",
+									baseElevation,
+								)
+							: decorationTemplate(
+									position,
+									body,
+									Decoration.make({
+										kind:
+											interaction.itemKind === EditorItemKinds.Hopscotch
+												? DecorationKinds.Hopscotch
+												: interaction.itemKind === EditorItemKinds.Plant
+													? DecorationKinds.Plant
+													: interaction.itemKind === EditorItemKinds.Sign
+														? DecorationKinds.Sign
+														: DecorationKinds.Lamp,
+										height,
+									}),
+									baseElevation,
+								);
+		const accent = invalidPreview ? "#e59a91" : "#fff0a8";
+		return html`
+				<svg data-editor-create-preview data-can-drop=${String(interaction.canDrop)} aria-hidden="true" class="pointer-events-none absolute inset-0 z-40 h-full w-full" viewBox=${`0 0 ${viewport.width} ${viewport.height}`} preserveAspectRatio="xMidYMid meet">
+					<g transform=${`translate(${world.editor.camera.x} ${world.editor.camera.y})`}>
+						<g opacity="0.82">${visual}</g>
+						<polygon data-editor-create-outline points=${points(projectedRectangle(position, body, baseElevation))} fill="none" stroke=${accent} stroke-width="4" stroke-dasharray="10 7" vector-effect="non-scaling-stroke" />
+					</g>
+				</svg>
+				`;
+	};
+
+	const paletteGuidanceTemplate = (
+		popover: {
+			readonly left: number;
+			readonly top: number;
+			readonly fading: boolean;
+		} | null,
+	): TemplateResult =>
+		popover === null
+			? html``
+			: html`<div role="status" class=${`pointer-events-none fixed z-50 w-60 rounded-xl border border-[#d9a969] bg-[#17272e] px-4 py-3 text-[13px] font-semibold text-[#fff1d6] shadow-xl transition-opacity duration-200 ${popover.fading ? "opacity-0" : "opacity-100"}`} style=${`left: ${Math.max(12, popover.left - 252)}px; top: ${popover.top}px;`}>Drag this item onto the room to place it.</div>`;
+	return {
+		invalidPlacementTemplate,
+		signDialogTemplate,
+		createPreviewTemplate,
+		paletteGuidanceTemplate,
+	};
+};
