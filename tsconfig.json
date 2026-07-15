@@ -78,6 +78,7 @@
 					"missingEffectError": "error",
 					"missingEffectServiceDependency": "error",
 					"missingLayerContext": "error",
+					"missingPipeableSignature": "error",
 					"missingReturnYieldStar": "error",
 					"missingStarInYieldEffectGen": "error",
 					"multipleCatchTag": "error",
@@ -113,7 +114,7 @@
 					"unnecessaryPipe": "error",
 					"unnecessaryPipeChain": "error",
 					"unnecessaryTypeofType": "error",
-					"unsafeEffectTypeAssertion": "error"
+					"unsafeEffectTypeAssertion": "error",
 				}
 			}
 		]
