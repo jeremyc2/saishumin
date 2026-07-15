@@ -10,12 +10,16 @@ selection, or transitions.
 
 - `world.ts` defines the World shape and stable runtime constants.
 - `components.ts` and `entity-id.ts` own ECS data definitions and identity.
+- `editor-state.ts` owns the transient editor-state contract stored in a World;
+  the Design Studio owns transitions for that contract.
 - `floor.ts` owns authored floor terrain data and expansion rules.
 - `initial-world.ts` constructs the current single-Authored-Room World snapshot.
 - `reconcile-world.ts` repairs transient HMR state while retaining authored
   content.
 - `spatial/` owns collision, elevation, and support-surface facts shared by
-  gameplay, the Design Studio, and rendering.
+  gameplay, the Design Studio, and rendering. Its colocated `__tests__/`
+  directories cover spatial facts; `world/__tests__/` covers initial and HMR
+  reconciliation snapshots.
 
 Callers import the specific interface they need; there is intentionally no
 barrel or forwarding module. World code does not import gameplay, Design Studio,

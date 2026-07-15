@@ -1,6 +1,5 @@
-import type { Direction } from "../model/control";
-import type { EditorState } from "../design-studio/model";
 import type { PlayerFacing } from "./components";
+import type { EditorState } from "./editor-state";
 import {
 	Body,
 	type Decoration,
@@ -11,6 +10,8 @@ import {
 } from "./components";
 import { EntityId } from "./entity-id";
 import type { FloorTile } from "./floor";
+
+export type Direction = "ArrowUp" | "ArrowDown" | "ArrowLeft" | "ArrowRight";
 
 export type World = {
 	readonly positions: ReadonlyMap<EntityId, Position>;

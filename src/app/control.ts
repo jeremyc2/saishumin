@@ -1,4 +1,5 @@
 import { Schema } from "effect";
+import type { Direction as WorldDirection } from "../world/world";
 
 export const Control = Schema.Literals([
 	"ArrowUp",
@@ -21,11 +22,7 @@ export const Controls = {
 	Interact: Control.make("x"),
 } as const;
 
-export type Direction =
-	| typeof Controls.Up
-	| typeof Controls.Down
-	| typeof Controls.Left
-	| typeof Controls.Right;
+export type Direction = WorldDirection;
 
 export const isControl = Schema.is(Control);
 

@@ -1,6 +1,6 @@
 import { afterAll, describe, expect, test } from "bun:test";
 import { ManagedRuntime } from "effect";
-import { Controls, type Direction } from "../../../model/control";
+import { Controls, type Direction } from "../../../app/control";
 import {
 	Body,
 	Decoration,

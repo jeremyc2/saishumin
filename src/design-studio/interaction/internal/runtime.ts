@@ -1,5 +1,5 @@
 import { Effect, Scope } from "effect";
-import { Action, type Action as AppAction } from "../../../model/action";
+import { Action, type Action as AppAction } from "../../../app/action";
 import {
 	autoPanCamera,
 	contentEnvelope,

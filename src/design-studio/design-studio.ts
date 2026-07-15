@@ -1,4 +1,4 @@
-import type { Action } from "../model/action";
+import type { Action } from "../app/action";
 import type { World } from "../world/world";
 import { updateDesignStudioAction } from "./internal/actions";
 

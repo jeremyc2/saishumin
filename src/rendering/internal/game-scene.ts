@@ -2,7 +2,7 @@ import { html, svg, type TemplateResult } from "lit-html";
 import type { EditSessionPresentation } from "../../design-studio/edit-session/edit-session";
 import type { DesignStudioInteractionRuntime } from "../../design-studio/interaction/runtime";
 import type { DesignStudioView } from "../../design-studio/view/view";
-import { Action, type Action as AppAction } from "../../model/action";
+import { Action, type Action as AppAction } from "../../app/action";
 import {
 	renderDepthForCharacter,
 	renderDepthForEntity,

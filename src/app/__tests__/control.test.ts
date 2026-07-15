@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { Controls, controlForKey } from "./control";
+import { Controls, controlForKey } from "../control";
 
 describe("controlForKey", () => {
 	test("maps WASD to the corresponding arrow-key controls", () => {

@@ -5,8 +5,8 @@ import { recoverInvalidPlayerPlacement } from "./player-recovery";
 import {
 	isPlayerPlacementValid,
 	nearestValidPlayerPosition,
-} from "../../../ecs/player-placement";
-import { Controls } from "../../../model/control";
+} from "../../../world/spatial/player-placement";
+import { Controls } from "../../../app/control";
 import {
 	type Body,
 	DecorationKinds,

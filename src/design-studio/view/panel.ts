@@ -1,5 +1,5 @@
 import { html, type TemplateResult } from "lit-html";
-import { Action, type Action as AppAction } from "../../model/action";
+import { Action, type Action as AppAction } from "../../app/action";
 import {
 	DecorationKinds,
 	defaultSignContent,

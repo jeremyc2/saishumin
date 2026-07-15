@@ -1,5 +1,5 @@
 import { html, type TemplateResult } from "lit-html";
-import { Action, type Action as AppAction } from "../../model/action";
+import { Action, type Action as AppAction } from "../../app/action";
 import {
 	points,
 	projectedRectangle,
@@ -18,6 +18,7 @@ import {
 } from "../../world/components";
 import { placementElevationForKind } from "../../world/spatial/elevation";
 import { isSupportSurfaceOccupied } from "../../world/spatial/support-surface";
+import type { InvalidPlacement } from "../../world/editor-state";
 import type { World } from "../../world/world";
 import type { EditSessionPresentation } from "../edit-session/edit-session";
 import type { DesignStudioInteractionRuntime } from "../interaction/runtime";
@@ -25,7 +26,6 @@ import {
 	defaultEditorItemBody,
 	defaultEditorItemHeight,
 	EditorItemKinds,
-	type InvalidPlacement,
 } from "../model";
 
 type Dispatch = (action: AppAction) => void;
