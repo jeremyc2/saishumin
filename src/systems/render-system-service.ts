@@ -1,16 +1,5 @@
 import { Context, Effect, Layer } from "effect";
 import { html, render, svg, type TemplateResult } from "lit-html";
-import {
-	isEntityPlacementValid,
-	isFloorPlanPlacementValid,
-	isNewEditorItemPlacementValid,
-} from "../ecs/editor-placement";
-import {
-	editorEntityHeight,
-	editorEntityHeightLimits,
-	editorItemKindForEntity,
-	maximumEditorBody,
-} from "../ecs/editor-sizing";
 import { Action } from "../model/action";
 import {
 	autoPanCamera,
@@ -26,14 +15,21 @@ import {
 } from "../model/design-studio-interaction";
 import {
 	type EditSessionPresentation,
+	editorEntityHeight,
+	editorEntityHeightLimits,
+	editorItemKindForEntity,
 	editSessionView,
-} from "../model/edit-session";
+	isEntityPlacementValid,
+	isFloorPlanPlacementValid,
+	isNewEditorItemPlacementValid,
+	maximumEditorBody,
+} from "../design-studio/edit-session/edit-session";
 import {
 	defaultEditorItemBody,
 	defaultEditorItemHeight,
 	type EditorItemKind,
 	EditorItemKinds,
-} from "../model/editor";
+} from "../design-studio/model";
 import { editorPlacementPositionAtPointer } from "../render/editor-placement-projection";
 import {
 	renderDepthForCharacter,

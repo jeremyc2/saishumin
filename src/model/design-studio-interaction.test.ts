@@ -21,7 +21,7 @@ import {
 	releasePalettePress,
 	visiblePalettePopover,
 } from "./design-studio-interaction";
-import { EditorItemKinds } from "./editor";
+import { EditorItemKinds } from "../design-studio/model";
 
 describe("Design Studio interaction", () => {
 	test("activates a palette drag only after leaving the item rectangle expanded by 12 pixels", () => {

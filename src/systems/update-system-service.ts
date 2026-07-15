@@ -1,13 +1,5 @@
 import { Context, Effect, Layer } from "effect";
 import {
-	isEntityPlacementValid,
-	isFloorPlanPlacementValid,
-} from "../ecs/editor-placement";
-import {
-	editorItemKindForEntity,
-	maximumEditorBody,
-} from "../ecs/editor-sizing";
-import {
 	isPlayerPlacementValid,
 	nearestValidPlayerPosition,
 } from "../ecs/player-placement";
@@ -18,9 +10,16 @@ import {
 	beginEditSession,
 	cancelEditSession,
 	commitEditSession,
+	editorItemKindForEntity,
+	isEntityPlacementValid,
+	isFloorPlanPlacementValid,
+	maximumEditorBody,
 	previewEditSession,
-} from "../model/edit-session";
-import { EditorItemKinds, editorItemHeightLimits } from "../model/editor";
+} from "../design-studio/edit-session/edit-session";
+import {
+	EditorItemKinds,
+	editorItemHeightLimits,
+} from "../design-studio/model";
 import { playerFacingForDirections } from "../model/player-facing";
 import { cameraForFloor, followCamera } from "../render/projection";
 import {

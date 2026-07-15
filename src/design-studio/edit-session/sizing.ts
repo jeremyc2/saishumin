@@ -4,10 +4,10 @@ import {
 	editorItemHeightLimits,
 	isEditorItemKind,
 	maximumEditorItemBody,
-} from "../model/editor";
-import { Body } from "../world/components";
-import type { EntityId } from "../world/entity-id";
-import type { World } from "../world/world";
+} from "../model";
+import { Body } from "../../world/components";
+import type { EntityId } from "../../world/entity-id";
+import type { World } from "../../world/world";
 
 export const editorItemKindForEntity = (
 	world: World,

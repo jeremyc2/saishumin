@@ -1,14 +1,14 @@
 import { describe, expect, test } from "bun:test";
-import { defaultEditorItemBody, EditorItemKinds } from "../model/editor";
-import { Body, Position } from "../world/components";
-import { initialWorld } from "../world/initial-world";
-import { crateEntities, playerEntity, wallEntities } from "../world/world";
+import { defaultEditorItemBody, EditorItemKinds } from "../../model";
+import { Body, Position } from "../../../world/components";
+import { initialWorld } from "../../../world/initial-world";
+import { crateEntities, playerEntity, wallEntities } from "../../../world/world";
 import {
 	isEntityPlacementValid,
 	isFloorPlanPlacementValid,
 	isInsideFloorPlan,
 	isNewEditorItemPlacementValid,
-} from "./editor-placement";
+} from "../placement";
 
 const wallEntity = wallEntities[0];
 const smallBody = Body.make({ width: 40, depth: 40 });

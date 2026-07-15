@@ -7,7 +7,7 @@ import type {
 	EditorSelection,
 	EditSessionOperation,
 	EditSessionPreview,
-} from "./editor";
+} from "../design-studio/model";
 
 export type Action = Data.TaggedEnum<{
 	KeyChanged: { readonly key: Control; readonly pressed: boolean };
