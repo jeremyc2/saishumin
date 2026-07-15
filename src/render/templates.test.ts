@@ -1,6 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { Body, Position } from "../model/component";
-import { PlayerFacings } from "../model/player-facing";
+import { Body, PlayerFacings, Position } from "../world/components";
 import {
 	closedChestTemplate,
 	crateShadowDepthOffset,

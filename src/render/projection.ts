@@ -1,4 +1,4 @@
-import type { Body, Position } from "../model/component";
+import type { Body, Position } from "../world/components";
 
 const horizontalProjectionScale = 1;
 const depthProjectionScale = Math.SQRT1_2;

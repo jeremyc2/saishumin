@@ -1,6 +1,11 @@
 import { Schema } from "effect";
-import { Body, type Position } from "./component";
-import type { EntityId } from "./entity-id";
+import {
+	Body,
+	defaultDecorationHeight,
+	isDecorationKind,
+	type Position,
+} from "../world/components";
+import type { EntityId } from "../world/entity-id";
 
 export const EditorItemKind = Schema.Literals([
 	"hopscotch",
@@ -44,13 +49,10 @@ export const defaultEditorItemBody = (kind: EditorItemKind): Body => {
 };
 
 export const defaultEditorItemHeight = (kind: EditorItemKind): number => {
-	if (kind === EditorItemKinds.Hopscotch) return 0;
-	if (kind === EditorItemKinds.Plant) return 84;
-	if (kind === EditorItemKinds.Lamp) return 96;
+	if (isDecorationKind(kind)) return defaultDecorationHeight(kind);
 	if (kind === EditorItemKinds.Wall) return 80;
 	if (kind === EditorItemKinds.Platform) return 40;
 	if (kind === EditorItemKinds.Chest) return 52;
-	if (kind === EditorItemKinds.Sign) return 104;
 	return 62;
 };
 

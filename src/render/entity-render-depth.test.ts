@@ -1,14 +1,5 @@
 import { describe, expect, test } from "bun:test";
 import {
-	crateBody,
-	crateHeight,
-	initialWorld,
-	lavaMonsterBody,
-	lavaMonsterEntity,
-	playerBody,
-	playerEntity,
-} from "../ecs/world";
-import {
 	Body,
 	Decoration,
 	DecorationKinds,
@@ -16,8 +7,17 @@ import {
 	Obstacle,
 	ObstacleKinds,
 	Position,
-} from "../model/component";
-import { EntityId } from "../model/entity-id";
+} from "../world/components";
+import { EntityId } from "../world/entity-id";
+import { initialWorld } from "../world/initial-world";
+import {
+	crateBody,
+	crateHeight,
+	lavaMonsterBody,
+	lavaMonsterEntity,
+	playerBody,
+	playerEntity,
+} from "../world/world";
 import {
 	renderDepthForCharacter,
 	renderDepthForEntity,

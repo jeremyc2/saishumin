@@ -1,11 +1,16 @@
-import { DecorationKinds, defaultSignContent } from "../model/component";
-import { defaultEditorItemHeight, isEditorItemKind } from "../model/editor";
-import { floorTileVersion } from "../model/floor-tile";
-import { isPlayerFacing, PlayerFacings } from "../model/player-facing";
-import { surfaceAt } from "./collision";
+import {
+	DecorationKinds,
+	defaultDecorationHeight,
+	defaultSignContent,
+	isDecorationKind,
+	isPlayerFacing,
+	PlayerFacings,
+} from "./components";
+import { floorTileVersion } from "./floor";
+import { initialWorld } from "./initial-world";
+import { surfaceAt } from "./spatial/collision";
 import {
 	groundElevation,
-	initialWorld,
 	lavaMonsterBody,
 	lavaMonsterEntity,
 	lavaMonsterSpawnPosition,
@@ -40,8 +45,8 @@ export const reconcileWorld = (world: World): World => {
 		if (Number.isFinite(decoration.height)) continue;
 		decorations.set(entity, {
 			...decoration,
-			height: isEditorItemKind(decoration.kind)
-				? defaultEditorItemHeight(decoration.kind)
+			height: isDecorationKind(decoration.kind)
+				? defaultDecorationHeight(decoration.kind)
 				: 0,
 		});
 	}

@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { crateBody, crateHeight } from "../ecs/world";
-import { Body, Position } from "../model/component";
+import { Body, Position } from "../world/components";
+import { crateBody, crateHeight } from "../world/world";
 import {
 	cameraForFloor,
 	followCamera,

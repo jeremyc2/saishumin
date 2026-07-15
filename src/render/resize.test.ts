@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { Body, Position } from "../model/component";
+import { Body, Position } from "../world/components";
 import { resizeFromHandle } from "./resize";
 
 const position = Position.make({ x: 50, y: 40 });

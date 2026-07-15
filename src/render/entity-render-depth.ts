@@ -1,20 +1,20 @@
-import { overlaps } from "../ecs/collision";
 import { editorItemKindForEntity } from "../ecs/editor-sizing";
+import type { Body } from "../world/components";
+import type { EntityId } from "../world/entity-id";
+import { overlaps } from "../world/spatial/collision";
 import {
 	bodyBoundsOverlap,
 	canSitOnSupport,
 	entityBaseElevation,
 	entityTopElevation,
-} from "../ecs/elevation";
+} from "../world/spatial/elevation";
 import {
 	groundElevation,
 	obstacleHeightTolerance,
 	playerBody,
 	playerEntity,
 	type World,
-} from "../ecs/world";
-import type { Body } from "../model/component";
-import type { EntityId } from "../model/entity-id";
+} from "../world/world";
 import { visualDepth } from "./projection";
 
 export const supportedObjectDepthOffset = 0.5;

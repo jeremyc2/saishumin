@@ -1,20 +1,20 @@
-import type { Body, Position } from "../model/component";
 import {
 	defaultEditorItemHeight,
 	type EditorItemKind,
 	EditorItemKinds,
 } from "../model/editor";
-import type { EntityId } from "../model/entity-id";
-import { isSolidEntity, overlaps } from "./collision";
+import type { Body, Position } from "../world/components";
+import type { EntityId } from "../world/entity-id";
+import { isSolidEntity, overlaps } from "../world/spatial/collision";
 import {
 	entityBaseElevation,
 	entityHeight,
 	placementElevationForEntity,
 	placementElevationForKind,
 	verticalRangesOverlap,
-} from "./elevation";
-import { isSupportSurfaceTransformValid } from "./support-surface";
-import { playerEntity, type World } from "./world";
+} from "../world/spatial/elevation";
+import { isSupportSurfaceTransformValid } from "../world/spatial/support-surface";
+import { playerEntity, type World } from "../world/world";
 
 export type OriginalPlacement = {
 	readonly position: Position;

@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { Body } from "../model/component";
-import { floorTilesCoveringPlan, initialFloorTiles } from "../model/floor-tile";
+import { Body } from "../world/components";
+import { floorTilesCoveringPlan, initialFloorTiles } from "../world/floor";
 import { outdoorFloorTiles, terrainTileSize } from "./outdoor-floor";
 
 const floorPlan = Body.make({ width: 1_160, depth: 640 });

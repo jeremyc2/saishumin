@@ -1,12 +1,23 @@
 import { afterAll, describe, expect, test } from "bun:test";
 import { ManagedRuntime } from "effect";
-import { overlaps } from "../ecs/collision";
+import { Controls, type Direction } from "../model/control";
+import {
+	Body,
+	Decoration,
+	DecorationKinds,
+	Elevation,
+	Obstacle,
+	ObstacleKinds,
+	Position,
+} from "../world/components";
+import { EntityId } from "../world/entity-id";
+import { initialWorld } from "../world/initial-world";
+import { overlaps } from "../world/spatial/collision";
 import {
 	crateBody,
 	crateEntities,
 	crateHeight,
 	groundElevation,
-	initialWorld,
 	lavaMonsterBody,
 	lavaMonsterEntity,
 	lavaMonsterFollowDistance,
@@ -17,18 +28,7 @@ import {
 	roomDepth,
 	stationaryVelocity,
 	type World,
-} from "../ecs/world";
-import {
-	Body,
-	Decoration,
-	DecorationKinds,
-	Elevation,
-	Obstacle,
-	ObstacleKinds,
-	Position,
-} from "../model/component";
-import { Controls, type Direction } from "../model/control";
-import { EntityId } from "../model/entity-id";
+} from "../world/world";
 import { MovementSystemService } from "./movement-system-service";
 
 const runtime = ManagedRuntime.make(MovementSystemService.layer);

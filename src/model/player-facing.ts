@@ -1,29 +1,5 @@
-import { Schema } from "effect";
+import { type PlayerFacing, PlayerFacings } from "../world/components";
 import { Controls, type Direction } from "./control";
-
-export const PlayerFacing = Schema.Literals([
-	"up",
-	"up-right",
-	"right",
-	"down-right",
-	"down",
-	"down-left",
-	"left",
-	"up-left",
-]);
-export type PlayerFacing = typeof PlayerFacing.Type;
-export const isPlayerFacing = Schema.is(PlayerFacing);
-
-export const PlayerFacings = {
-	Up: PlayerFacing.make("up"),
-	UpRight: PlayerFacing.make("up-right"),
-	Right: PlayerFacing.make("right"),
-	DownRight: PlayerFacing.make("down-right"),
-	Down: PlayerFacing.make("down"),
-	DownLeft: PlayerFacing.make("down-left"),
-	Left: PlayerFacing.make("left"),
-	UpLeft: PlayerFacing.make("up-left"),
-} as const;
 
 /**
  * Resolves the same signed input vector used by movement into one of the eight

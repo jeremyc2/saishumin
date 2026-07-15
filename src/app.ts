@@ -1,14 +1,14 @@
 import { Effect, Layer, ManagedRuntime, Queue, Ref, Stream } from "effect";
 import { run } from "otaku-hmr";
 import { State } from "otaku-state";
-import { reconcileWorld } from "./ecs/reconcile-world";
-import { initialWorld } from "./ecs/world";
 import { Action } from "./model/action";
 import { type Control, Controls, controlForKey } from "./model/control";
 import { editSessionPresentation, editSessionView } from "./model/edit-session";
 import { MovementSystemService } from "./systems/movement-system-service";
 import { RenderSystemService } from "./systems/render-system-service";
 import { UpdateSystemService } from "./systems/update-system-service";
+import { initialWorld } from "./world/initial-world";
+import { reconcileWorld } from "./world/reconcile-world";
 
 document.body.className =
 	"m-0 overflow-hidden bg-[#14212a] font-sans scheme-dark";

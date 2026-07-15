@@ -16,12 +16,37 @@ export const Elevation = Schema.Struct({
 });
 export type Elevation = typeof Elevation.Type;
 
+export const PlayerFacing = Schema.Literals([
+	"up",
+	"up-right",
+	"right",
+	"down-right",
+	"down",
+	"down-left",
+	"left",
+	"up-left",
+]);
+export type PlayerFacing = typeof PlayerFacing.Type;
+export const isPlayerFacing = Schema.is(PlayerFacing);
+
+export const PlayerFacings = {
+	Up: PlayerFacing.make("up"),
+	UpRight: PlayerFacing.make("up-right"),
+	Right: PlayerFacing.make("right"),
+	DownRight: PlayerFacing.make("down-right"),
+	Down: PlayerFacing.make("down"),
+	DownLeft: PlayerFacing.make("down-left"),
+	Left: PlayerFacing.make("left"),
+	UpLeft: PlayerFacing.make("up-left"),
+} as const;
+
 export const ObstacleKind = Schema.Literals([
 	"wall",
 	"crate",
 	"platform",
 	"chest",
 ]);
+export const isObstacleKind = Schema.is(ObstacleKind);
 export const ObstacleKinds = {
 	Wall: ObstacleKind.make("wall"),
 	Crate: ObstacleKind.make("crate"),
@@ -43,6 +68,7 @@ export const DecorationKind = Schema.Literals([
 	"sign",
 ]);
 export type DecorationKind = typeof DecorationKind.Type;
+export const isDecorationKind = Schema.is(DecorationKind);
 
 export const DecorationKinds = {
 	Hopscotch: DecorationKind.make("hopscotch"),
@@ -50,6 +76,13 @@ export const DecorationKinds = {
 	Lamp: DecorationKind.make("lamp"),
 	Sign: DecorationKind.make("sign"),
 } as const;
+
+export const defaultDecorationHeight = (kind: DecorationKind): number => {
+	if (kind === DecorationKinds.Hopscotch) return 0;
+	if (kind === DecorationKinds.Plant) return 84;
+	if (kind === DecorationKinds.Lamp) return 96;
+	return 104;
+};
 
 export const Decoration = Schema.Struct({
 	kind: DecorationKind,

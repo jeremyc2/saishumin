@@ -1,13 +1,13 @@
 import { svg, type TemplateResult } from "lit-html";
-import type { ShadowSection } from "../ecs/elevation";
 import {
 	type Body,
 	type Decoration,
 	DecorationKinds,
 	type Elevation,
+	type PlayerFacing,
 	type Position,
-} from "../model/component";
-import type { PlayerFacing } from "../model/player-facing";
+} from "../world/components";
+import type { ShadowSection } from "../world/spatial/elevation";
 import {
 	insetRectangle,
 	points,

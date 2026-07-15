@@ -1,5 +1,5 @@
 import { Graph, Option } from "effect";
-import type { Position } from "../model/component";
+import type { Position } from "../world/components";
 
 type GridPoint = {
 	readonly column: number;

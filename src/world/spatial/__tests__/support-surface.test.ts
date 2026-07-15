@@ -7,14 +7,17 @@ import {
 	Obstacle,
 	ObstacleKinds,
 	Position,
-} from "../model/component";
-import { EntityId } from "../model/entity-id";
-import { shadowElevationForEntity, shadowSectionsForEntity } from "./elevation";
+} from "../../components";
+import { EntityId } from "../../entity-id";
+import { initialWorld } from "../../initial-world";
+import {
+	shadowElevationForEntity,
+	shadowSectionsForEntity,
+} from "../elevation";
 import {
 	entitiesSupportedBy,
 	isSupportSurfaceTransformValid,
-} from "./support-surface";
-import { initialWorld } from "./world";
+} from "../support-surface";
 
 const platform = EntityId(940);
 const plant = EntityId(941);

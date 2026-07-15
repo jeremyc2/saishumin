@@ -1,9 +1,9 @@
-import type { Position } from "../model/component";
+import type { Position } from "../world/components";
 import {
 	type FloorTerrain,
 	type FloorTile,
 	floorTileWorldSize,
-} from "../model/floor-tile";
+} from "../world/floor";
 import { projectVector } from "./projection";
 
 export type TerrainEdge = "top" | "right" | "bottom" | "left";

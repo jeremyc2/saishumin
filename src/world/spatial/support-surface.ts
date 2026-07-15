@@ -1,13 +1,13 @@
-import type { Body, Position } from "../model/component";
-import type { EntityId } from "../model/entity-id";
-import { editorItemKindForEntity } from "./editor-sizing";
+import type { Body, Position } from "../components";
+import type { EntityId } from "../entity-id";
+import { obstacleHeightTolerance, type World } from "../world";
 import {
 	bodyBoundsOverlap,
 	canSitOnSupport,
 	entityBaseElevation,
 	entityTopElevation,
+	spatialKindForEntity,
 } from "./elevation";
-import { obstacleHeightTolerance, type World } from "./world";
 
 export const entitiesSupportedBy = (
 	world: World,
@@ -26,7 +26,7 @@ export const entitiesSupportedBy = (
 	const supported: Array<EntityId> = [];
 	for (const [entity, position] of world.positions) {
 		if (entity === surfaceEntity) continue;
-		const kind = editorItemKindForEntity(world, entity);
+		const kind = spatialKindForEntity(world, entity);
 		const body = world.bodies.get(entity);
 		if (
 			kind !== undefined &&
