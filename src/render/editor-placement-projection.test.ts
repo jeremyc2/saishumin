@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { EditorItemKinds } from "../model/editor";
+import { EditorItemKinds } from "../design-studio/model";
 import {
 	Body,
 	Elevation,

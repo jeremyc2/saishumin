@@ -3,13 +3,13 @@ import { Layer, ManagedRuntime } from "effect";
 import { isPlayerPlacementValid } from "../ecs/player-placement";
 import { Action } from "../model/action";
 import { Controls, type Direction } from "../model/control";
-import { editSessionView } from "../model/edit-session";
+import { editSessionView } from "../design-studio/edit-session/edit-session";
 import {
 	defaultEditorItemBody,
 	EditorItemKinds,
 	editorItemHeightLimits,
 	maximumEditorItemBody,
-} from "../model/editor";
+} from "../design-studio/model";
 import {
 	Body,
 	Decoration,

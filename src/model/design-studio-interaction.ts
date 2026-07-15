@@ -2,7 +2,7 @@ import { projectedRectangle } from "../render/projection";
 import type { Position } from "../world/components";
 import { entityBaseElevation, entityHeight } from "../world/spatial/elevation";
 import { playerEntity, type World } from "../world/world";
-import type { EditorItemKind } from "./editor";
+import type { EditorItemKind } from "../design-studio/model";
 
 export type ScreenBounds = {
 	readonly left: number;

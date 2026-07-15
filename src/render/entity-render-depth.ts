@@ -1,4 +1,4 @@
-import { editorItemKindForEntity } from "../ecs/editor-sizing";
+import { editorItemKindForEntity } from "../design-studio/edit-session/edit-session";
 import type { Body } from "../world/components";
 import type { EntityId } from "../world/entity-id";
 import { overlaps } from "../world/spatial/collision";
