@@ -3,4 +3,4 @@
  * elapsed frame time; player, movable-item, and creature phases remain
  * implementation details.
  */
-export { MovementSystemService } from "./internal/runtime";
+export { MovementSystemService } from "./internal/movement-runtime";

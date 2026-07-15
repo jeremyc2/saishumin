@@ -58,7 +58,7 @@ export class MovementSystemService extends Context.Service<
 	{
 		readonly update: (world: World, elapsed: number) => World;
 	}
->()("saishumin/gameplay/movement/internal/runtime/MovementSystemService") {
+>()("saishumin/gameplay/movement/internal/movement-runtime/MovementSystemService") {
 	static readonly layer = Layer.sync(this, () => {
 		const isDirectlyPushableEntity = (
 			world: World,
