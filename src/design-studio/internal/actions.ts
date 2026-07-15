@@ -2,7 +2,6 @@ import type { Data } from "effect";
 import { dual } from "effect/Function";
 import { Action } from "../../app/action";
 import type { Direction } from "../../app/control";
-import type { Pipeable } from "../../pipeable";
 import {
 	cameraFollowingPlayer,
 	cameraForFloor,
@@ -467,11 +466,10 @@ const dispatchDesignStudioAction = (world: World, action: Action): World =>
 		EditorDeleteSelected: () => deleteSelected(world),
 	});
 
-export const updateDesignStudioAction: Pipeable<
-	World,
-	[action: DesignStudioAction],
-	World
-> = dual(
+export const updateDesignStudioAction = dual<
+	(action: DesignStudioAction) => (self: World) => World,
+	(self: World, action: DesignStudioAction) => World
+>(
 	2,
 	(world: World, action: DesignStudioAction): World =>
 		dispatchDesignStudioAction(world, action),

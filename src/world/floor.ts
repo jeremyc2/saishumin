@@ -1,5 +1,4 @@
 import { dual } from "effect/Function";
-import type { Pipeable } from "../pipeable";
 import type { Body, Position } from "./components";
 
 export type FloorTerrain = "grass" | "sand" | "dirt" | "cobblestone";
@@ -123,11 +122,19 @@ export const initialFloorTiles = (
 
 const tileKey = (column: number, row: number): string => `${column}:${row}`;
 
-export const floorTilesCoveringPlan: Pipeable<
-	ReadonlyArray<FloorTile>,
-	[origin: Position, floorPlan: Body, floorOrigin?: Position],
-	ReadonlyArray<FloorTile>
-> = dual(
+export const floorTilesCoveringPlan = dual<
+	(
+		origin: Position,
+		floorPlan: Body,
+		floorOrigin?: Position,
+	) => (self: ReadonlyArray<FloorTile>) => ReadonlyArray<FloorTile>,
+	(
+		self: ReadonlyArray<FloorTile>,
+		origin: Position,
+		floorPlan: Body,
+		floorOrigin?: Position,
+	) => ReadonlyArray<FloorTile>
+>(
 	(arguments_) => Array.isArray(arguments_[0]),
 	(
 		tiles: ReadonlyArray<FloorTile>,

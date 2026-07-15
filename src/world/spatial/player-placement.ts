@@ -1,5 +1,4 @@
 import { dual } from "effect/Function";
-import type { Pipeable } from "../../pipeable";
 import type { Position } from "../components";
 import type { EntityId } from "../entity-id";
 import {
@@ -25,11 +24,10 @@ const blocksPlayerAtElevation = (
 	);
 };
 
-export const isPlayerPlacementValid: Pipeable<
-	World,
-	[position: Position, elevation: number],
-	boolean
-> = dual(3, (world: World, position: Position, elevation: number): boolean => {
+export const isPlayerPlacementValid = dual<
+	(position: Position, elevation: number) => (self: World) => boolean,
+	(self: World, position: Position, elevation: number) => boolean
+>(3, (world: World, position: Position, elevation: number): boolean => {
 	if (
 		position.x - playerBody.width / 2 < world.floorOrigin.x ||
 		position.x + playerBody.width / 2 >
@@ -56,11 +54,13 @@ export const isPlayerPlacementValid: Pipeable<
 	return true;
 });
 
-export const nearestValidPlayerPosition: Pipeable<
-	World,
-	[origin: Position, elevation: number],
-	Position | undefined
-> = dual(
+export const nearestValidPlayerPosition = dual<
+	(
+		origin: Position,
+		elevation: number,
+	) => (self: World) => Position | undefined,
+	(self: World, origin: Position, elevation: number) => Position | undefined
+>(
 	3,
 	(world: World, origin: Position, elevation: number): Position | undefined => {
 		const minimumX = world.floorOrigin.x + playerBody.width / 2;

@@ -1,5 +1,4 @@
 import { dual } from "effect/Function";
-import type { Pipeable } from "../../pipeable";
 import type { Body, Position } from "../components";
 import type { EntityId } from "../entity-id";
 import { obstacleHeightTolerance, type World } from "../world";
@@ -11,11 +10,19 @@ import {
 	spatialKindForEntity,
 } from "./elevation";
 
-export const entitiesSupportedBy: Pipeable<
-	World,
-	[surfaceEntity: EntityId, surfacePosition: Position, surfaceBody: Body],
-	ReadonlyArray<EntityId>
-> = dual(
+export const entitiesSupportedBy = dual<
+	(
+		surfaceEntity: EntityId,
+		surfacePosition: Position,
+		surfaceBody: Body,
+	) => (self: World) => ReadonlyArray<EntityId>,
+	(
+		self: World,
+		surfaceEntity: EntityId,
+		surfacePosition: Position,
+		surfaceBody: Body,
+	) => ReadonlyArray<EntityId>
+>(
 	4,
 	(
 		world: World,
@@ -55,11 +62,19 @@ export const entitiesSupportedBy: Pipeable<
 	},
 );
 
-export const isSupportSurfaceOccupied: Pipeable<
-	World,
-	[surfaceEntity: EntityId, surfacePosition: Position, surfaceBody: Body],
-	boolean
-> = dual(
+export const isSupportSurfaceOccupied = dual<
+	(
+		surfaceEntity: EntityId,
+		surfacePosition: Position,
+		surfaceBody: Body,
+	) => (self: World) => boolean,
+	(
+		self: World,
+		surfaceEntity: EntityId,
+		surfacePosition: Position,
+		surfaceBody: Body,
+	) => boolean
+>(
 	4,
 	(
 		world: World,
@@ -71,17 +86,23 @@ export const isSupportSurfaceOccupied: Pipeable<
 			.length > 0,
 );
 
-export const isSupportSurfaceTransformValid: Pipeable<
-	World,
-	[
+export const isSupportSurfaceTransformValid = dual<
+	(
 		surfaceEntity: EntityId,
 		position: Position,
 		body: Body,
 		originalPosition: Position,
 		originalBody: Body,
-	],
-	boolean
-> = dual(
+	) => (self: World) => boolean,
+	(
+		self: World,
+		surfaceEntity: EntityId,
+		position: Position,
+		body: Body,
+		originalPosition: Position,
+		originalBody: Body,
+	) => boolean
+>(
 	6,
 	(
 		world: World,

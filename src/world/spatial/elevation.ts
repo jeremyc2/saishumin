@@ -1,5 +1,4 @@
 import { dual } from "effect/Function";
-import type { Pipeable } from "../../pipeable";
 import {
 	type Body,
 	type DecorationKind,
@@ -19,29 +18,34 @@ import {
 	type World,
 } from "../world";
 
-export const entityBaseElevation: Pipeable<World, [entity: EntityId], number> =
-	dual(
-		2,
-		(world: World, entity: EntityId): number =>
-			world.elevations.get(entity)?.z ?? groundElevation,
-	);
-
-export const entityHeight: Pipeable<World, [entity: EntityId], number> = dual(
+export const entityBaseElevation = dual<
+	(entity: EntityId) => (self: World) => number,
+	(self: World, entity: EntityId) => number
+>(
 	2,
 	(world: World, entity: EntityId): number =>
-		entity === lavaMonsterEntity
-			? lavaMonsterCollisionHeight
-			: (world.obstacles.get(entity)?.height ??
-				world.decorations.get(entity)?.height ??
-				0),
+		world.elevations.get(entity)?.z ?? groundElevation,
 );
 
-export const entityTopElevation: Pipeable<World, [entity: EntityId], number> =
-	dual(
-		2,
-		(world: World, entity: EntityId): number =>
-			entityBaseElevation(world, entity) + entityHeight(world, entity),
-	);
+export const entityHeight = dual<
+	(entity: EntityId) => (self: World) => number,
+	(self: World, entity: EntityId) => number
+>(2, (world: World, entity: EntityId): number =>
+	entity === lavaMonsterEntity
+		? lavaMonsterCollisionHeight
+		: (world.obstacles.get(entity)?.height ??
+			world.decorations.get(entity)?.height ??
+			0),
+);
+
+export const entityTopElevation = dual<
+	(entity: EntityId) => (self: World) => number,
+	(self: World, entity: EntityId) => number
+>(
+	2,
+	(world: World, entity: EntityId): number =>
+		entityBaseElevation(world, entity) + entityHeight(world, entity),
+);
 
 export const verticalRangesOverlap = ({
 	base,
@@ -90,11 +94,10 @@ export const bodyBoundsOverlap = ({
 
 export type SpatialEntityKind = typeof ObstacleKind.Type | DecorationKind;
 
-export const spatialKindForEntity: Pipeable<
-	World,
-	[entity: EntityId],
-	SpatialEntityKind | undefined
-> = dual(2, (world: World, entity: EntityId): SpatialEntityKind | undefined => {
+export const spatialKindForEntity = dual<
+	(entity: EntityId) => (self: World) => SpatialEntityKind | undefined,
+	(self: World, entity: EntityId) => SpatialEntityKind | undefined
+>(2, (world: World, entity: EntityId): SpatialEntityKind | undefined => {
 	const kind =
 		world.obstacles.get(entity)?.kind ?? world.decorations.get(entity)?.kind;
 	return isObstacleKind(kind) || isDecorationKind(kind) ? kind : undefined;
@@ -118,17 +121,23 @@ export const canSitOnSupport = ({
 		? canSitOnPlatform(kind)
 		: supportKind === ObstacleKinds.Crate && kind === ObstacleKinds.Crate;
 
-export const placementElevationForKind: Pipeable<
-	World,
-	[
+export const placementElevationForKind = dual<
+	(
 		kind: SpatialEntityKind,
 		position: Position,
 		body: Body,
 		excludedEntity?: EntityId,
 		maximumElevation?: number,
-	],
-	number
-> = dual(
+	) => (self: World) => number,
+	(
+		self: World,
+		kind: SpatialEntityKind,
+		position: Position,
+		body: Body,
+		excludedEntity?: EntityId,
+		maximumElevation?: number,
+	) => number
+>(
 	(arguments_) => typeof arguments_[0] === "object",
 	(
 		world: World,
@@ -166,11 +175,21 @@ export const placementElevationForKind: Pipeable<
 	},
 );
 
-export const placementElevationForEntity: Pipeable<
-	World,
-	[entity: EntityId, position: Position, body: Body, maximumElevation?: number],
-	number
-> = dual(
+export const placementElevationForEntity = dual<
+	(
+		entity: EntityId,
+		position: Position,
+		body: Body,
+		maximumElevation?: number,
+	) => (self: World) => number,
+	(
+		self: World,
+		entity: EntityId,
+		position: Position,
+		body: Body,
+		maximumElevation?: number,
+	) => number
+>(
 	(arguments_) => typeof arguments_[0] === "object",
 	(
 		world: World,
@@ -193,11 +212,10 @@ export const placementElevationForEntity: Pipeable<
 	},
 );
 
-export const shadowElevationForEntity: Pipeable<
-	World,
-	[entity: EntityId, position: Position, body: Body],
-	number
-> = dual(
+export const shadowElevationForEntity = dual<
+	(entity: EntityId, position: Position, body: Body) => (self: World) => number,
+	(self: World, entity: EntityId, position: Position, body: Body) => number
+>(
 	4,
 	(world: World, entity: EntityId, position: Position, body: Body): number => {
 		const base = entityBaseElevation(world, entity);
@@ -261,11 +279,19 @@ const shadowSection = (
 				elevation,
 			};
 
-export const shadowSectionsForEntity: Pipeable<
-	World,
-	[entity: EntityId, position: Position, body: Body],
-	ReadonlyArray<ShadowSection>
-> = dual(
+export const shadowSectionsForEntity = dual<
+	(
+		entity: EntityId,
+		position: Position,
+		body: Body,
+	) => (self: World) => ReadonlyArray<ShadowSection>,
+	(
+		self: World,
+		entity: EntityId,
+		position: Position,
+		body: Body,
+	) => ReadonlyArray<ShadowSection>
+>(
 	4,
 	(
 		world: World,

@@ -1,5 +1,4 @@
 import { dual } from "effect/Function";
-import type { Pipeable } from "../../pipeable";
 import type { Position } from "../../world/components";
 import {
 	type FloorTerrain,
@@ -101,11 +100,17 @@ const transitionsForTile = (
 	);
 };
 
-export const outdoorFloorTiles: Pipeable<
-	ReadonlyArray<FloorTile>,
-	[origin: Position, view: OutdoorFloorBounds],
-	ReadonlyArray<OutdoorFloorTile>
-> = dual(
+export const outdoorFloorTiles = dual<
+	(
+		origin: Position,
+		view: OutdoorFloorBounds,
+	) => (self: ReadonlyArray<FloorTile>) => ReadonlyArray<OutdoorFloorTile>,
+	(
+		self: ReadonlyArray<FloorTile>,
+		origin: Position,
+		view: OutdoorFloorBounds,
+	) => ReadonlyArray<OutdoorFloorTile>
+>(
 	3,
 	(
 		tiles: ReadonlyArray<FloorTile>,

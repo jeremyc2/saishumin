@@ -23,9 +23,9 @@ import {
 } from "./world";
 
 /**
- * HMR state can outlive the module definitions that created it. Reconciliation
- * repairs required player state and transient inputs while preserving geometry
- * authored in the design studio.
+ * World state may not satisfy the current game invariants, regardless of where
+ * it came from. Reconciliation repairs required entity and transient state while
+ * preserving valid content authored in the design studio.
  */
 export const reconcileWorld = (world: World): World => {
 	const floorPlan = world.floorPlan ?? initialWorld.floorPlan;

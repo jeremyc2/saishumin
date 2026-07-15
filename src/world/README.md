@@ -14,14 +14,17 @@ selection, or transitions.
   the Design Studio owns transitions for that contract.
 - `floor.ts` owns authored floor terrain data and expansion rules.
 - `initial-world.ts` constructs the current single-Authored-Room World snapshot.
-- `reconcile-world.ts` repairs transient HMR state while retaining authored
-  content.
+- `reconcile-world.ts` repairs invalid game state while retaining valid authored
+  content, regardless of whether the state came from HMR, disk, or another
+  persistence boundary.
 - `spatial/` owns collision, elevation, and support-surface facts shared by
   gameplay, the Design Studio, and rendering. Its colocated `__tests__/`
-  directories cover spatial facts; `world/__tests__/` covers initial and HMR
-  reconciliation snapshots.
+  directories cover spatial facts; `world/__tests__/` covers initial and invalid
+  state reconciliation snapshots.
 
 Callers import the specific interface they need; there is intentionally no
 barrel or forwarding module. World code does not import gameplay, Design Studio,
 or rendering behavior. Those modules may transform or observe a World through
-these interfaces, while application composition owns the persistent HMR key.
+these interfaces, while application composition owns loading, storing, and
+reconciling World snapshots. HMR is the current persistence boundary, but it is
+not part of the World module's contract.

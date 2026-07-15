@@ -1,5 +1,4 @@
 import { dual } from "effect/Function";
-import type { Pipeable } from "../../pipeable";
 import type { Body, Position } from "../../world/components";
 import type { EntityId } from "../../world/entity-id";
 import { isSolidEntity, overlaps } from "../../world/spatial/collision";
@@ -28,11 +27,10 @@ const isBlockingEntity = (world: World, entity: EntityId): boolean =>
 
 const placementBoundaryTolerance = 0.000_001;
 
-export const isInsideFloorPlan: Pipeable<
-	World,
-	[position: Position, body: Body],
-	boolean
-> = dual(3, (world: World, position: Position, body: Body): boolean =>
+export const isInsideFloorPlan = dual<
+	(position: Position, body: Body) => (self: World) => boolean,
+	(self: World, position: Position, body: Body) => boolean
+>(3, (world: World, position: Position, body: Body): boolean =>
 	isInsideBody(world.floorPlan, world.floorOrigin, position, body),
 );
 
@@ -51,11 +49,10 @@ const isInsideBody = (
 	position.y + body.depth / 2 <=
 		containerOrigin.y + container.depth + placementBoundaryTolerance;
 
-export const isFloorPlanPlacementValid: Pipeable<
-	World,
-	[floorPlan: Body],
-	boolean
-> = dual(2, (world: World, floorPlan: Body): boolean => {
+export const isFloorPlanPlacementValid = dual<
+	(floorPlan: Body) => (self: World) => boolean,
+	(self: World, floorPlan: Body) => boolean
+>(2, (world: World, floorPlan: Body): boolean => {
 	for (const [entity, position] of world.positions) {
 		if (entity === playerEntity) continue;
 		const body = world.bodies.get(entity);
@@ -68,16 +65,21 @@ export const isFloorPlanPlacementValid: Pipeable<
 	return true;
 });
 
-export const isEntityPlacementValid: Pipeable<
-	World,
-	[
+export const isEntityPlacementValid = dual<
+	(
 		entity: EntityId,
 		position: Position,
 		body: Body,
 		originalPlacement?: OriginalPlacement,
-	],
-	boolean
-> = dual(
+	) => (self: World) => boolean,
+	(
+		self: World,
+		entity: EntityId,
+		position: Position,
+		body: Body,
+		originalPlacement?: OriginalPlacement,
+	) => boolean
+>(
 	(arguments_) => typeof arguments_[0] === "object",
 	(
 		world: World,
@@ -141,11 +143,14 @@ export const isEntityPlacementValid: Pipeable<
 	},
 );
 
-export const isNewEditorItemPlacementValid: Pipeable<
-	World,
-	[kind: EditorItemKind, position: Position, body: Body],
-	boolean
-> = dual(
+export const isNewEditorItemPlacementValid = dual<
+	(
+		kind: EditorItemKind,
+		position: Position,
+		body: Body,
+	) => (self: World) => boolean,
+	(self: World, kind: EditorItemKind, position: Position, body: Body) => boolean
+>(
 	4,
 	(
 		world: World,

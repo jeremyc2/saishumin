@@ -1,5 +1,4 @@
 import { dual } from "effect/Function";
-import type { Pipeable } from "../../pipeable";
 import { type Body, DecorationKinds, type Position } from "../components";
 import type { EntityId } from "../entity-id";
 import {
@@ -10,7 +9,10 @@ import {
 } from "../world";
 import { bodyBoundsOverlap, entityTopElevation } from "./elevation";
 
-export const isSolidEntity: Pipeable<World, [entity: EntityId], boolean> = dual(
+export const isSolidEntity = dual<
+	(entity: EntityId) => (self: World) => boolean,
+	(self: World, entity: EntityId) => boolean
+>(
 	2,
 	(world: World, entity: EntityId): boolean =>
 		entity === lavaMonsterEntity ||
@@ -31,11 +33,10 @@ export const overlaps = ({
 	readonly otherBody: Body;
 }): boolean => bodyBoundsOverlap({ position, body, otherPosition, otherBody });
 
-export const isPositionInsideRoom: Pipeable<
-	World,
-	[position: Position],
-	boolean
-> = dual(
+export const isPositionInsideRoom = dual<
+	(position: Position) => (self: World) => boolean,
+	(self: World, position: Position) => boolean
+>(
 	2,
 	(world: World, position: Position): boolean =>
 		position.x >= world.floorOrigin.x &&
@@ -49,11 +50,19 @@ export type SupportSurface = {
 	readonly entity: EntityId | null;
 };
 
-export const supportSurfaceAt: Pipeable<
-	World,
-	[position: Position, body: Body, maximumElevation?: number],
-	SupportSurface
-> = dual(
+export const supportSurfaceAt = dual<
+	(
+		position: Position,
+		body: Body,
+		maximumElevation?: number,
+	) => (self: World) => SupportSurface,
+	(
+		self: World,
+		position: Position,
+		body: Body,
+		maximumElevation?: number,
+	) => SupportSurface
+>(
 	(arguments_) =>
 		typeof arguments_[0] === "object" && "editor" in arguments_[0],
 	(
@@ -98,11 +107,19 @@ export const supportSurfaceAt: Pipeable<
  * even though it intersects the surfaces on either side. Once the entire body
  * clears a ledge, the lower surface naturally takes over and the body can fall.
  */
-export const surfaceAt: Pipeable<
-	World,
-	[position: Position, body: Body, maximumElevation?: number],
-	number
-> = dual(
+export const surfaceAt = dual<
+	(
+		position: Position,
+		body: Body,
+		maximumElevation?: number,
+	) => (self: World) => number,
+	(
+		self: World,
+		position: Position,
+		body: Body,
+		maximumElevation?: number,
+	) => number
+>(
 	(arguments_) =>
 		typeof arguments_[0] === "object" && "editor" in arguments_[0],
 	(

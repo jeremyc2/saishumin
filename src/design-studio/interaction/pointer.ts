@@ -1,5 +1,4 @@
 import { dual } from "effect/Function";
-import type { Pipeable } from "../../pipeable";
 import { projectedRectangle } from "../../presentation/geometry/projection";
 import type { Position } from "../../world/components";
 import {
@@ -42,11 +41,15 @@ export const initialDesignStudioInteraction: DesignStudioInteraction = {
 export const isDesignStudioPanelVisible = (world: World): boolean =>
 	world.editor.editSession === null;
 
-export const pressPaletteItem: Pipeable<
-	DesignStudioInteraction,
-	[press: PalettePress],
-	DesignStudioInteraction
-> = dual(
+export const pressPaletteItem = dual<
+	(
+		press: PalettePress,
+	) => (self: DesignStudioInteraction) => DesignStudioInteraction,
+	(
+		self: DesignStudioInteraction,
+		press: PalettePress,
+	) => DesignStudioInteraction
+>(
 	2,
 	(
 		state: DesignStudioInteraction,
@@ -77,11 +80,12 @@ type PalettePressMovement = {
 	} | null;
 };
 
-export const movePalettePress: Pipeable<
-	DesignStudioInteraction,
-	[pointer: Position],
-	PalettePressMovement
-> = dual(
+export const movePalettePress = dual<
+	(
+		pointer: Position,
+	) => (self: DesignStudioInteraction) => PalettePressMovement,
+	(self: DesignStudioInteraction, pointer: Position) => PalettePressMovement
+>(
 	2,
 	(state: DesignStudioInteraction, pointer: Position): PalettePressMovement => {
 		const press = state.palettePress;
@@ -94,11 +98,10 @@ export const movePalettePress: Pipeable<
 	},
 );
 
-export const releasePalettePress: Pipeable<
-	DesignStudioInteraction,
-	[time: number],
-	DesignStudioInteraction
-> = dual(
+export const releasePalettePress = dual<
+	(time: number) => (self: DesignStudioInteraction) => DesignStudioInteraction,
+	(self: DesignStudioInteraction, time: number) => DesignStudioInteraction
+>(
 	2,
 	(state: DesignStudioInteraction, time: number): DesignStudioInteraction => {
 		const press = state.palettePress;
@@ -119,11 +122,12 @@ type VisiblePalettePopover = {
 	readonly opacity: number;
 };
 
-export const visiblePalettePopover: Pipeable<
-	DesignStudioInteraction,
-	[time: number],
-	VisiblePalettePopover | null
-> = dual(
+export const visiblePalettePopover = dual<
+	(
+		time: number,
+	) => (self: DesignStudioInteraction) => VisiblePalettePopover | null,
+	(self: DesignStudioInteraction, time: number) => VisiblePalettePopover | null
+>(
 	2,
 	(
 		state: DesignStudioInteraction,

@@ -1,5 +1,4 @@
 import { dual } from "effect/Function";
-import type { Pipeable } from "../../pipeable";
 import type { Body, Position } from "../../world/components";
 import { groundElevation, playerEntity, type World } from "../../world/world";
 
@@ -14,7 +13,10 @@ const cameraDeadZone = {
 	bottom: 700,
 } as const;
 
-export const project: Pipeable<Position, [z?: number], Position> = dual(
+export const project = dual<
+	(z?: number) => (self: Position) => Position,
+	(self: Position, z?: number) => Position
+>(
 	(arguments_) => typeof arguments_[0] === "object",
 	(position: Position, z: number = 0): Position => ({
 		x: cameraOrigin.x + position.x * horizontalProjectionScale,
@@ -27,7 +29,10 @@ export const projectVector = (vector: Position): Position => ({
 	y: vector.y * depthProjectionScale,
 });
 
-export const unproject: Pipeable<Position, [z?: number], Position> = dual(
+export const unproject = dual<
+	(z?: number) => (self: Position) => Position,
+	(self: Position, z?: number) => Position
+>(
 	(arguments_) => typeof arguments_[0] === "object",
 	(position: Position, z: number = 0): Position => ({
 		x: (position.x - cameraOrigin.x) / horizontalProjectionScale,
@@ -38,11 +43,17 @@ export const unproject: Pipeable<Position, [z?: number], Position> = dual(
 export const points = (corners: ReadonlyArray<Position>): string =>
 	corners.map(({ x, y }) => `${x},${y}`).join(" ");
 
-export const projectedRectangle: Pipeable<
-	Position,
-	[body: Body, z?: number],
-	readonly [Position, Position, Position, Position]
-> = dual(
+export const projectedRectangle = dual<
+	(
+		body: Body,
+		z?: number,
+	) => (self: Position) => readonly [Position, Position, Position, Position],
+	(
+		self: Position,
+		body: Body,
+		z?: number,
+	) => readonly [Position, Position, Position, Position]
+>(
 	(arguments_) => typeof arguments_[0] === "object" && "x" in arguments_[0],
 	(
 		position: Position,
@@ -68,11 +79,17 @@ export const projectedRectangle: Pipeable<
 	],
 );
 
-export const insetRectangle: Pipeable<
-	readonly [Position, Position, Position, Position],
-	[inset: number],
-	readonly [Position, Position, Position, Position]
-> = dual(
+export const insetRectangle = dual<
+	(
+		inset: number,
+	) => (
+		self: readonly [Position, Position, Position, Position],
+	) => readonly [Position, Position, Position, Position],
+	(
+		self: readonly [Position, Position, Position, Position],
+		inset: number,
+	) => readonly [Position, Position, Position, Position]
+>(
 	2,
 	(
 		corners: readonly [Position, Position, Position, Position],
@@ -87,11 +104,10 @@ export const insetRectangle: Pipeable<
 
 export const visualDepth = (position: Position): number => position.y;
 
-export const cameraForFloor: Pipeable<
-	Body,
-	[floorOrigin?: Position],
-	Position
-> = dual(
+export const cameraForFloor = dual<
+	(floorOrigin?: Position) => (self: Body) => Position,
+	(self: Body, floorOrigin?: Position) => Position
+>(
 	(arguments_) => typeof arguments_[0] === "object" && "width" in arguments_[0],
 	(floorPlan: Body, floorOrigin: Position = { x: 0, y: 0 }): Position => {
 		const projected = project({
@@ -105,11 +121,10 @@ export const cameraForFloor: Pipeable<
 	},
 );
 
-export const followCamera: Pipeable<
-	Position,
-	[position: Position, z?: number],
-	Position
-> = dual(
+export const followCamera = dual<
+	(position: Position, z?: number) => (self: Position) => Position,
+	(self: Position, position: Position, z?: number) => Position
+>(
 	(arguments_) => arguments_.length >= 2 && typeof arguments_[1] === "object",
 	(camera: Position, position: Position, z: number = 0): Position => {
 		const projected = project(position, z);

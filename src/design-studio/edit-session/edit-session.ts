@@ -1,6 +1,5 @@
 import { Data } from "effect";
 import { dual } from "effect/Function";
-import type { Pipeable } from "../../pipeable";
 import {
 	Decoration,
 	DecorationKinds,
@@ -71,72 +70,65 @@ const nextEntityId = (world: World): EntityIdType => {
 	return EntityId(greatestId + 1);
 };
 
-export const addEditorItemToWorld: Pipeable<
-	World,
-	[itemKind: EditorItemKind, position: Position],
-	World
-> = dual(
-	3,
-	(world: World, itemKind: EditorItemKind, position: Position): World => {
-		const entity = nextEntityId(world);
-		const body = defaultEditorItemBody(itemKind);
-		const height = defaultEditorItemHeight(itemKind);
-		const positions = new Map(world.positions).set(entity, position);
-		const bodies = new Map(world.bodies).set(entity, body);
-		const obstacles = new Map(world.obstacles);
-		const decorations = new Map(world.decorations);
-		const elevations = new Map(world.elevations).set(
+export const addEditorItemToWorld = dual<
+	(itemKind: EditorItemKind, position: Position) => (self: World) => World,
+	(self: World, itemKind: EditorItemKind, position: Position) => World
+>(3, (world: World, itemKind: EditorItemKind, position: Position): World => {
+	const entity = nextEntityId(world);
+	const body = defaultEditorItemBody(itemKind);
+	const height = defaultEditorItemHeight(itemKind);
+	const positions = new Map(world.positions).set(entity, position);
+	const bodies = new Map(world.bodies).set(entity, body);
+	const obstacles = new Map(world.obstacles);
+	const decorations = new Map(world.decorations);
+	const elevations = new Map(world.elevations).set(
+		entity,
+		Elevation.make({
+			z: placementElevationForKind(world, itemKind, position, body),
+			velocity: stationaryVelocity,
+		}),
+	);
+	const signContents = new Map(world.signContents);
+
+	if (itemKind === EditorItemKinds.Wall)
+		obstacles.set(
 			entity,
-			Elevation.make({
-				z: placementElevationForKind(world, itemKind, position, body),
-				velocity: stationaryVelocity,
-			}),
+			Obstacle.make({ height: wallHeight, kind: ObstacleKinds.Wall }),
 		);
-		const signContents = new Map(world.signContents);
+	else if (itemKind === EditorItemKinds.Platform)
+		obstacles.set(
+			entity,
+			Obstacle.make({ height: 40, kind: ObstacleKinds.Platform }),
+		);
+	else if (itemKind === EditorItemKinds.Crate)
+		obstacles.set(
+			entity,
+			Obstacle.make({ height: crateHeight, kind: ObstacleKinds.Crate }),
+		);
+	else if (itemKind === EditorItemKinds.Chest)
+		obstacles.set(entity, Obstacle.make({ height, kind: ObstacleKinds.Chest }));
+	else {
+		let kind = DecorationKinds.Lamp;
+		if (itemKind === EditorItemKinds.Hopscotch)
+			kind = DecorationKinds.Hopscotch;
+		else if (itemKind === EditorItemKinds.Plant) kind = DecorationKinds.Plant;
+		else if (itemKind === EditorItemKinds.Sign) kind = DecorationKinds.Sign;
+		decorations.set(entity, Decoration.make({ kind, height }));
+		if (itemKind === EditorItemKinds.Sign)
+			signContents.set(entity, defaultSignContent);
+	}
 
-		if (itemKind === EditorItemKinds.Wall)
-			obstacles.set(
-				entity,
-				Obstacle.make({ height: wallHeight, kind: ObstacleKinds.Wall }),
-			);
-		else if (itemKind === EditorItemKinds.Platform)
-			obstacles.set(
-				entity,
-				Obstacle.make({ height: 40, kind: ObstacleKinds.Platform }),
-			);
-		else if (itemKind === EditorItemKinds.Crate)
-			obstacles.set(
-				entity,
-				Obstacle.make({ height: crateHeight, kind: ObstacleKinds.Crate }),
-			);
-		else if (itemKind === EditorItemKinds.Chest)
-			obstacles.set(
-				entity,
-				Obstacle.make({ height, kind: ObstacleKinds.Chest }),
-			);
-		else {
-			let kind = DecorationKinds.Lamp;
-			if (itemKind === EditorItemKinds.Hopscotch)
-				kind = DecorationKinds.Hopscotch;
-			else if (itemKind === EditorItemKinds.Plant) kind = DecorationKinds.Plant;
-			else if (itemKind === EditorItemKinds.Sign) kind = DecorationKinds.Sign;
-			decorations.set(entity, Decoration.make({ kind, height }));
-			if (itemKind === EditorItemKinds.Sign)
-				signContents.set(entity, defaultSignContent);
-		}
-
-		return {
-			...world,
-			positions,
-			bodies,
-			obstacles,
-			decorations,
-			elevations,
-			signContents,
-			editor: { ...world.editor, selected: entity },
-		};
-	},
-);
+	return {
+		...world,
+		positions,
+		bodies,
+		obstacles,
+		decorations,
+		elevations,
+		signContents,
+		editor: { ...world.editor, selected: entity },
+	};
+});
 
 const applyOperation = (
 	world: World,
@@ -229,11 +221,10 @@ const validityFor = (
 		: { kind: "invalid", reason: "overlaps-editor-item" };
 };
 
-export const beginEditSession: Pipeable<
-	World,
-	[operation: EditSessionOperation],
-	World
-> = dual(2, (world: World, operation: EditSessionOperation): World => {
+export const beginEditSession = dual<
+	(operation: EditSessionOperation) => (self: World) => World,
+	(self: World, operation: EditSessionOperation) => World
+>(2, (world: World, operation: EditSessionOperation): World => {
 	if (!world.editor.open || world.editor.editSession !== null) return world;
 	return {
 		...world,
@@ -248,11 +239,10 @@ export const beginEditSession: Pipeable<
 	};
 });
 
-export const previewEditSession: Pipeable<
-	World,
-	[preview: EditSessionPreview],
-	World
-> = dual(2, (world: World, preview: EditSessionPreview): World => {
+export const previewEditSession = dual<
+	(preview: EditSessionPreview) => (self: World) => World,
+	(self: World, preview: EditSessionPreview) => World
+>(2, (world: World, preview: EditSessionPreview): World => {
 	const session = world.editor.editSession;
 	if (session === null || session.operation.kind !== preview.kind) return world;
 	const operation = {

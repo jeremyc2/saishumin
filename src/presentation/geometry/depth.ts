@@ -1,5 +1,4 @@
 import { dual } from "effect/Function";
-import type { Pipeable } from "../../pipeable";
 import type { Body } from "../../world/components";
 import type { EntityId } from "../../world/entity-id";
 import { overlaps } from "../../world/spatial/collision";
@@ -87,16 +86,17 @@ const renderDepthForEntityInternal = (
 	return depth;
 };
 
-export const renderDepthForEntity: Pipeable<World, [entity: EntityId], number> =
-	dual(2, (world: World, entity: EntityId): number =>
-		renderDepthForEntityInternal(world, entity, new Set()),
-	);
+export const renderDepthForEntity = dual<
+	(entity: EntityId) => (self: World) => number,
+	(self: World, entity: EntityId) => number
+>(2, (world: World, entity: EntityId): number =>
+	renderDepthForEntityInternal(world, entity, new Set()),
+);
 
-export const renderDepthForCharacter: Pipeable<
-	World,
-	[character: EntityId, body: Body],
-	number
-> = dual(3, (world: World, character: EntityId, body: Body): number => {
+export const renderDepthForCharacter = dual<
+	(character: EntityId, body: Body) => (self: World) => number,
+	(self: World, character: EntityId, body: Body) => number
+>(3, (world: World, character: EntityId, body: Body): number => {
 	const position = world.positions.get(character);
 	const elevation = world.elevations.get(character);
 	if (position === undefined || elevation === undefined)
