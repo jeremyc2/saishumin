@@ -229,11 +229,13 @@ export const makeDesignStudioPanel = (
 												</div>
 										</div>
 									`
-									: selectedEntity !== undefined &&
-											selectedBody !== undefined &&
-											selectedPosition !== undefined &&
-											selectedMaximumBody !== undefined
-										? html`
+									: (
+											() =>
+												selectedEntity !== undefined &&
+												selectedBody !== undefined &&
+												selectedPosition !== undefined &&
+												selectedMaximumBody !== undefined
+													? html`
 											<div class="mt-3 rounded-xl bg-[#17272e] p-4">
 												<div class="flex items-start justify-between gap-3">
 													<div>
@@ -343,7 +345,8 @@ export const makeDesignStudioPanel = (
 										}
 									</div>
 										`
-										: html`<div class="mt-3 rounded-xl border border-dashed border-[#30464c] px-4 py-5 text-center text-[11px] leading-relaxed text-[#819993]">Select an object to move or resize it.<br />Select the floor to change the plan.</div>`
+													: html`<div class="mt-3 rounded-xl border border-dashed border-[#30464c] px-4 py-5 text-center text-[11px] leading-relaxed text-[#819993]">Select an object to move or resize it.<br />Select the floor to change the plan.</div>`
+										)()
 							}
 						</section>
 					</div>

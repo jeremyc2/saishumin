@@ -1,11 +1,4 @@
 import { Context, Layer } from "effect";
-import { updateFallingMovableItems } from "./movable-items";
-import { updateLavaMonster } from "./lava-monster";
-import { recoverInvalidPlayerPlacement } from "./player-recovery";
-import {
-	isPlayerPlacementValid,
-	nearestValidPlayerPosition,
-} from "../../../world/spatial/player-placement";
 import { Controls } from "../../../app/control";
 import {
 	type Body,
@@ -28,6 +21,10 @@ import {
 	placementElevationForEntity,
 	verticalRangesOverlap,
 } from "../../../world/spatial/elevation";
+import {
+	isPlayerPlacementValid,
+	nearestValidPlayerPosition,
+} from "../../../world/spatial/player-placement";
 import { isSupportSurfaceOccupied } from "../../../world/spatial/support-surface";
 import {
 	cratePushSlowdown,
@@ -43,6 +40,9 @@ import {
 	stationaryVelocity,
 	type World,
 } from "../../../world/world";
+import { updateLavaMonster } from "./lava-monster";
+import { updateFallingMovableItems } from "./movable-items";
+import { recoverInvalidPlayerPlacement } from "./player-recovery";
 
 export class MovementSystemService extends Context.Service<
 	MovementSystemService,

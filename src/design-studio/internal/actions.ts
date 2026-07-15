@@ -1,7 +1,3 @@
-import {
-	isPlayerPlacementValid,
-	nearestValidPlayerPosition,
-} from "../../world/spatial/player-placement";
 import { Action } from "../../app/action";
 import type { Direction } from "../../app/control";
 import {
@@ -21,6 +17,10 @@ import {
 	entityBaseElevation,
 	placementElevationForEntity,
 } from "../../world/spatial/elevation";
+import {
+	isPlayerPlacementValid,
+	nearestValidPlayerPosition,
+} from "../../world/spatial/player-placement";
 import { isSupportSurfaceOccupied } from "../../world/spatial/support-surface";
 import {
 	groundElevation,

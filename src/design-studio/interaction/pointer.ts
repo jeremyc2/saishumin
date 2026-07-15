@@ -1,8 +1,11 @@
-import type { EditorItemKind } from "../model";
 import { projectedRectangle } from "../../rendering/geometry/projection";
 import type { Position } from "../../world/components";
-import { entityBaseElevation, entityHeight } from "../../world/spatial/elevation";
+import {
+	entityBaseElevation,
+	entityHeight,
+} from "../../world/spatial/elevation";
 import { playerEntity, type World } from "../../world/world";
+import type { EditorItemKind } from "../model";
 
 export type ScreenBounds = {
 	readonly left: number;
@@ -40,7 +43,11 @@ export const isDesignStudioPanelVisible = (world: World): boolean =>
 export const pressPaletteItem = (
 	state: DesignStudioInteraction,
 	press: PalettePress,
-): DesignStudioInteraction => ({ ...state, palettePress: press, popover: null });
+): DesignStudioInteraction => ({
+	...state,
+	palettePress: press,
+	popover: null,
+});
 
 const paletteActivationMargin = 12;
 
@@ -58,7 +65,10 @@ export const movePalettePress = (
 	pointer: Position,
 ): {
 	readonly state: DesignStudioInteraction;
-	readonly activated: { readonly itemKind: EditorItemKind; readonly pointer: Position } | null;
+	readonly activated: {
+		readonly itemKind: EditorItemKind;
+		readonly pointer: Position;
+	} | null;
 } => {
 	const press = state.palettePress;
 	if (press === null || isInsideActivationBounds(pointer, press.itemBounds))
@@ -76,7 +86,10 @@ export const releasePalettePress = (
 	const press = state.palettePress;
 	return press === null
 		? state
-		: { palettePress: null, popover: { itemBounds: press.itemBounds, shownAt: time } };
+		: {
+				palettePress: null,
+				popover: { itemBounds: press.itemBounds, shownAt: time },
+			};
 };
 
 const popoverVisibleMilliseconds = 3_000;
@@ -100,7 +113,9 @@ export const visiblePalettePopover = (
 	};
 };
 
-export const dismissPalettePopover = (state: DesignStudioInteraction): DesignStudioInteraction =>
+export const dismissPalettePopover = (
+	state: DesignStudioInteraction,
+): DesignStudioInteraction =>
 	state.popover === null ? state : { ...state, popover: null };
 
 const autoPanZone = 64;
@@ -112,7 +127,10 @@ const axisAutoPanSpeed = (pointer: number, extent: number): number => {
 		return maximumAutoPanSpeed * (1 - Math.max(0, pointer) / autoPanZone);
 	const farZoneStart = extent - autoPanZone;
 	if (pointer > farZoneStart)
-		return -maximumAutoPanSpeed * ((Math.min(extent, pointer) - farZoneStart) / autoPanZone);
+		return (
+			-maximumAutoPanSpeed *
+			((Math.min(extent, pointer) - farZoneStart) / autoPanZone)
+		);
 	return 0;
 };
 
@@ -138,7 +156,14 @@ const clampedAutoPanAxis = (
 	return clamp(current + delta, lowerBound, upperBound);
 };
 
-export const autoPanCamera = ({ camera, pointer, viewport, scale = { x: 1, y: 1 }, envelope, elapsedSeconds }: {
+export const autoPanCamera = ({
+	camera,
+	pointer,
+	viewport,
+	scale = { x: 1, y: 1 },
+	envelope,
+	elapsedSeconds,
+}: {
 	readonly camera: Position;
 	readonly pointer: Position;
 	readonly viewport: ViewportSize;
@@ -157,8 +182,22 @@ export const autoPanCamera = ({ camera, pointer, viewport, scale = { x: 1, y: 1 
 	const minimumY = viewportHeight - verticalPadding - envelope.bottom;
 	const maximumY = verticalPadding - envelope.top;
 	return {
-		x: clampedAutoPanAxis(camera.x, axisAutoPanSpeed(pointer.x, viewport.width), elapsedSeconds, scaleX, minimumX, maximumX),
-		y: clampedAutoPanAxis(camera.y, axisAutoPanSpeed(pointer.y, viewport.height), elapsedSeconds, scaleY, minimumY, maximumY),
+		x: clampedAutoPanAxis(
+			camera.x,
+			axisAutoPanSpeed(pointer.x, viewport.width),
+			elapsedSeconds,
+			scaleX,
+			minimumX,
+			maximumX,
+		),
+		y: clampedAutoPanAxis(
+			camera.y,
+			axisAutoPanSpeed(pointer.y, viewport.height),
+			elapsedSeconds,
+			scaleY,
+			minimumY,
+			maximumY,
+		),
 	};
 };
 
@@ -172,26 +211,54 @@ export const floorResizePointerDelta = (
 });
 
 const boundsForPoints = (points: ReadonlyArray<Position>): ScreenBounds => ({
-	left: Math.min(...points.map((point) => point.x)), top: Math.min(...points.map((point) => point.y)),
-	right: Math.max(...points.map((point) => point.x)), bottom: Math.max(...points.map((point) => point.y)),
+	left: Math.min(...points.map((point) => point.x)),
+	top: Math.min(...points.map((point) => point.y)),
+	right: Math.max(...points.map((point) => point.x)),
+	bottom: Math.max(...points.map((point) => point.y)),
 });
 
-const unionBounds = (left: ScreenBounds, right: ScreenBounds): ScreenBounds => ({
-	left: Math.min(left.left, right.left), top: Math.min(left.top, right.top),
-	right: Math.max(left.right, right.right), bottom: Math.max(left.bottom, right.bottom),
+const unionBounds = (
+	left: ScreenBounds,
+	right: ScreenBounds,
+): ScreenBounds => ({
+	left: Math.min(left.left, right.left),
+	top: Math.min(left.top, right.top),
+	right: Math.max(left.right, right.right),
+	bottom: Math.max(left.bottom, right.bottom),
 });
 
 export const contentEnvelope = (world: World): ScreenBounds => {
-	let envelope = boundsForPoints(projectedRectangle({ x: world.floorOrigin.x + world.floorPlan.width / 2, y: world.floorOrigin.y + world.floorPlan.depth / 2 }, world.floorPlan));
+	let envelope = boundsForPoints(
+		projectedRectangle(
+			{
+				x: world.floorOrigin.x + world.floorPlan.width / 2,
+				y: world.floorOrigin.y + world.floorPlan.depth / 2,
+			},
+			world.floorPlan,
+		),
+	);
 	for (const [entity, position] of world.positions) {
 		if (entity === playerEntity) continue;
 		const body = world.bodies.get(entity);
 		if (body === undefined) continue;
 		const base = entityBaseElevation(world, entity);
-		envelope = unionBounds(envelope, boundsForPoints([...projectedRectangle(position, body, base), ...projectedRectangle(position, body, base + entityHeight(world, entity))]));
+		envelope = unionBounds(
+			envelope,
+			boundsForPoints([
+				...projectedRectangle(position, body, base),
+				...projectedRectangle(
+					position,
+					body,
+					base + entityHeight(world, entity),
+				),
+			]),
+		);
 	}
 	return envelope;
 };
 
-export const contentEnvelopeIncludingPreview = (authoredWorld: World, previewWorld: World): ScreenBounds =>
+export const contentEnvelopeIncludingPreview = (
+	authoredWorld: World,
+	previewWorld: World,
+): ScreenBounds =>
 	unionBounds(contentEnvelope(authoredWorld), contentEnvelope(previewWorld));

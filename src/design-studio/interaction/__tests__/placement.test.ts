@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { EditorItemKinds } from "../../model";
+import { project, unproject } from "../../../rendering/geometry/projection";
 import {
 	Body,
 	Elevation,
@@ -9,11 +9,8 @@ import {
 } from "../../../world/components";
 import { EntityId } from "../../../world/entity-id";
 import { initialWorld } from "../../../world/initial-world";
+import { EditorItemKinds } from "../../model";
 import { editorPlacementPositionAtPointer } from "../placement";
-import {
-	project,
-	unproject,
-} from "../../../rendering/geometry/projection";
 
 const platform = EntityId(900);
 const platformPosition = Position.make({ x: 520, y: 300 });

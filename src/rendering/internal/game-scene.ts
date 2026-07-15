@@ -1,29 +1,8 @@
 import { html, svg, type TemplateResult } from "lit-html";
+import { Action, type Action as AppAction } from "../../app/action";
 import type { EditSessionPresentation } from "../../design-studio/edit-session/edit-session";
 import type { DesignStudioInteractionRuntime } from "../../design-studio/interaction/runtime";
 import type { DesignStudioView } from "../../design-studio/view/view";
-import { Action, type Action as AppAction } from "../../app/action";
-import {
-	renderDepthForCharacter,
-	renderDepthForEntity,
-	renderDepthForPlayer,
-} from "../geometry/depth";
-import { outdoorFloorTiles } from "../artwork/outdoor-floor";
-import {
-	points,
-	project,
-	projectedRectangle,
-	viewport,
-} from "../geometry/projection";
-import {
-	boxTemplate,
-	chestTemplate,
-	crateTemplate,
-	decorationTemplate,
-	lavaMonsterTemplate,
-	playerTemplate,
-} from "../artwork/entities";
-import { terrainFloorTemplate } from "../artwork/terrain";
 import { DecorationKinds, ObstacleKinds } from "../../world/components";
 import type { EntityId } from "../../world/entity-id";
 import { surfaceAt } from "../../world/spatial/collision";
@@ -38,6 +17,27 @@ import {
 	playerEntity,
 	type World,
 } from "../../world/world";
+import {
+	boxTemplate,
+	chestTemplate,
+	crateTemplate,
+	decorationTemplate,
+	lavaMonsterTemplate,
+	playerTemplate,
+} from "../artwork/entities";
+import { outdoorFloorTiles } from "../artwork/outdoor-floor";
+import { terrainFloorTemplate } from "../artwork/terrain";
+import {
+	renderDepthForCharacter,
+	renderDepthForEntity,
+	renderDepthForPlayer,
+} from "../geometry/depth";
+import {
+	points,
+	project,
+	projectedRectangle,
+	viewport,
+} from "../geometry/projection";
 
 type Dispatch = (action: AppAction) => void;
 
@@ -67,41 +67,42 @@ const sceneObjects = (world: World): ReadonlyArray<RenderedObject> => {
 		const body = world.bodies.get(entity);
 		if (position === undefined || body === undefined) continue;
 		const baseElevation = entityBaseElevation(world, entity);
-		const template =
-			obstacle.kind === ObstacleKinds.Crate
-				? crateTemplate(
-						position,
-						body,
-						obstacle.height,
-						world.grabbed === entity,
-						baseElevation,
-						shadowSectionsForEntity(world, entity, position, body),
-					)
-				: obstacle.kind === ObstacleKinds.Chest
-					? chestTemplate(
-							position,
-							body,
-							obstacle.height,
-							world.openedChests.has(entity),
-							baseElevation,
-						)
-					: obstacle.kind === ObstacleKinds.Wall
-						? boxTemplate(
-								position,
-								body,
-								obstacle.height,
-								{ top: "#426772", front: "#29454f" },
-								"",
-								baseElevation,
-							)
-						: boxTemplate(
-								position,
-								body,
-								obstacle.height,
-								{ top: "#77927e", front: "#4f6c61" },
-								"",
-								baseElevation,
-							);
+		let template: TemplateResult;
+		if (obstacle.kind === ObstacleKinds.Crate)
+			template = crateTemplate(
+				position,
+				body,
+				obstacle.height,
+				world.grabbed === entity,
+				baseElevation,
+				shadowSectionsForEntity(world, entity, position, body),
+			);
+		else if (obstacle.kind === ObstacleKinds.Chest)
+			template = chestTemplate(
+				position,
+				body,
+				obstacle.height,
+				world.openedChests.has(entity),
+				baseElevation,
+			);
+		else if (obstacle.kind === ObstacleKinds.Wall)
+			template = boxTemplate(
+				position,
+				body,
+				obstacle.height,
+				{ top: "#426772", front: "#29454f" },
+				"",
+				baseElevation,
+			);
+		else
+			template = boxTemplate(
+				position,
+				body,
+				obstacle.height,
+				{ top: "#77927e", front: "#4f6c61" },
+				"",
+				baseElevation,
+			);
 		objects.push({
 			depth: renderDepthForEntity(world, entity),
 			entity,

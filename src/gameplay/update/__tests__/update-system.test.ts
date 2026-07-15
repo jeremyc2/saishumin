@@ -1,6 +1,5 @@
 import { afterAll, describe, expect, test } from "bun:test";
 import { Layer, ManagedRuntime } from "effect";
-import { isPlayerPlacementValid } from "../../../world/spatial/player-placement";
 import { Action } from "../../../app/action";
 import { Controls, type Direction } from "../../../app/control";
 import { editSessionView } from "../../../design-studio/edit-session/edit-session";
@@ -22,6 +21,7 @@ import {
 } from "../../../world/components";
 import { EntityId } from "../../../world/entity-id";
 import { initialWorld } from "../../../world/initial-world";
+import { isPlayerPlacementValid } from "../../../world/spatial/player-placement";
 import {
 	crateBody,
 	crateEntities,

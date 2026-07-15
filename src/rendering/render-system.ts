@@ -1,9 +1,9 @@
 import { Context, Effect, Layer } from "effect";
 import { html, render } from "lit-html";
+import type { Action } from "../app/action";
 import type { EditSessionPresentation } from "../design-studio/edit-session/edit-session";
 import { makeDesignStudioInteractionRuntime } from "../design-studio/interaction/runtime";
 import { makeDesignStudioView } from "../design-studio/view/view";
-import type { Action } from "../app/action";
 import { playerEntity, type World } from "../world/world";
 import { gameSceneTemplate } from "./internal/game-scene";
 

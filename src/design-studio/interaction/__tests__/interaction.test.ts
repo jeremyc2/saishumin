@@ -9,6 +9,7 @@ import {
 import { EntityId } from "../../../world/entity-id";
 import { initialWorld } from "../../../world/initial-world";
 import { playerEntity } from "../../../world/world";
+import { EditorItemKinds } from "../../model";
 import {
 	autoPanCamera,
 	contentEnvelope,
@@ -21,7 +22,6 @@ import {
 	releasePalettePress,
 	visiblePalettePopover,
 } from "../pointer";
-import { EditorItemKinds } from "../../model";
 
 describe("Design Studio interaction", () => {
 	test("activates a palette drag only after leaving the item rectangle expanded by 12 pixels", () => {

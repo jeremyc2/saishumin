@@ -1,30 +1,32 @@
 import { html, type TemplateResult } from "lit-html";
 import { Action, type Action as AppAction } from "../../app/action";
 import {
-	points,
-	projectedRectangle,
-	viewport,
-} from "../../rendering/geometry/projection";
-import {
 	boxTemplate,
 	chestTemplate,
 	crateTemplate,
 	decorationTemplate,
 } from "../../rendering/artwork/entities";
 import {
+	points,
+	projectedRectangle,
+	viewport,
+} from "../../rendering/geometry/projection";
+import {
 	Decoration,
+	type DecorationKind,
 	DecorationKinds,
 	defaultSignContent,
 } from "../../world/components";
+import type { InvalidPlacement } from "../../world/editor-state";
 import { placementElevationForKind } from "../../world/spatial/elevation";
 import { isSupportSurfaceOccupied } from "../../world/spatial/support-surface";
-import type { InvalidPlacement } from "../../world/editor-state";
 import type { World } from "../../world/world";
 import type { EditSessionPresentation } from "../edit-session/edit-session";
 import type { DesignStudioInteractionRuntime } from "../interaction/runtime";
 import {
 	defaultEditorItemBody,
 	defaultEditorItemHeight,
+	type EditorItemKind,
 	EditorItemKinds,
 } from "../model";
 
@@ -34,16 +36,33 @@ export const invalidPreviewDescription = (input: {
 	readonly rejectionReason: EditSessionPresentation["rejectionReason"];
 	readonly invalidPlacementKind: InvalidPlacement["kind"] | null;
 	readonly occupiedSupport: boolean;
-}): string =>
-	input.rejectionReason === "floor-excludes-editor-item"
-		? "The floor plan must contain every existing object."
-		: input.rejectionReason === "occupied-support"
-			? "Move every object off this platform before moving or shrinking it."
-			: input.invalidPlacementKind === "floor"
-				? "The floor plan must contain every existing object."
-				: input.occupiedSupport
-					? "Move every object off this platform before moving, shrinking, or deleting it."
-					: "Keep the object inside the floor plan and clear of other objects.";
+}): string => {
+	if (
+		input.rejectionReason === "floor-excludes-editor-item" ||
+		input.invalidPlacementKind === "floor"
+	)
+		return "The floor plan must contain every existing object.";
+	if (input.rejectionReason === "occupied-support")
+		return "Move every object off this platform before moving or shrinking it.";
+	if (input.occupiedSupport)
+		return "Move every object off this platform before moving, shrinking, or deleting it.";
+	return "Keep the object inside the floor plan and clear of other objects.";
+};
+
+const decorationKindForEditorItem = (
+	itemKind: EditorItemKind,
+): DecorationKind => {
+	switch (itemKind) {
+		case EditorItemKinds.Hopscotch:
+			return DecorationKinds.Hopscotch;
+		case EditorItemKinds.Plant:
+			return DecorationKinds.Plant;
+		case EditorItemKinds.Sign:
+			return DecorationKinds.Sign;
+		default:
+			return DecorationKinds.Lamp;
+	}
+};
 
 export const makeDesignStudioOverlays = (
 	interactionRuntime: DesignStudioInteractionRuntime,
@@ -118,45 +137,39 @@ export const makeDesignStudioOverlays = (
 			body,
 		);
 		const height = defaultEditorItemHeight(interaction.itemKind);
-		const visual =
-			interaction.itemKind === EditorItemKinds.Crate
-				? crateTemplate(position, body, height, false, baseElevation)
-				: interaction.itemKind === EditorItemKinds.Chest
-					? chestTemplate(position, body, height, false, baseElevation)
-					: interaction.itemKind === EditorItemKinds.Wall
-						? boxTemplate(
-								position,
-								body,
-								height,
-								{ top: "#426772", front: "#29454f" },
-								"",
-								baseElevation,
-							)
-						: interaction.itemKind === EditorItemKinds.Platform
-							? boxTemplate(
-									position,
-									body,
-									height,
-									{ top: "#77927e", front: "#4f6c61" },
-									"",
-									baseElevation,
-								)
-							: decorationTemplate(
-									position,
-									body,
-									Decoration.make({
-										kind:
-											interaction.itemKind === EditorItemKinds.Hopscotch
-												? DecorationKinds.Hopscotch
-												: interaction.itemKind === EditorItemKinds.Plant
-													? DecorationKinds.Plant
-													: interaction.itemKind === EditorItemKinds.Sign
-														? DecorationKinds.Sign
-														: DecorationKinds.Lamp,
-										height,
-									}),
-									baseElevation,
-								);
+		let visual: TemplateResult;
+		if (interaction.itemKind === EditorItemKinds.Crate)
+			visual = crateTemplate(position, body, height, false, baseElevation);
+		else if (interaction.itemKind === EditorItemKinds.Chest)
+			visual = chestTemplate(position, body, height, false, baseElevation);
+		else if (interaction.itemKind === EditorItemKinds.Wall)
+			visual = boxTemplate(
+				position,
+				body,
+				height,
+				{ top: "#426772", front: "#29454f" },
+				"",
+				baseElevation,
+			);
+		else if (interaction.itemKind === EditorItemKinds.Platform)
+			visual = boxTemplate(
+				position,
+				body,
+				height,
+				{ top: "#77927e", front: "#4f6c61" },
+				"",
+				baseElevation,
+			);
+		else
+			visual = decorationTemplate(
+				position,
+				body,
+				Decoration.make({
+					kind: decorationKindForEditorItem(interaction.itemKind),
+					height,
+				}),
+				baseElevation,
+			);
 		const accent = invalidPreview ? "#e59a91" : "#fff0a8";
 		return html`
 				<svg data-editor-create-preview data-can-drop=${String(interaction.canDrop)} aria-hidden="true" class="pointer-events-none absolute inset-0 z-40 h-full w-full" viewBox=${`0 0 ${viewport.width} ${viewport.height}`} preserveAspectRatio="xMidYMid meet">

@@ -6,12 +6,12 @@ import {
 	editSessionView,
 } from "../design-studio/edit-session/edit-session";
 import { MovementSystemService } from "../gameplay/movement/movement-system";
-import { Action } from "./action";
-import { type Control, Controls, controlForKey } from "./control";
-import { RenderSystem } from "../rendering/render-system";
 import { UpdateSystemService } from "../gameplay/update/update-system";
+import { RenderSystem } from "../rendering/render-system";
 import { initialWorld } from "../world/initial-world";
 import { reconcileWorld } from "../world/reconcile-world";
+import { Action } from "./action";
+import { type Control, Controls, controlForKey } from "./control";
 
 document.body.className =
 	"m-0 overflow-hidden bg-[#14212a] font-sans scheme-dark";

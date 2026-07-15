@@ -1,4 +1,7 @@
 import { describe, expect, test } from "bun:test";
+import { Position } from "../../../world/components";
+import { initialWorld } from "../../../world/initial-world";
+import { EditorItemKinds } from "../../model";
 import {
 	beginEditSession,
 	cancelEditSession,
@@ -6,9 +9,6 @@ import {
 	editSessionView,
 	previewEditSession,
 } from "../edit-session";
-import { EditorItemKinds } from "../../model";
-import { Position } from "../../../world/components";
-import { initialWorld } from "../../../world/initial-world";
 
 const editingWorld = {
 	...initialWorld,

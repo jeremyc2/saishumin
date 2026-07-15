@@ -1,4 +1,4 @@
-import type { EditorItemKind } from "../model";
+import { unproject } from "../../rendering/geometry/projection";
 import type { Body, Position } from "../../world/components";
 import type { EntityId } from "../../world/entity-id";
 import {
@@ -8,7 +8,7 @@ import {
 	entityTopElevation,
 } from "../../world/spatial/elevation";
 import { groundElevation, type World } from "../../world/world";
-import { unproject } from "../../rendering/geometry/projection";
+import type { EditorItemKind } from "../model";
 
 const subtract = (position: Position, offset: Position): Position => ({
 	x: position.x - offset.x,

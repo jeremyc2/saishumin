@@ -1,3 +1,6 @@
+import { Body } from "../../world/components";
+import type { EntityId } from "../../world/entity-id";
+import type { World } from "../../world/world";
 import {
 	defaultEditorItemHeight,
 	type EditorItemKind,
@@ -5,9 +8,6 @@ import {
 	isEditorItemKind,
 	maximumEditorItemBody,
 } from "../model";
-import { Body } from "../../world/components";
-import type { EntityId } from "../../world/entity-id";
-import type { World } from "../../world/world";
 
 export const editorItemKindForEntity = (
 	world: World,

@@ -1,4 +1,4 @@
 export {
-	makeDesignStudioInteractionRuntime,
 	type DesignStudioInteractionRuntime,
+	makeDesignStudioInteractionRuntime,
 } from "./internal/runtime";

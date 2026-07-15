@@ -1,11 +1,11 @@
 import { describe, expect, test } from "bun:test";
+import { EditorItemKinds } from "../../model";
 import {
 	autoPanCamera,
 	initialDesignStudioInteraction,
 	movePalettePress,
 	pressPaletteItem,
 } from "../pointer";
-import { EditorItemKinds } from "../../model";
 
 describe("Design Studio pointer interaction", () => {
 	test("activates a palette drag only after leaving the item rectangle expanded by 12 pixels", () => {

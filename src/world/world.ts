@@ -1,5 +1,4 @@
 import type { PlayerFacing } from "./components";
-import type { EditorState } from "./editor-state";
 import {
 	Body,
 	type Decoration,
@@ -8,6 +7,7 @@ import {
 	Position,
 	type SignContent,
 } from "./components";
+import type { EditorState } from "./editor-state";
 import { EntityId } from "./entity-id";
 import type { FloorTile } from "./floor";
 

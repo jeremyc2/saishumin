@@ -126,13 +126,10 @@ export const makeDesignStudioView = (
 			return svg`
 					${edges.map((edge) => {
 						const horizontal = edge.start.y === edge.end.y;
-						const start = horizontal
-							? edge.start.x <= edge.end.x
-								? edge.start
-								: edge.end
-							: edge.start.y <= edge.end.y
-								? edge.start
-								: edge.end;
+						const startCoordinate = horizontal ? edge.start.x : edge.start.y;
+						const endCoordinate = horizontal ? edge.end.x : edge.end.y;
+						const start =
+							startCoordinate <= endCoordinate ? edge.start : edge.end;
 						const end = start === edge.start ? edge.end : edge.start;
 						const dashCoordinate = horizontal ? start.x : start.y;
 						return svg`<line

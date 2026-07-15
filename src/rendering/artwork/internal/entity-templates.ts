@@ -603,14 +603,13 @@ export const playerTemplate = (
 	const isAirborne =
 		hasSurface && shadowDistance > playerShadowVisual.airborneThreshold;
 	const drawing = playerDrawingForFacing(facing);
+	let shadowTemplate = svg``;
+	if (isAirborne)
+		shadowTemplate = svg`<ellipse cx=${shadow.x} cy=${shadow.y + playerShadowVisual.airborneOffset} rx=${playerShadowVisual.airborneRadius.x * shadowScale} ry=${playerShadowVisual.airborneRadius.y * shadowScale} fill="#14212a" opacity=${shadowOpacity} />`;
+	else if (hasSurface)
+		shadowTemplate = svg`<ellipse cx=${wheelContact.x} cy=${wheelContact.y} rx=${playerShadowVisual.groundedRadius.x} ry=${playerShadowVisual.groundedRadius.y} fill="#14212a" opacity=${playerShadowVisual.groundedOpacity} />`;
 	return svg`
-		${
-			isAirborne
-				? svg`<ellipse cx=${shadow.x} cy=${shadow.y + playerShadowVisual.airborneOffset} rx=${playerShadowVisual.airborneRadius.x * shadowScale} ry=${playerShadowVisual.airborneRadius.y * shadowScale} fill="#14212a" opacity=${shadowOpacity} />`
-				: hasSurface
-					? svg`<ellipse cx=${wheelContact.x} cy=${wheelContact.y} rx=${playerShadowVisual.groundedRadius.x} ry=${playerShadowVisual.groundedRadius.y} fill="#14212a" opacity=${playerShadowVisual.groundedOpacity} />`
-					: svg``
-		}
+		${shadowTemplate}
 		<g
 			data-player-expression=${handlingObject ? "handling" : "neutral"}
 			data-player-facing=${facing}

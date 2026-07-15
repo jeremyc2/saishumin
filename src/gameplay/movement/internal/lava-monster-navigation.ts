@@ -13,6 +13,7 @@ import {
 } from "../../../world/world";
 import { canPlaceLavaMonster } from "./lava-monster-placement";
 import { findGridPath } from "./navigation";
+
 const navigationGridSize = 28;
 export const lavaMonsterDirection = (
 	world: World,

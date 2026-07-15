@@ -27,14 +27,16 @@ describe("crate shadows", () => {
 		);
 
 		expect(
-			template.values.flat().some(
-				(value) =>
-					typeof value === "object" &&
-					value !== null &&
-					"strings" in value &&
-					Array.isArray(value.strings) &&
-					value.strings.join("").includes('fill="#14212a"'),
-			),
+			template.values
+				.flat()
+				.some(
+					(value) =>
+						typeof value === "object" &&
+						value !== null &&
+						"strings" in value &&
+						Array.isArray(value.strings) &&
+						value.strings.join("").includes('fill="#14212a"'),
+				),
 		).toBe(true);
 	});
 });

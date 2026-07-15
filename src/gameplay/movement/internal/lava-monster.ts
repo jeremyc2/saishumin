@@ -27,18 +27,16 @@ import {
 const facingFor = (delta: Position, previous: PlayerFacing): PlayerFacing => {
 	const horizontal = Math.sign(delta.x);
 	const vertical = Math.sign(delta.y);
-	if (vertical < 0)
-		return horizontal < 0
-			? PlayerFacings.UpLeft
-			: horizontal > 0
-				? PlayerFacings.UpRight
-				: PlayerFacings.Up;
-	if (vertical > 0)
-		return horizontal < 0
-			? PlayerFacings.DownLeft
-			: horizontal > 0
-				? PlayerFacings.DownRight
-				: PlayerFacings.Down;
+	if (vertical < 0) {
+		if (horizontal < 0) return PlayerFacings.UpLeft;
+		if (horizontal > 0) return PlayerFacings.UpRight;
+		return PlayerFacings.Up;
+	}
+	if (vertical > 0) {
+		if (horizontal < 0) return PlayerFacings.DownLeft;
+		if (horizontal > 0) return PlayerFacings.DownRight;
+		return PlayerFacings.Down;
+	}
 	if (horizontal < 0) return PlayerFacings.Left;
 	return horizontal > 0 ? PlayerFacings.Right : previous;
 };

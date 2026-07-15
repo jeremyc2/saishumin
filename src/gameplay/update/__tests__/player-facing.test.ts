@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { type PlayerFacing, PlayerFacings } from "../../../world/components";
 import { Controls, type Direction } from "../../../app/control";
+import { type PlayerFacing, PlayerFacings } from "../../../world/components";
 import { playerFacingForDirections } from "../internal/player-facing";
 
 describe("playerFacingForDirections", () => {

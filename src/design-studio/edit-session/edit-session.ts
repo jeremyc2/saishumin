@@ -1,10 +1,4 @@
 import {
-	isEntityPlacementValid,
-	isFloorPlanPlacementValid,
-	isInsideFloorPlan,
-	isNewEditorItemPlacementValid,
-} from "./placement";
-import {
 	Decoration,
 	DecorationKinds,
 	defaultSignContent,
@@ -13,13 +7,13 @@ import {
 	ObstacleKinds,
 	type Position,
 } from "../../world/components";
-import { EntityId, type EntityId as EntityIdType } from "../../world/entity-id";
 import type {
 	EditSessionOperation,
 	EditSessionPreview,
 	EditSessionRejectionReason,
 	EditSessionValidity,
 } from "../../world/editor-state";
+import { EntityId, type EntityId as EntityIdType } from "../../world/entity-id";
 import { floorTilesCoveringPlan } from "../../world/floor";
 import {
 	placementElevationForEntity,
@@ -38,6 +32,12 @@ import {
 	type EditorItemKind,
 	EditorItemKinds,
 } from "../model";
+import {
+	isEntityPlacementValid,
+	isFloorPlanPlacementValid,
+	isInsideFloorPlan,
+	isNewEditorItemPlacementValid,
+} from "./placement";
 
 export type EditSessionPresentation = {
 	readonly active: boolean;
@@ -105,14 +105,11 @@ export const addEditorItemToWorld = (
 	else if (itemKind === EditorItemKinds.Chest)
 		obstacles.set(entity, Obstacle.make({ height, kind: ObstacleKinds.Chest }));
 	else {
-		const kind =
-			itemKind === EditorItemKinds.Hopscotch
-				? DecorationKinds.Hopscotch
-				: itemKind === EditorItemKinds.Plant
-					? DecorationKinds.Plant
-					: itemKind === EditorItemKinds.Sign
-						? DecorationKinds.Sign
-						: DecorationKinds.Lamp;
+		let kind = DecorationKinds.Lamp;
+		if (itemKind === EditorItemKinds.Hopscotch)
+			kind = DecorationKinds.Hopscotch;
+		else if (itemKind === EditorItemKinds.Plant) kind = DecorationKinds.Plant;
+		else if (itemKind === EditorItemKinds.Sign) kind = DecorationKinds.Sign;
 		decorations.set(entity, Decoration.make({ kind, height }));
 		if (itemKind === EditorItemKinds.Sign)
 			signContents.set(entity, defaultSignContent);

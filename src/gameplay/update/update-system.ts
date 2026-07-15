@@ -1,8 +1,7 @@
 import { Context, Effect, Layer } from "effect";
-import { updateDesignStudio } from "../../design-studio/design-studio";
 import { Action } from "../../app/action";
 import { Controls, type Direction, isDirection } from "../../app/control";
-import { playerFacingForDirections } from "./internal/player-facing";
+import { updateDesignStudio } from "../../design-studio/design-studio";
 import { followCamera } from "../../rendering/geometry/projection";
 import {
 	DecorationKinds,
@@ -27,6 +26,7 @@ import {
 	type World,
 } from "../../world/world";
 import { MovementSystemService } from "../movement/movement-system";
+import { playerFacingForDirections } from "./internal/player-facing";
 
 const cameraFollowingPlayer = (world: World, camera: Position): Position => {
 	const position = world.positions.get(playerEntity);
