@@ -2,6 +2,10 @@
 - Reference the git submodules in `reference_repositories` for best practices, usage examples, and documentation for the frameworks and packages we use.
 - NEVER loosen `diagnosticSeverity` rules in `tsconfig.json`.
 - When you need to run the dev server, use `bun dev:ai` instead of `bun dev` to avoid port conflicts.
+- Keep tests colocated with the module they exercise in that module's `__tests__/` directory. Use multiple `__tests__/` directories; do not centralize the test suite.
+- Preserve idiomatic Effect control flow and typed error handling. Prefer Effect primitives over project-specific wrappers that hide or remap errors, requirements, dependency provision, or cleanup.
+- Treat a module as an interface plus its implementation, not as a single file. Split large implementations into private files without unnecessarily widening the module's interface.
+- Do not introduce an Effect `Context.Service` merely to reduce file size. Add one when it represents a meaningful contextual dependency, lifecycle, or substitutable implementation.
 
 ## Agent skills
 

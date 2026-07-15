@@ -4,6 +4,14 @@ Saishumin is a room-exploration game with an integrated Design Studio for author
 
 ## Language
 
+**World**:
+The complete runtime snapshot of the game, including every Authored Room and all transient gameplay and Design Studio state. A World may contain one or more Authored Rooms.
+_Avoid_: Room, level
+
+**Authored Room**:
+The committed room state within a World, including its floor and Editor Items. It excludes transient gameplay state and any uncommitted Edit Session preview.
+_Avoid_: World, level
+
 **Editor Item**:
 An object that can be created and modified in the Design Studio, such as hopscotch, plant, lamp, wall, platform, crate, chest, or sign. The player and floor are not Editor Items.
 _Avoid_: Editor object, palette object
