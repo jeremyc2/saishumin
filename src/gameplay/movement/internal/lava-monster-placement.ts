@@ -14,11 +14,18 @@ import {
 	playerEntity,
 	type World,
 } from "../../../world/world";
-export const canPlaceLavaMonster = (
-	world: World,
-	position: Position,
-	elevation: number,
-): boolean => {
+
+type LavaMonsterPlacementInput = {
+	readonly world: World;
+	readonly position: Position;
+	readonly elevation: number;
+};
+
+export const canPlaceLavaMonster = ({
+	world,
+	position,
+	elevation,
+}: LavaMonsterPlacementInput): boolean => {
 	const { floorOrigin, floorPlan } = world;
 	if (
 		position.x < floorOrigin.x + lavaMonsterBody.width / 2 ||
@@ -33,12 +40,12 @@ export const canPlaceLavaMonster = (
 		const obstacleBody = world.bodies.get(entity);
 		const blocksAtElevation =
 			entity === playerEntity
-				? verticalRangesOverlap(
-						elevation,
-						lavaMonsterCollisionHeight,
-						world.elevations.get(playerEntity)?.z ?? groundElevation,
-						playerCollisionHeight,
-					)
+				? verticalRangesOverlap({
+						base: elevation,
+						height: lavaMonsterCollisionHeight,
+						otherBase: world.elevations.get(playerEntity)?.z ?? groundElevation,
+						otherHeight: playerCollisionHeight,
+					})
 				: isSolidEntity(world, entity) &&
 					elevation <
 						entityTopElevation(world, entity) - obstacleHeightTolerance;
@@ -46,17 +53,26 @@ export const canPlaceLavaMonster = (
 			blocksAtElevation &&
 			obstaclePosition !== undefined &&
 			obstacleBody !== undefined &&
-			overlaps(position, lavaMonsterBody, obstaclePosition, obstacleBody)
+			overlaps({
+				position,
+				body: lavaMonsterBody,
+				otherPosition: obstaclePosition,
+				otherBody: obstacleBody,
+			})
 		)
 			return false;
 	}
 	return true;
 };
-export const nearestValidLavaMonsterPosition = (
-	world: World,
-	origin: Position,
-	elevation: number,
-): Position | undefined => {
+export const nearestValidLavaMonsterPosition = ({
+	world,
+	origin,
+	elevation,
+}: {
+	readonly world: World;
+	readonly origin: Position;
+	readonly elevation: number;
+}): Position | undefined => {
 	const minimumX = world.floorOrigin.x + lavaMonsterBody.width / 2,
 		maximumX =
 			world.floorOrigin.x + world.floorPlan.width - lavaMonsterBody.width / 2,
@@ -83,7 +99,8 @@ export const nearestValidLavaMonsterPosition = (
 	for (const x of xs)
 		for (const y of ys) {
 			const candidate = { x, y };
-			if (!canPlaceLavaMonster(world, candidate, elevation)) continue;
+			if (!canPlaceLavaMonster({ world, position: candidate, elevation }))
+				continue;
 			const distance = Math.hypot(x - origin.x, y - origin.y);
 			if (distance < nearestDistance) {
 				nearest = candidate;

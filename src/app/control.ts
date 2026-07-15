@@ -13,14 +13,14 @@ export const Control = Schema.Literals([
 export type Control = typeof Control.Type;
 
 export const Controls = {
-	Up: Control.make("ArrowUp"),
-	Down: Control.make("ArrowDown"),
-	Left: Control.make("ArrowLeft"),
-	Right: Control.make("ArrowRight"),
-	Jump: Control.make(" "),
-	Grab: Control.make("Shift"),
-	Interact: Control.make("x"),
-} as const;
+	Up: "ArrowUp",
+	Down: "ArrowDown",
+	Left: "ArrowLeft",
+	Right: "ArrowRight",
+	Jump: " ",
+	Grab: "Shift",
+	Interact: "x",
+} as const satisfies Record<string, Control>;
 
 export type Direction = WorldDirection;
 

@@ -23,15 +23,27 @@ const resizeAxis = (
 	};
 };
 
-export const resizeFromHandle = (
-	position: Position,
-	body: Body,
-	delta: Position,
-	widthDirection: ResizeDirection,
-	depthDirection: ResizeDirection,
-	minimumBody: Body,
-	maximumBody: Body,
-): { readonly position: Position; readonly body: Body } => {
+type ResizeResult = { readonly position: Position; readonly body: Body };
+
+type ResizeFromHandleInput = {
+	readonly position: Position;
+	readonly body: Body;
+	readonly delta: Position;
+	readonly widthDirection: ResizeDirection;
+	readonly depthDirection: ResizeDirection;
+	readonly minimumBody: Body;
+	readonly maximumBody: Body;
+};
+
+export const resizeFromHandle = ({
+	position,
+	body,
+	delta,
+	widthDirection,
+	depthDirection,
+	minimumBody,
+	maximumBody,
+}: ResizeFromHandleInput): ResizeResult => {
 	const width = resizeAxis(
 		position.x,
 		body.width,

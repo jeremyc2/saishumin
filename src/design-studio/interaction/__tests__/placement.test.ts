@@ -34,12 +34,12 @@ describe("editor placement projection", () => {
 
 		expect(unproject(pointer).y).toBeLessThan(210);
 		expect(
-			editorPlacementPositionAtPointer(
+			editorPlacementPositionAtPointer({
 				world,
-				EditorItemKinds.Plant,
-				itemBody,
-				pointer,
-			),
+				kind: EditorItemKinds.Plant,
+				body: itemBody,
+				projectedPointer: pointer,
+			}),
 		).toEqual(desiredPosition);
 	});
 
@@ -55,13 +55,13 @@ describe("editor placement projection", () => {
 		);
 
 		expect(
-			editorPlacementPositionAtPointer(
+			editorPlacementPositionAtPointer({
 				world,
-				EditorItemKinds.Lamp,
-				itemBody,
-				pointer,
+				kind: EditorItemKinds.Lamp,
+				body: itemBody,
+				projectedPointer: pointer,
 				grabOffset,
-			),
+			}),
 		).toEqual(desiredPosition);
 	});
 
@@ -87,24 +87,24 @@ describe("editor placement projection", () => {
 		const pointer = project(desiredPosition, platformHeight + lowerHeight);
 
 		expect(
-			editorPlacementPositionAtPointer(
-				stackedWorld,
-				EditorItemKinds.Crate,
-				itemBody,
-				pointer,
-			),
+			editorPlacementPositionAtPointer({
+				world: stackedWorld,
+				kind: EditorItemKinds.Crate,
+				body: itemBody,
+				projectedPointer: pointer,
+			}),
 		).toEqual(desiredPosition);
 	});
 
 	test("continues to resolve floor-only positions on the floor", () => {
 		const desiredPosition = Position.make({ x: 100, y: 500 });
 		expect(
-			editorPlacementPositionAtPointer(
+			editorPlacementPositionAtPointer({
 				world,
-				EditorItemKinds.Crate,
-				itemBody,
-				project(desiredPosition),
-			),
+				kind: EditorItemKinds.Crate,
+				body: itemBody,
+				projectedPointer: project(desiredPosition),
+			}),
 		).toEqual(desiredPosition);
 	});
 });

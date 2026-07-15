@@ -9,20 +9,20 @@ describe("World collision", () => {
 		const body = Body.make({ width: 40, depth: 30 });
 
 		expect(
-			overlaps(
-				Position.make({ x: 100, y: 100 }),
+			overlaps({
+				position: Position.make({ x: 100, y: 100 }),
 				body,
-				Position.make({ x: 139, y: 100 }),
-				body,
-			),
+				otherPosition: Position.make({ x: 139, y: 100 }),
+				otherBody: body,
+			}),
 		).toBe(true);
 		expect(
-			overlaps(
-				Position.make({ x: 100, y: 100 }),
+			overlaps({
+				position: Position.make({ x: 100, y: 100 }),
 				body,
-				Position.make({ x: 140, y: 100 }),
-				body,
-			),
+				otherPosition: Position.make({ x: 140, y: 100 }),
+				otherBody: body,
+			}),
 		).toBe(false);
 	});
 

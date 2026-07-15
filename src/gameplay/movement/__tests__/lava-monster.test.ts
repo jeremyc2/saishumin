@@ -153,7 +153,14 @@ describe("lava-monster movement through MovementSystemService", () => {
 		expect(recovered).toBeDefined();
 		if (recovered !== undefined) {
 			expect(recovered).not.toEqual(lavaMonsterSpawnPosition);
-			expect(overlaps(recovered, lavaMonsterBody, embedded, body)).toBe(false);
+			expect(
+				overlaps({
+					position: recovered,
+					body: lavaMonsterBody,
+					otherPosition: embedded,
+					otherBody: body,
+				}),
+			).toBe(false);
 		}
 	});
 
@@ -195,9 +202,14 @@ describe("lava-monster movement through MovementSystemService", () => {
 		expect(world.elevations.get(lavaMonsterEntity)?.z).toBe(platformHeight);
 		const monster = world.positions.get(lavaMonsterEntity);
 		if (monster !== undefined)
-			expect(overlaps(monster, lavaMonsterBody, player, playerBody)).toBe(
-				false,
-			);
+			expect(
+				overlaps({
+					position: monster,
+					body: lavaMonsterBody,
+					otherPosition: player,
+					otherBody: playerBody,
+				}),
+			).toBe(false);
 	});
 
 	test("does not jump merely because the player is airborne", () => {

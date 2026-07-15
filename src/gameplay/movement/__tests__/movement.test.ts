@@ -252,7 +252,12 @@ describe("MovementSystemService", () => {
 		expect(movedPosition).toBeDefined();
 		if (movedPosition === undefined) return;
 		expect(
-			overlaps(movedPosition, playerBody, objectPosition, objectBody),
+			overlaps({
+				position: movedPosition,
+				body: playerBody,
+				otherPosition: objectPosition,
+				otherBody: objectBody,
+			}),
 		).toBe(false);
 		expect(moved.elevations.get(playerEntity)?.z).toBe(84);
 		expect(moved.elevations.get(playerEntity)?.velocity).toBeLessThan(0);
@@ -292,7 +297,12 @@ describe("MovementSystemService", () => {
 		expect(movedPosition).toBeDefined();
 		if (movedPosition === undefined) return;
 		expect(
-			overlaps(movedPosition, playerBody, objectPosition, objectBody),
+			overlaps({
+				position: movedPosition,
+				body: playerBody,
+				otherPosition: objectPosition,
+				otherBody: objectBody,
+			}),
 		).toBe(false);
 		expect(moved.elevations.get(playerEntity)?.z).toBe(groundElevation);
 	});
@@ -384,12 +394,12 @@ describe("MovementSystemService", () => {
 		}
 
 		expect(
-			overlaps(
-				world.positions.get(playerEntity) ?? platformPosition,
-				playerBody,
-				cratePosition,
-				crateBody,
-			),
+			overlaps({
+				position: world.positions.get(playerEntity) ?? platformPosition,
+				body: playerBody,
+				otherPosition: cratePosition,
+				otherBody: crateBody,
+			}),
 		).toBe(true);
 		expect(world.elevations.get(playerEntity)).toEqual({
 			z: platformHeight + crateHeight,
@@ -520,12 +530,12 @@ describe("MovementSystemService", () => {
 		const moved = movementSystem.update(world, 0.05);
 
 		expect(
-			overlaps(
-				moved.positions.get(playerEntity) ?? cratePosition,
-				playerBody,
-				cratePosition,
-				crateBody,
-			),
+			overlaps({
+				position: moved.positions.get(playerEntity) ?? cratePosition,
+				body: playerBody,
+				otherPosition: cratePosition,
+				otherBody: crateBody,
+			}),
 		).toBe(false);
 		expect(moved.elevations.get(playerEntity)?.z).not.toBe(
 			platformHeight + crateHeight,

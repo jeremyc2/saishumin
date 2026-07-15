@@ -5,6 +5,7 @@
 - Keep tests colocated with the module they exercise in that module's `__tests__/` directory. Use multiple `__tests__/` directories; do not centralize the test suite.
 - Preserve idiomatic Effect control flow and typed error handling. Prefer Effect primitives over project-specific wrappers that hide or remap errors, requirements, dependency provision, or cleanup.
 - Treat a module as an interface plus its implementation, not as a single file. Split large implementations into private files without unnecessarily widening the module's interface.
+- For exported functions with multiple inputs, use `dual` only when there is a meaningful primary data value and a real pipeline use case. Otherwise accept one object with named fields; keep implementation-only functions unexported whenever the module seam allows it.
 - Do not introduce an Effect `Context.Service` merely to reduce file size. Add one when it represents a meaningful contextual dependency, lifecycle, or substitutable implementation.
 - Do not use nested ternary operators.
 

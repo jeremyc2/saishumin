@@ -1,4 +1,5 @@
 import { Context, Layer } from "effect";
+import { pipe } from "effect/Function";
 import { Controls } from "../../../app/control";
 import {
 	type Body,
@@ -112,12 +113,12 @@ export class MovementSystemService extends Context.Service<
 						)
 							continue;
 					} else if (
-						!verticalRangesOverlap(
-							entityBaseElevation(world, entity),
-							entityHeight(world, entity),
-							entityBaseElevation(world, otherEntity),
-							entityHeight(world, otherEntity),
-						)
+						!verticalRangesOverlap({
+							base: entityBaseElevation(world, entity),
+							height: entityHeight(world, entity),
+							otherBase: entityBaseElevation(world, otherEntity),
+							otherHeight: entityHeight(world, otherEntity),
+						})
 					)
 						continue;
 
@@ -212,7 +213,7 @@ export class MovementSystemService extends Context.Service<
 				if (
 					otherPosition === undefined ||
 					otherBody === undefined ||
-					!overlaps(position, playerBody, otherPosition, otherBody) ||
+					!overlaps({ position, body: playerBody, otherPosition, otherBody }) ||
 					fromElevation < top - obstacleHeightTolerance ||
 					toElevation > top
 				)
@@ -256,13 +257,18 @@ export class MovementSystemService extends Context.Service<
 					if (
 						otherPosition === undefined ||
 						otherBody === undefined ||
-						!overlaps(candidate, body, otherPosition, otherBody) ||
-						!verticalRangesOverlap(
-							entityBaseElevation(world, entity),
-							entityHeight(world, entity),
-							entityBaseElevation(world, otherEntity),
-							entityHeight(world, otherEntity),
-						)
+						!overlaps({
+							position: candidate,
+							body,
+							otherPosition,
+							otherBody,
+						}) ||
+						!verticalRangesOverlap({
+							base: entityBaseElevation(world, entity),
+							height: entityHeight(world, entity),
+							otherBase: entityBaseElevation(world, otherEntity),
+							otherHeight: entityHeight(world, otherEntity),
+						})
 					)
 						continue;
 					if (
@@ -292,7 +298,12 @@ export class MovementSystemService extends Context.Service<
 				if (
 					obstaclePosition !== undefined &&
 					obstacleBody !== undefined &&
-					overlaps(position, playerBody, obstaclePosition, obstacleBody) &&
+					overlaps({
+						position,
+						body: playerBody,
+						otherPosition: obstaclePosition,
+						otherBody: obstacleBody,
+					}) &&
 					blocksPlayerMovementAtElevation(world, entity, elevation)
 				)
 					return false;
@@ -387,12 +398,12 @@ export class MovementSystemService extends Context.Service<
 				if (
 					obstaclePosition === undefined ||
 					obstacleBody === undefined ||
-					!overlaps(
-						fullSpeedCandidate,
-						playerBody,
-						obstaclePosition,
-						obstacleBody,
-					)
+					!overlaps({
+						position: fullSpeedCandidate,
+						body: playerBody,
+						otherPosition: obstaclePosition,
+						otherBody: obstacleBody,
+					})
 				)
 					continue;
 				if (!blocksPlayerMovementAtElevation(world, entity, elevation))
@@ -403,12 +414,12 @@ export class MovementSystemService extends Context.Service<
 					!isSupported ||
 					elevation.z <
 						entityBaseElevation(world, entity) - obstacleHeightTolerance ||
-					!verticalRangesOverlap(
-						elevation.z,
-						playerCollisionHeight,
-						entityBaseElevation(world, entity),
-						entityHeight(world, entity),
-					)
+					!verticalRangesOverlap({
+						base: elevation.z,
+						height: playerCollisionHeight,
+						otherBase: entityBaseElevation(world, entity),
+						otherHeight: entityHeight(world, entity),
+					})
 				) {
 					return { world, position };
 				}
@@ -517,7 +528,12 @@ export class MovementSystemService extends Context.Service<
 						obstacleBody !== undefined &&
 						elevation.z < obstacleBase &&
 						z + playerCollisionHeight >= obstacleBase &&
-						overlaps(movedPosition, playerBody, obstaclePosition, obstacleBody)
+						overlaps({
+							position: movedPosition,
+							body: playerBody,
+							otherPosition: obstaclePosition,
+							otherBody: obstacleBody,
+						})
 					)
 						ceiling = Math.min(ceiling, obstacleBase);
 				}
@@ -624,17 +640,14 @@ export class MovementSystemService extends Context.Service<
 		};
 		return {
 			update: (world, elapsed) =>
-				recoverInvalidPlayerPlacement(
-					updateLavaMonster(
-						updateFallingMovableItems(
-							updateMovement(
-								world.pushing === null ? world : { ...world, pushing: null },
-								elapsed,
-							),
-							elapsed,
-						),
+				pipe(
+					updateMovement(
+						world.pushing === null ? world : { ...world, pushing: null },
 						elapsed,
 					),
+					updateFallingMovableItems(elapsed),
+					updateLavaMonster(elapsed),
+					recoverInvalidPlayerPlacement,
 				),
 		};
 	});

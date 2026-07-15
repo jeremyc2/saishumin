@@ -1,5 +1,7 @@
+import { dual } from "effect/Function";
 import { Action } from "../../app/action";
 import type { Direction } from "../../app/control";
+import type { Pipeable } from "../../pipeable";
 import {
 	cameraForFloor,
 	followCamera,
@@ -66,7 +68,7 @@ const sanitizedEntityBody = (
 	entity: EntityId,
 	body: Body,
 ): Body => {
-	const maximumBody = maximumEditorBody(world, entity);
+	const maximumBody = maximumEditorBody({ world, entity });
 	return Body.make({
 		width: clamp(
 			Number.isFinite(body.width) ? body.width : minimumEntityExtent,
@@ -242,7 +244,7 @@ const changeEntityHeight = (
 	height: number,
 ): World => {
 	if (!world.editor.open || !Number.isFinite(height)) return world;
-	const kind = editorItemKindForEntity(world, entity);
+	const kind = editorItemKindForEntity({ world, entity });
 	if (kind === undefined || kind === EditorItemKinds.Hopscotch) return world;
 	const limits = editorItemHeightLimits(kind);
 	const nextHeight = clamp(height, limits.minimum, limits.maximum);
@@ -469,7 +471,12 @@ const dispatchDesignStudioAction = (world: World, action: Action): World =>
 		EditorDeleteSelected: () => deleteSelected(world),
 	});
 
-export const updateDesignStudioAction = (
-	world: World,
-	action: DesignStudioAction,
-): World => dispatchDesignStudioAction(world, action);
+export const updateDesignStudioAction: Pipeable<
+	World,
+	[action: DesignStudioAction],
+	World
+> = dual(
+	2,
+	(world: World, action: DesignStudioAction): World =>
+		dispatchDesignStudioAction(world, action),
+);

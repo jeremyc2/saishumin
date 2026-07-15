@@ -9,17 +9,22 @@ import {
 	maximumEditorItemBody,
 } from "../model";
 
-export const editorItemKindForEntity = (
-	world: World,
-	entity: EntityId,
-): EditorItemKind | undefined => {
+type EditorEntityInput = { readonly world: World; readonly entity: EntityId };
+
+export const editorItemKindForEntity = ({
+	world,
+	entity,
+}: EditorEntityInput): EditorItemKind | undefined => {
 	const kind =
 		world.obstacles.get(entity)?.kind ?? world.decorations.get(entity)?.kind;
 	return kind !== undefined && isEditorItemKind(kind) ? kind : undefined;
 };
 
-export const maximumEditorBody = (world: World, entity: EntityId): Body => {
-	const kind = editorItemKindForEntity(world, entity);
+export const maximumEditorBody = ({
+	world,
+	entity,
+}: EditorEntityInput): Body => {
+	const kind = editorItemKindForEntity({ world, entity });
 	return kind === undefined
 		? Body.make({
 				width: Number.POSITIVE_INFINITY,
@@ -28,18 +33,24 @@ export const maximumEditorBody = (world: World, entity: EntityId): Body => {
 		: maximumEditorItemBody(kind);
 };
 
-export const editorEntityHeight = (world: World, entity: EntityId): number => {
+export const editorEntityHeight = ({
+	world,
+	entity,
+}: EditorEntityInput): number => {
 	const obstacle = world.obstacles.get(entity);
 	if (obstacle !== undefined) return obstacle.height;
 	const decoration = world.decorations.get(entity);
 	return decoration?.height ?? 0;
 };
 
-export const editorEntityHeightLimits = (
-	world: World,
-	entity: EntityId,
-): { readonly minimum: number; readonly maximum: number } => {
-	const kind = editorItemKindForEntity(world, entity);
+export const editorEntityHeightLimits = ({
+	world,
+	entity,
+}: EditorEntityInput): {
+	readonly minimum: number;
+	readonly maximum: number;
+} => {
+	const kind = editorItemKindForEntity({ world, entity });
 	return kind === undefined
 		? { minimum: 0, maximum: 0 }
 		: editorItemHeightLimits(kind);

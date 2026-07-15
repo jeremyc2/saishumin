@@ -198,10 +198,10 @@ export class UpdateSystemService extends Context.Service<
 							return {
 								...world,
 								pressed: nextPressed,
-								playerFacing: playerFacingForDirections(
-									nextPressed,
-									world.playerFacing,
-								),
+								playerFacing: playerFacingForDirections({
+									directions: nextPressed,
+									previous: world.playerFacing,
+								}),
 								pushing: null,
 							};
 						},

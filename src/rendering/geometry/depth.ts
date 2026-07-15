@@ -1,3 +1,5 @@
+import { dual } from "effect/Function";
+import type { Pipeable } from "../../pipeable";
 import type { Body } from "../../world/components";
 import type { EntityId } from "../../world/entity-id";
 import { overlaps } from "../../world/spatial/collision";
@@ -50,7 +52,7 @@ const renderDepthForEntityInternal = (
 	for (const [supportEntity, obstacle] of world.obstacles) {
 		if (
 			supportEntity === entity ||
-			!canSitOnSupport(kind, obstacle.kind) ||
+			!canSitOnSupport({ kind, supportKind: obstacle.kind }) ||
 			Math.abs(baseElevation - entityTopElevation(world, supportEntity)) >
 				obstacleHeightTolerance
 		)
@@ -60,7 +62,12 @@ const renderDepthForEntityInternal = (
 		if (
 			supportPosition === undefined ||
 			supportBody === undefined ||
-			!bodyBoundsOverlap(supportPosition, supportBody, position, body)
+			!bodyBoundsOverlap({
+				position: supportPosition,
+				body: supportBody,
+				otherPosition: position,
+				otherBody: body,
+			})
 		)
 			continue;
 
@@ -80,14 +87,16 @@ const renderDepthForEntityInternal = (
 	return depth;
 };
 
-export const renderDepthForEntity = (world: World, entity: EntityId): number =>
-	renderDepthForEntityInternal(world, entity, new Set());
+export const renderDepthForEntity: Pipeable<World, [entity: EntityId], number> =
+	dual(2, (world: World, entity: EntityId): number =>
+		renderDepthForEntityInternal(world, entity, new Set()),
+	);
 
-export const renderDepthForCharacter = (
-	world: World,
-	character: EntityId,
-	body: Body,
-): number => {
+export const renderDepthForCharacter: Pipeable<
+	World,
+	[character: EntityId, body: Body],
+	number
+> = dual(3, (world: World, character: EntityId, body: Body): number => {
 	const position = world.positions.get(character);
 	const elevation = world.elevations.get(character);
 	if (position === undefined || elevation === undefined)
@@ -102,7 +111,12 @@ export const renderDepthForCharacter = (
 			obstacleBody !== undefined &&
 			elevation.z >=
 				entityTopElevation(world, entity) - obstacleHeightTolerance &&
-			overlaps(position, body, obstaclePosition, obstacleBody)
+			overlaps({
+				position,
+				body,
+				otherPosition: obstaclePosition,
+				otherBody: obstacleBody,
+			})
 		) {
 			const surfaceProgress = supportSurfaceProgress(
 				obstaclePosition.y,
@@ -119,7 +133,7 @@ export const renderDepthForCharacter = (
 		}
 	}
 	return depth;
-};
+});
 
 export const renderDepthForPlayer = (world: World): number =>
 	renderDepthForCharacter(world, playerEntity, playerBody);

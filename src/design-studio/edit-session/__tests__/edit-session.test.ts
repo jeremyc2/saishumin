@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { pipe } from "effect/Function";
 import { Position } from "../../../world/components";
 import { initialWorld } from "../../../world/initial-world";
 import { EditorItemKinds } from "../../model";
@@ -18,13 +19,14 @@ const editingWorld = {
 describe("Edit Session", () => {
 	test("keeps a valid preview separate from the Authored Room until commit", () => {
 		const position = Position.make({ x: 300, y: 200 });
-		const preview = previewEditSession(
-			beginEditSession(editingWorld, {
+		const preview = pipe(
+			editingWorld,
+			beginEditSession({
 				kind: "create",
 				itemKind: EditorItemKinds.Plant,
 				position,
 			}),
-			{ kind: "create", position },
+			previewEditSession({ kind: "create", position }),
 		);
 
 		expect(preview.editor.editSession).not.toBeNull();

@@ -1,3 +1,5 @@
+import { dual } from "effect/Function";
+import type { Pipeable } from "../../pipeable";
 import type { Position } from "../../world/components";
 import {
 	type FloorTerrain,
@@ -99,36 +101,43 @@ const transitionsForTile = (
 	);
 };
 
-export const outdoorFloorTiles = (
-	tiles: ReadonlyArray<FloorTile>,
-	origin: Position,
-	view: OutdoorFloorBounds,
-): ReadonlyArray<OutdoorFloorTile> => {
-	const tilesByPosition = new Map(
-		tiles.map((tile) => [tileKey(tile.column, tile.row), tile] as const),
-	);
-	const viewLeft = view.left - terrainOverscan.x;
-	const viewTop = view.top - terrainOverscan.y;
-	const viewRight = view.left + view.width + terrainOverscan.x;
-	const viewBottom = view.top + view.height + terrainOverscan.y;
-	return tiles.flatMap((tile) => {
-		const position = {
-			x: origin.x + tile.column * terrainTileSize.width,
-			y: origin.y + tile.row * terrainTileSize.height,
-		};
-		if (
-			position.x >= viewRight ||
-			position.x + terrainTileSize.width <= viewLeft ||
-			position.y >= viewBottom ||
-			position.y + terrainTileSize.height <= viewTop
-		)
-			return [];
-		return [
-			{
-				...tile,
-				position,
-				transitions: transitionsForTile(tile, tilesByPosition),
-			},
-		];
-	});
-};
+export const outdoorFloorTiles: Pipeable<
+	ReadonlyArray<FloorTile>,
+	[origin: Position, view: OutdoorFloorBounds],
+	ReadonlyArray<OutdoorFloorTile>
+> = dual(
+	3,
+	(
+		tiles: ReadonlyArray<FloorTile>,
+		origin: Position,
+		view: OutdoorFloorBounds,
+	): ReadonlyArray<OutdoorFloorTile> => {
+		const tilesByPosition = new Map(
+			tiles.map((tile) => [tileKey(tile.column, tile.row), tile] as const),
+		);
+		const viewLeft = view.left - terrainOverscan.x;
+		const viewTop = view.top - terrainOverscan.y;
+		const viewRight = view.left + view.width + terrainOverscan.x;
+		const viewBottom = view.top + view.height + terrainOverscan.y;
+		return tiles.flatMap((tile) => {
+			const position = {
+				x: origin.x + tile.column * terrainTileSize.width,
+				y: origin.y + tile.row * terrainTileSize.height,
+			};
+			if (
+				position.x >= viewRight ||
+				position.x + terrainTileSize.width <= viewLeft ||
+				position.y >= viewBottom ||
+				position.y + terrainTileSize.height <= viewTop
+			)
+				return [];
+			return [
+				{
+					...tile,
+					position,
+					transitions: transitionsForTile(tile, tilesByPosition),
+				},
+			];
+		});
+	},
+);

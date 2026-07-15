@@ -228,18 +228,29 @@ const playerFaceTemplate = (
 	`;
 };
 
-export const boxTemplate = (
-	position: Position,
-	body: Body,
-	height: number,
-	colors: {
-		readonly top: string;
-		readonly front: string;
-		readonly edge?: string;
-	},
+type BoxColors = {
+	readonly top: string;
+	readonly front: string;
+	readonly edge?: string;
+};
+
+type BoxTemplateInput = {
+	readonly position: Position;
+	readonly body: Body;
+	readonly height: number;
+	readonly colors: BoxColors;
+	readonly className?: string;
+	readonly baseElevation?: number;
+};
+
+export const boxTemplate = ({
+	position,
+	body,
+	height,
+	colors,
 	className = "",
 	baseElevation = 0,
-): TemplateResult => {
+}: BoxTemplateInput): TemplateResult => {
 	const bottom = projectedRectangle(position, body, baseElevation);
 	const top = projectedRectangle(position, body, baseElevation + height);
 	const edge = colors.edge ?? "#263942";
@@ -251,16 +262,23 @@ export const boxTemplate = (
 	`;
 };
 
-export const crateTemplate = (
-	position: Position,
-	body: Body,
-	height: number,
-	grabbed: boolean,
+type CrateTemplateInput = {
+	readonly position: Position;
+	readonly body: Body;
+	readonly height: number;
+	readonly grabbed: boolean;
+	readonly baseElevation?: number;
+	readonly shadowSections?: ReadonlyArray<ShadowSection>;
+};
+
+export const crateTemplate = ({
+	position,
+	body,
+	height,
+	grabbed,
 	baseElevation = 0,
-	shadowSections: ReadonlyArray<ShadowSection> = [
-		{ position, body, elevation: baseElevation },
-	],
-): TemplateResult => {
+	shadowSections = [{ position, body, elevation: baseElevation }],
+}: CrateTemplateInput): TemplateResult => {
 	const top = projectedRectangle(position, body, baseElevation + height);
 	const topInset = projectedRectangle(
 		position,
@@ -393,12 +411,19 @@ const chestFrontTemplate = (
 	`;
 };
 
-export const closedChestTemplate = (
-	position: Position,
-	body: Body,
-	height: number,
+type ChestArtworkInput = {
+	readonly position: Position;
+	readonly body: Body;
+	readonly height: number;
+	readonly baseElevation?: number;
+};
+
+export const closedChestTemplate = ({
+	position,
+	body,
+	height,
 	baseElevation = 0,
-): TemplateResult => {
+}: ChestArtworkInput): TemplateResult => {
 	const front = chestFront(position, body, baseElevation, height);
 	const topInset = projectedRectangle(
 		position,
@@ -419,12 +444,12 @@ export const closedChestTemplate = (
 	`;
 };
 
-export const openChestTemplate = (
-	position: Position,
-	body: Body,
-	height: number,
+export const openChestTemplate = ({
+	position,
+	body,
+	height,
 	baseElevation = 0,
-): TemplateResult => {
+}: ChestArtworkInput): TemplateResult => {
 	const lowerHeight = Math.max(20, height * chestVisual.lowerHeightRatio);
 	const front = chestFront(position, body, baseElevation, lowerHeight);
 	const hinge = project(
@@ -451,23 +476,25 @@ export const openChestTemplate = (
 	`;
 };
 
-export const chestTemplate = (
-	position: Position,
-	body: Body,
-	height: number,
-	opened: boolean,
-	baseElevation = 0,
-): TemplateResult =>
-	opened
-		? openChestTemplate(position, body, height, baseElevation)
-		: closedChestTemplate(position, body, height, baseElevation);
+type ChestTemplateInput = ChestArtworkInput & { readonly opened: boolean };
 
-export const signpostTemplate = (
-	position: Position,
-	body: Body,
-	height: number,
+export const chestTemplate = ({
+	position,
+	body,
+	height,
+	opened,
 	baseElevation = 0,
-): TemplateResult => {
+}: ChestTemplateInput): TemplateResult =>
+	opened
+		? openChestTemplate({ position, body, height, baseElevation })
+		: closedChestTemplate({ position, body, height, baseElevation });
+
+export const signpostTemplate = ({
+	position,
+	body,
+	height,
+	baseElevation = 0,
+}: ChestArtworkInput): TemplateResult => {
 	const base = project(position, baseElevation);
 	const scale = Math.max(0.6, Math.min(2.4, (body.width + body.depth) / 140));
 	const heightScale = height / 104;
@@ -483,13 +510,21 @@ export const signpostTemplate = (
 	`;
 };
 
-export const decorationTemplate = (
-	position: Position,
-	body: Body,
-	decoration: Decoration,
+type DecorationTemplateInput = {
+	readonly position: Position;
+	readonly body: Body;
+	readonly decoration: Decoration;
+	readonly baseElevation?: number;
+	readonly grabbed?: boolean;
+};
+
+export const decorationTemplate = ({
+	position,
+	body,
+	decoration,
 	baseElevation = 0,
 	grabbed = false,
-): TemplateResult => {
+}: DecorationTemplateInput): TemplateResult => {
 	if (decoration.kind === DecorationKinds.Hopscotch) {
 		const hopscotchPoint = (x: number, y: number): Position =>
 			project({
@@ -544,7 +579,12 @@ export const decorationTemplate = (
 	const base = project(position, baseElevation);
 	const scale = Math.max(0.55, Math.min(2.6, (body.width + body.depth) / 140));
 	if (decoration.kind === DecorationKinds.Sign)
-		return signpostTemplate(position, body, decoration.height, baseElevation);
+		return signpostTemplate({
+			position,
+			body,
+			height: decoration.height,
+			baseElevation,
+		});
 
 	const heightScale =
 		decoration.kind === DecorationKinds.Plant
@@ -580,13 +620,21 @@ export const decorationTemplate = (
 	`;
 };
 
-export const playerTemplate = (
-	position: Position,
-	elevation: Elevation,
-	shadowHeight: number,
-	facing: PlayerFacing,
+type PlayerTemplateInput = {
+	readonly position: Position;
+	readonly elevation: Elevation;
+	readonly shadowHeight: number;
+	readonly facing: PlayerFacing;
+	readonly handlingObject?: boolean;
+};
+
+export const playerTemplate = ({
+	position,
+	elevation,
+	shadowHeight,
+	facing,
 	handlingObject = false,
-): TemplateResult => {
+}: PlayerTemplateInput): TemplateResult => {
 	const shadow = project(position, shadowHeight);
 	const wheelContact = project(position, elevation.z);
 	const shadowDistance = Math.max(0, elevation.z - shadowHeight);
@@ -753,12 +801,19 @@ const lavaMonsterFaceTemplate = (view: LavaMonsterView): TemplateResult => {
 	`;
 };
 
-export const lavaMonsterTemplate = (
-	position: Position,
-	elevation: Elevation,
-	shadowHeight: number,
-	facing: PlayerFacing,
-): TemplateResult => {
+type LavaMonsterTemplateInput = {
+	readonly position: Position;
+	readonly elevation: Elevation;
+	readonly shadowHeight: number;
+	readonly facing: PlayerFacing;
+};
+
+export const lavaMonsterTemplate = ({
+	position,
+	elevation,
+	shadowHeight,
+	facing,
+}: LavaMonsterTemplateInput): TemplateResult => {
 	const shadow = project(position, shadowHeight);
 	const base = project(position, elevation.z);
 	const drawing = lavaMonsterDrawingForFacing(facing);

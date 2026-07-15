@@ -20,23 +20,29 @@ describe("playerFacingForDirections", () => {
 	for (const [directions, expected] of cases) {
 		test(`faces ${expected}`, () => {
 			expect(
-				playerFacingForDirections(new Set(directions), PlayerFacings.Down),
+				playerFacingForDirections({
+					directions: new Set(directions),
+					previous: PlayerFacings.Down,
+				}),
 			).toBe(expected);
 		});
 	}
 
 	test("keeps the previous facing while stationary", () => {
-		expect(playerFacingForDirections(new Set(), PlayerFacings.UpLeft)).toBe(
-			PlayerFacings.UpLeft,
-		);
+		expect(
+			playerFacingForDirections({
+				directions: new Set(),
+				previous: PlayerFacings.UpLeft,
+			}),
+		).toBe(PlayerFacings.UpLeft);
 	});
 
 	test("uses the remaining axis when opposite inputs cancel", () => {
 		expect(
-			playerFacingForDirections(
-				new Set([Controls.Up, Controls.Down, Controls.Right]),
-				PlayerFacings.Down,
-			),
+			playerFacingForDirections({
+				directions: new Set([Controls.Up, Controls.Down, Controls.Right]),
+				previous: PlayerFacings.Down,
+			}),
 		).toBe(PlayerFacings.Right);
 	});
 });

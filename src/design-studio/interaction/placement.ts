@@ -21,14 +21,21 @@ const subtract = (position: Position, offset: Position): Position => ({
  * same screen point on the floor, so each eligible platform must be
  * inverse-projected at its own top elevation.
  */
-export const editorPlacementPositionAtPointer = (
-	world: World,
-	kind: EditorItemKind,
-	body: Body,
-	projectedPointer: Position,
-	grabOffset: Position = { x: 0, y: 0 },
-	excludedEntity?: EntityId,
-): Position => {
+export const editorPlacementPositionAtPointer = ({
+	world,
+	kind,
+	body,
+	projectedPointer,
+	grabOffset = { x: 0, y: 0 },
+	excludedEntity,
+}: {
+	readonly world: World;
+	readonly kind: EditorItemKind;
+	readonly body: Body;
+	readonly projectedPointer: Position;
+	readonly grabOffset?: Position;
+	readonly excludedEntity?: EntityId;
+}): Position => {
 	let resolvedPosition = subtract(
 		unproject(projectedPointer, groundElevation),
 		grabOffset,
@@ -37,7 +44,10 @@ export const editorPlacementPositionAtPointer = (
 
 	let resolvedElevation = groundElevation;
 	for (const [entity, obstacle] of world.obstacles) {
-		if (entity === excludedEntity || !canSitOnSupport(kind, obstacle.kind))
+		if (
+			entity === excludedEntity ||
+			!canSitOnSupport({ kind, supportKind: obstacle.kind })
+		)
 			continue;
 		const platformPosition = world.positions.get(entity);
 		const platformBody = world.bodies.get(entity);
@@ -50,7 +60,12 @@ export const editorPlacementPositionAtPointer = (
 		);
 		if (
 			elevation >= resolvedElevation &&
-			bodyBoundsOverlap(platformPosition, platformBody, candidate, body)
+			bodyBoundsOverlap({
+				position: platformPosition,
+				body: platformBody,
+				otherPosition: candidate,
+				otherBody: body,
+			})
 		) {
 			resolvedElevation = elevation;
 			resolvedPosition = candidate;

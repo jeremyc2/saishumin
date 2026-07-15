@@ -384,12 +384,12 @@ export const makeDesignStudioInteractionRuntime = (input: {
 				);
 				if (projectedPointer === undefined) return;
 				const body = defaultEditorItemBody(paletteMove.activated.itemKind);
-				const position = editorPlacementPositionAtPointer(
+				const position = editorPlacementPositionAtPointer({
 					world,
-					paletteMove.activated.itemKind,
+					kind: paletteMove.activated.itemKind,
 					body,
 					projectedPointer,
-				);
+				});
 				const target = document.elementFromPoint(event.clientX, event.clientY);
 				activeInteraction = {
 					kind: "create",
@@ -440,12 +440,12 @@ export const makeDesignStudioInteractionRuntime = (input: {
 				);
 				if (projectedPointer === undefined) return;
 				const body = defaultEditorItemBody(interaction.itemKind);
-				const position = editorPlacementPositionAtPointer(
+				const position = editorPlacementPositionAtPointer({
 					world,
-					interaction.itemKind,
+					kind: interaction.itemKind,
 					body,
 					projectedPointer,
-				);
+				});
 				const target = document.elementFromPoint(event.clientX, event.clientY);
 				activeInteraction = {
 					...interaction,
@@ -465,8 +465,8 @@ export const makeDesignStudioInteractionRuntime = (input: {
 			if (interaction.kind === "resize-floor") {
 				const pointer = svgPosition(event.clientX, event.clientY);
 				if (pointer === undefined) return;
-				const resized = resizeFromHandle(
-					{
+				const resized = resizeFromHandle({
+					position: {
 						x:
 							interaction.originalFloorOrigin.x +
 							interaction.floorPlan.width / 2,
@@ -474,17 +474,17 @@ export const makeDesignStudioInteractionRuntime = (input: {
 							interaction.originalFloorOrigin.y +
 							interaction.floorPlan.depth / 2,
 					},
-					interaction.floorPlan,
-					floorResizePointerDelta(
-						interaction.pointer,
-						pointer,
-						world.editor.camera,
-					),
-					interaction.widthDirection,
-					interaction.depthDirection,
-					minimumFloorBody,
-					maximumFloorBody,
-				);
+					body: interaction.floorPlan,
+					delta: floorResizePointerDelta({
+						startPointer: interaction.pointer,
+						screenPointer: pointer,
+						camera: world.editor.camera,
+					}),
+					widthDirection: interaction.widthDirection,
+					depthDirection: interaction.depthDirection,
+					minimumBody: minimumFloorBody,
+					maximumBody: maximumFloorBody,
+				});
 				const floorOrigin = {
 					x: resized.position.x - resized.body.width / 2,
 					y: resized.position.y - resized.body.depth / 2,
@@ -506,16 +506,19 @@ export const makeDesignStudioInteractionRuntime = (input: {
 					event,
 					world.editor.camera,
 				);
-				const itemKind = editorItemKindForEntity(world, interaction.entity);
-				if (projectedPointer === undefined || itemKind === undefined) return;
-				const position = editorPlacementPositionAtPointer(
+				const itemKind = editorItemKindForEntity({
 					world,
-					itemKind,
-					interaction.body,
+					entity: interaction.entity,
+				});
+				if (projectedPointer === undefined || itemKind === undefined) return;
+				const position = editorPlacementPositionAtPointer({
+					world,
+					kind: itemKind,
+					body: interaction.body,
 					projectedPointer,
-					interaction.grabOffset,
-					interaction.entity,
-				);
+					grabOffset: interaction.grabOffset,
+					excludedEntity: interaction.entity,
+				});
 				dispatch(
 					Action.EditorEditSessionPreviewed({
 						preview: { kind: "move", position },
@@ -524,18 +527,18 @@ export const makeDesignStudioInteractionRuntime = (input: {
 			} else if (interaction.kind === "resize") {
 				const pointer = pointerWorldPosition(event, world.editor.camera);
 				if (pointer === undefined) return;
-				const resized = resizeFromHandle(
-					interaction.position,
-					interaction.body,
-					{
+				const resized = resizeFromHandle({
+					position: interaction.position,
+					body: interaction.body,
+					delta: {
 						x: pointer.x - interaction.pointer.x,
 						y: pointer.y - interaction.pointer.y,
 					},
-					interaction.widthDirection,
-					interaction.depthDirection,
-					minimumEntityBody,
-					maximumEditorBody(world, interaction.entity),
-				);
+					widthDirection: interaction.widthDirection,
+					depthDirection: interaction.depthDirection,
+					minimumBody: minimumEntityBody,
+					maximumBody: maximumEditorBody({ world, entity: interaction.entity }),
+				});
 				dispatch(
 					Action.EditorEditSessionPreviewed({
 						preview: {
@@ -737,7 +740,10 @@ export const makeDesignStudioInteractionRuntime = (input: {
 						envelope:
 							previewWorld === world
 								? contentEnvelope(world)
-								: contentEnvelopeIncludingPreview(world, previewWorld),
+								: contentEnvelopeIncludingPreview({
+										authoredWorld: world,
+										previewWorld,
+									}),
 						elapsedSeconds,
 					});
 					if (
@@ -750,12 +756,12 @@ export const makeDesignStudioInteractionRuntime = (input: {
 						};
 						if (interaction.kind === "create") {
 							const body = defaultEditorItemBody(interaction.itemKind);
-							const position = editorPlacementPositionAtPointer(
+							const position = editorPlacementPositionAtPointer({
 								world,
-								interaction.itemKind,
+								kind: interaction.itemKind,
 								body,
 								projectedPointer,
-							);
+							});
 							activeInteraction = { ...interaction, position };
 							dispatch(
 								Action.EditorEditSessionAutoPanned({
@@ -764,19 +770,19 @@ export const makeDesignStudioInteractionRuntime = (input: {
 								}),
 							);
 						} else if (interaction.kind === "move") {
-							const itemKind = editorItemKindForEntity(
+							const itemKind = editorItemKindForEntity({
 								world,
-								interaction.entity,
-							);
+								entity: interaction.entity,
+							});
 							if (itemKind !== undefined) {
-								const position = editorPlacementPositionAtPointer(
+								const position = editorPlacementPositionAtPointer({
 									world,
-									itemKind,
-									interaction.body,
+									kind: itemKind,
+									body: interaction.body,
 									projectedPointer,
-									interaction.grabOffset,
-									interaction.entity,
-								);
+									grabOffset: interaction.grabOffset,
+									excludedEntity: interaction.entity,
+								});
 								dispatch(
 									Action.EditorEditSessionAutoPanned({
 										camera: nextCamera,
@@ -786,18 +792,21 @@ export const makeDesignStudioInteractionRuntime = (input: {
 							}
 						} else if (interaction.kind === "resize") {
 							const pointerWorld = unproject(projectedPointer);
-							const resized = resizeFromHandle(
-								interaction.position,
-								interaction.body,
-								{
+							const resized = resizeFromHandle({
+								position: interaction.position,
+								body: interaction.body,
+								delta: {
 									x: pointerWorld.x - interaction.pointer.x,
 									y: pointerWorld.y - interaction.pointer.y,
 								},
-								interaction.widthDirection,
-								interaction.depthDirection,
-								minimumEntityBody,
-								maximumEditorBody(world, interaction.entity),
-							);
+								widthDirection: interaction.widthDirection,
+								depthDirection: interaction.depthDirection,
+								minimumBody: minimumEntityBody,
+								maximumBody: maximumEditorBody({
+									world,
+									entity: interaction.entity,
+								}),
+							});
 							dispatch(
 								Action.EditorEditSessionAutoPanned({
 									camera: nextCamera,
@@ -809,8 +818,8 @@ export const makeDesignStudioInteractionRuntime = (input: {
 								}),
 							);
 						} else {
-							const resized = resizeFromHandle(
-								{
+							const resized = resizeFromHandle({
+								position: {
 									x:
 										interaction.originalFloorOrigin.x +
 										interaction.floorPlan.width / 2,
@@ -818,17 +827,17 @@ export const makeDesignStudioInteractionRuntime = (input: {
 										interaction.originalFloorOrigin.y +
 										interaction.floorPlan.depth / 2,
 								},
-								interaction.floorPlan,
-								floorResizePointerDelta(
-									interaction.pointer,
-									pointer,
-									nextCamera,
-								),
-								interaction.widthDirection,
-								interaction.depthDirection,
-								minimumFloorBody,
-								maximumFloorBody,
-							);
+								body: interaction.floorPlan,
+								delta: floorResizePointerDelta({
+									startPointer: interaction.pointer,
+									screenPointer: pointer,
+									camera: nextCamera,
+								}),
+								widthDirection: interaction.widthDirection,
+								depthDirection: interaction.depthDirection,
+								minimumBody: minimumFloorBody,
+								maximumBody: maximumFloorBody,
+							});
 							const floorOrigin = {
 								x: resized.position.x - resized.body.width / 2,
 								y: resized.position.y - resized.body.depth / 2,

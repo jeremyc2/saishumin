@@ -139,37 +139,47 @@ export const makeDesignStudioOverlays = (
 		const height = defaultEditorItemHeight(interaction.itemKind);
 		let visual: TemplateResult;
 		if (interaction.itemKind === EditorItemKinds.Crate)
-			visual = crateTemplate(position, body, height, false, baseElevation);
+			visual = crateTemplate({
+				position,
+				body,
+				height,
+				grabbed: false,
+				baseElevation,
+			});
 		else if (interaction.itemKind === EditorItemKinds.Chest)
-			visual = chestTemplate(position, body, height, false, baseElevation);
+			visual = chestTemplate({
+				position,
+				body,
+				height,
+				opened: false,
+				baseElevation,
+			});
 		else if (interaction.itemKind === EditorItemKinds.Wall)
-			visual = boxTemplate(
+			visual = boxTemplate({
 				position,
 				body,
 				height,
-				{ top: "#426772", front: "#29454f" },
-				"",
+				colors: { top: "#426772", front: "#29454f" },
 				baseElevation,
-			);
+			});
 		else if (interaction.itemKind === EditorItemKinds.Platform)
-			visual = boxTemplate(
+			visual = boxTemplate({
 				position,
 				body,
 				height,
-				{ top: "#77927e", front: "#4f6c61" },
-				"",
+				colors: { top: "#77927e", front: "#4f6c61" },
 				baseElevation,
-			);
+			});
 		else
-			visual = decorationTemplate(
+			visual = decorationTemplate({
 				position,
 				body,
-				Decoration.make({
+				decoration: Decoration.make({
 					kind: decorationKindForEditorItem(interaction.itemKind),
 					height,
 				}),
 				baseElevation,
-			);
+			});
 		const accent = invalidPreview ? "#e59a91" : "#fff0a8";
 		return html`
 				<svg data-editor-create-preview data-can-drop=${String(interaction.canDrop)} aria-hidden="true" class="pointer-events-none absolute inset-0 z-40 h-full w-full" viewBox=${`0 0 ${viewport.width} ${viewport.height}`} preserveAspectRatio="xMidYMid meet">

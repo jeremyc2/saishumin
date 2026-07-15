@@ -143,15 +143,15 @@ export const makeDesignStudioPanel = (
 		const selectedMaximumBody =
 			selectedEntity === undefined
 				? undefined
-				: maximumEditorBody(world, selectedEntity);
+				: maximumEditorBody({ world, entity: selectedEntity });
 		const selectedHeight =
 			selectedEntity === undefined
 				? undefined
-				: editorEntityHeight(world, selectedEntity);
+				: editorEntityHeight({ world, entity: selectedEntity });
 		const selectedHeightLimits =
 			selectedEntity === undefined
 				? undefined
-				: editorEntityHeightLimits(world, selectedEntity);
+				: editorEntityHeightLimits({ world, entity: selectedEntity });
 		const selectedSignContent =
 			selectedEntity === undefined ||
 			world.decorations.get(selectedEntity)?.kind !== DecorationKinds.Sign

@@ -1,3 +1,5 @@
+import { dual } from "effect/Function";
+import type { Pipeable } from "../../../pipeable";
 import { ObstacleKinds } from "../../../world/components";
 import { placementElevationForEntity } from "../../../world/spatial/elevation";
 import {
@@ -9,10 +11,11 @@ import {
 } from "../../../world/world";
 
 /** Advances crates independently after horizontal player interactions. */
-export const updateFallingMovableItems = (
-	world: World,
-	elapsed: number,
-): World => {
+export const updateFallingMovableItems: Pipeable<
+	World,
+	[elapsed: number],
+	World
+> = dual(2, (world: World, elapsed: number): World => {
 	const elevations = new Map(world.elevations);
 	let changed = false;
 	for (const [entity, obstacle] of world.obstacles) {
@@ -46,4 +49,4 @@ export const updateFallingMovableItems = (
 		changed = true;
 	}
 	return changed ? { ...world, elevations } : world;
-};
+});

@@ -11,20 +11,20 @@ import {
 
 describe("crate shadows", () => {
 	test("renders a crate with its supporting shadow", () => {
-		const template = crateTemplate(
-			Position.make({ x: 300, y: 300 }),
-			Body.make({ width: 84, depth: 64 }),
-			62,
-			false,
-			62,
-			[
+		const template = crateTemplate({
+			position: Position.make({ x: 300, y: 300 }),
+			body: Body.make({ width: 84, depth: 64 }),
+			height: 62,
+			grabbed: false,
+			baseElevation: 62,
+			shadowSections: [
 				{
 					position: Position.make({ x: 300, y: 300 }),
 					body: Body.make({ width: 84, depth: 64 }),
 					elevation: 0,
 				},
 			],
-		);
+		});
 
 		expect(
 			template.values
@@ -43,12 +43,12 @@ describe("crate shadows", () => {
 
 describe("crate top boards", () => {
 	test("renders divider lines across a deep crate top", () => {
-		const template = crateTemplate(
-			Position.make({ x: 300, y: 300 }),
-			Body.make({ width: 84, depth: 240 }),
-			62,
-			false,
-		);
+		const template = crateTemplate({
+			position: Position.make({ x: 300, y: 300 }),
+			body: Body.make({ width: 84, depth: 240 }),
+			height: 62,
+			grabbed: false,
+		});
 
 		expect(template.strings.join("")).toContain("<line");
 	});
@@ -58,8 +58,8 @@ describe("chest templates", () => {
 	test("use distinct open and closed artwork", () => {
 		const position = Position.make({ x: 300, y: 300 });
 		const body = Body.make({ width: 84, depth: 64 });
-		const closed = closedChestTemplate(position, body, 52);
-		const open = openChestTemplate(position, body, 52);
+		const closed = closedChestTemplate({ position, body, height: 52 });
+		const open = openChestTemplate({ position, body, height: 52 });
 
 		expect(closed.strings.join("")).toContain('data-chest-state="closed"');
 		expect(open.strings.join("")).toContain('data-chest-state="open"');
@@ -68,11 +68,11 @@ describe("chest templates", () => {
 
 describe("signpost template", () => {
 	test("renders a wooden signpost", () => {
-		const template = signpostTemplate(
-			Position.make({ x: 300, y: 300 }),
-			Body.make({ width: 88, depth: 56 }),
-			104,
-		);
+		const template = signpostTemplate({
+			position: Position.make({ x: 300, y: 300 }),
+			body: Body.make({ width: 88, depth: 56 }),
+			height: 104,
+		});
 
 		expect(template.strings.join("")).toContain('data-decoration-kind="sign"');
 	});
@@ -90,12 +90,12 @@ describe("player drawings", () => {
 			PlayerFacings.Left,
 			PlayerFacings.UpLeft,
 		].map((facing) =>
-			playerTemplate(
-				Position.make({ x: 300, y: 300 }),
-				{ z: 0, velocity: 0 },
-				0,
+			playerTemplate({
+				position: Position.make({ x: 300, y: 300 }),
+				elevation: { z: 0, velocity: 0 },
+				shadowHeight: 0,
 				facing,
-			),
+			}),
 		);
 
 		const views = drawings.map((template) => template.values[3]);
@@ -118,12 +118,12 @@ describe("lava monster drawings", () => {
 			PlayerFacings.Left,
 			PlayerFacings.UpLeft,
 		].map((facing) =>
-			lavaMonsterTemplate(
-				Position.make({ x: 300, y: 300 }),
-				{ z: 0, velocity: 0 },
-				0,
+			lavaMonsterTemplate({
+				position: Position.make({ x: 300, y: 300 }),
+				elevation: { z: 0, velocity: 0 },
+				shadowHeight: 0,
 				facing,
-			),
+			}),
 		);
 
 		const views = drawings.map((template) => template.values[3]);

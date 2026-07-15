@@ -6,10 +6,13 @@ import { type PlayerFacing, PlayerFacings } from "../../../world/components";
  * compass facings. When the vector cancels out, the player keeps looking in the
  * last meaningful direction instead of snapping to a default pose.
  */
-export const playerFacingForDirections = (
-	directions: ReadonlySet<Direction>,
-	previous: PlayerFacing,
-): PlayerFacing => {
+export const playerFacingForDirections = ({
+	directions,
+	previous,
+}: {
+	readonly directions: ReadonlySet<Direction>;
+	readonly previous: PlayerFacing;
+}): PlayerFacing => {
 	const horizontal =
 		Number(directions.has(Controls.Right)) -
 		Number(directions.has(Controls.Left));

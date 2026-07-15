@@ -69,40 +69,38 @@ const sceneObjects = (world: World): ReadonlyArray<RenderedObject> => {
 		const baseElevation = entityBaseElevation(world, entity);
 		let template: TemplateResult;
 		if (obstacle.kind === ObstacleKinds.Crate)
-			template = crateTemplate(
+			template = crateTemplate({
 				position,
 				body,
-				obstacle.height,
-				world.grabbed === entity,
+				height: obstacle.height,
+				grabbed: world.grabbed === entity,
 				baseElevation,
-				shadowSectionsForEntity(world, entity, position, body),
-			);
+				shadowSections: shadowSectionsForEntity(world, entity, position, body),
+			});
 		else if (obstacle.kind === ObstacleKinds.Chest)
-			template = chestTemplate(
+			template = chestTemplate({
 				position,
 				body,
-				obstacle.height,
-				world.openedChests.has(entity),
+				height: obstacle.height,
+				opened: world.openedChests.has(entity),
 				baseElevation,
-			);
+			});
 		else if (obstacle.kind === ObstacleKinds.Wall)
-			template = boxTemplate(
+			template = boxTemplate({
 				position,
 				body,
-				obstacle.height,
-				{ top: "#426772", front: "#29454f" },
-				"",
+				height: obstacle.height,
+				colors: { top: "#426772", front: "#29454f" },
 				baseElevation,
-			);
+			});
 		else
-			template = boxTemplate(
+			template = boxTemplate({
 				position,
 				body,
-				obstacle.height,
-				{ top: "#77927e", front: "#4f6c61" },
-				"",
+				height: obstacle.height,
+				colors: { top: "#77927e", front: "#4f6c61" },
 				baseElevation,
-			);
+			});
 		objects.push({
 			depth: renderDepthForEntity(world, entity),
 			entity,
@@ -119,13 +117,13 @@ const sceneObjects = (world: World): ReadonlyArray<RenderedObject> => {
 					? Number.NEGATIVE_INFINITY
 					: renderDepthForEntity(world, entity),
 			entity,
-			template: decorationTemplate(
+			template: decorationTemplate({
 				position,
 				body,
 				decoration,
-				entityBaseElevation(world, entity),
-				world.grabbed === entity,
-			),
+				baseElevation: entityBaseElevation(world, entity),
+				grabbed: world.grabbed === entity,
+			}),
 		});
 	}
 	if (!world.editor.open) {
@@ -140,28 +138,33 @@ const sceneObjects = (world: World): ReadonlyArray<RenderedObject> => {
 					lavaMonsterEntity,
 					lavaMonsterBody,
 				),
-				template: lavaMonsterTemplate(
-					lavaMonsterPosition,
-					lavaMonsterElevation,
-					surfaceAt(
+				template: lavaMonsterTemplate({
+					position: lavaMonsterPosition,
+					elevation: lavaMonsterElevation,
+					shadowHeight: surfaceAt(
 						world,
 						lavaMonsterPosition,
 						lavaMonsterBody,
 						lavaMonsterElevation.z,
 					),
-					world.lavaMonsterFacing,
-				),
+					facing: world.lavaMonsterFacing,
+				}),
 			});
 		if (playerPosition !== undefined && playerElevation !== undefined)
 			objects.push({
 				depth: renderDepthForPlayer(world),
-				template: playerTemplate(
-					playerPosition,
-					playerElevation,
-					surfaceAt(world, playerPosition, playerBody, playerElevation.z),
-					world.playerFacing,
-					world.grabbed !== null || world.pushing !== null,
-				),
+				template: playerTemplate({
+					position: playerPosition,
+					elevation: playerElevation,
+					shadowHeight: surfaceAt(
+						world,
+						playerPosition,
+						playerBody,
+						playerElevation.z,
+					),
+					facing: world.playerFacing,
+					handlingObject: world.grabbed !== null || world.pushing !== null,
+				}),
 			});
 	}
 	return objects.sort((left, right) => left.depth - right.depth);

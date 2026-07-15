@@ -1,3 +1,5 @@
+import { dual } from "effect/Function";
+import type { Pipeable } from "../../pipeable";
 import { projectedRectangle } from "../../rendering/geometry/projection";
 import type { Position } from "../../world/components";
 import {
@@ -40,14 +42,21 @@ export const initialDesignStudioInteraction: DesignStudioInteraction = {
 export const isDesignStudioPanelVisible = (world: World): boolean =>
 	world.editor.editSession === null;
 
-export const pressPaletteItem = (
-	state: DesignStudioInteraction,
-	press: PalettePress,
-): DesignStudioInteraction => ({
-	...state,
-	palettePress: press,
-	popover: null,
-});
+export const pressPaletteItem: Pipeable<
+	DesignStudioInteraction,
+	[press: PalettePress],
+	DesignStudioInteraction
+> = dual(
+	2,
+	(
+		state: DesignStudioInteraction,
+		press: PalettePress,
+	): DesignStudioInteraction => ({
+		...state,
+		palettePress: press,
+		popover: null,
+	}),
+);
 
 const paletteActivationMargin = 12;
 
@@ -60,58 +69,80 @@ const isInsideActivationBounds = (
 	pointer.y >= bounds.top - paletteActivationMargin &&
 	pointer.y <= bounds.bottom + paletteActivationMargin;
 
-export const movePalettePress = (
-	state: DesignStudioInteraction,
-	pointer: Position,
-): {
+type PalettePressMovement = {
 	readonly state: DesignStudioInteraction;
 	readonly activated: {
 		readonly itemKind: EditorItemKind;
 		readonly pointer: Position;
 	} | null;
-} => {
-	const press = state.palettePress;
-	if (press === null || isInsideActivationBounds(pointer, press.itemBounds))
-		return { state, activated: null };
-	return {
-		state: { ...state, palettePress: null, popover: null },
-		activated: { itemKind: press.itemKind, pointer },
-	};
 };
 
-export const releasePalettePress = (
-	state: DesignStudioInteraction,
-	time: number,
-): DesignStudioInteraction => {
-	const press = state.palettePress;
-	return press === null
-		? state
-		: {
-				palettePress: null,
-				popover: { itemBounds: press.itemBounds, shownAt: time },
-			};
-};
+export const movePalettePress: Pipeable<
+	DesignStudioInteraction,
+	[pointer: Position],
+	PalettePressMovement
+> = dual(
+	2,
+	(state: DesignStudioInteraction, pointer: Position): PalettePressMovement => {
+		const press = state.palettePress;
+		if (press === null || isInsideActivationBounds(pointer, press.itemBounds))
+			return { state, activated: null };
+		return {
+			state: { ...state, palettePress: null, popover: null },
+			activated: { itemKind: press.itemKind, pointer },
+		};
+	},
+);
+
+export const releasePalettePress: Pipeable<
+	DesignStudioInteraction,
+	[time: number],
+	DesignStudioInteraction
+> = dual(
+	2,
+	(state: DesignStudioInteraction, time: number): DesignStudioInteraction => {
+		const press = state.palettePress;
+		return press === null
+			? state
+			: {
+					palettePress: null,
+					popover: { itemBounds: press.itemBounds, shownAt: time },
+				};
+	},
+);
 
 const popoverVisibleMilliseconds = 3_000;
 const popoverFadeMilliseconds = 200;
 
-export const visiblePalettePopover = (
-	state: DesignStudioInteraction,
-	time: number,
-): { readonly itemBounds: ScreenBounds; readonly opacity: number } | null => {
-	const popover = state.popover;
-	if (popover === null) return null;
-	const elapsed = time - popover.shownAt;
-	if (elapsed >= popoverVisibleMilliseconds) return null;
-	const fadeStart = popoverVisibleMilliseconds - popoverFadeMilliseconds;
-	return {
-		itemBounds: popover.itemBounds,
-		opacity:
-			elapsed <= fadeStart
-				? 1
-				: (popoverVisibleMilliseconds - elapsed) / popoverFadeMilliseconds,
-	};
+type VisiblePalettePopover = {
+	readonly itemBounds: ScreenBounds;
+	readonly opacity: number;
 };
+
+export const visiblePalettePopover: Pipeable<
+	DesignStudioInteraction,
+	[time: number],
+	VisiblePalettePopover | null
+> = dual(
+	2,
+	(
+		state: DesignStudioInteraction,
+		time: number,
+	): VisiblePalettePopover | null => {
+		const popover = state.popover;
+		if (popover === null) return null;
+		const elapsed = time - popover.shownAt;
+		if (elapsed >= popoverVisibleMilliseconds) return null;
+		const fadeStart = popoverVisibleMilliseconds - popoverFadeMilliseconds;
+		return {
+			itemBounds: popover.itemBounds,
+			opacity:
+				elapsed <= fadeStart
+					? 1
+					: (popoverVisibleMilliseconds - elapsed) / popoverFadeMilliseconds,
+		};
+	},
+);
 
 export const dismissPalettePopover = (
 	state: DesignStudioInteraction,
@@ -201,11 +232,15 @@ export const autoPanCamera = ({
 	};
 };
 
-export const floorResizePointerDelta = (
-	startPointer: Position,
-	screenPointer: Position,
-	camera: Position,
-): Position => ({
+export const floorResizePointerDelta = ({
+	startPointer,
+	screenPointer,
+	camera,
+}: {
+	readonly startPointer: Position;
+	readonly screenPointer: Position;
+	readonly camera: Position;
+}): Position => ({
 	x: screenPointer.x - camera.x - startPointer.x,
 	y: (screenPointer.y - camera.y - startPointer.y) / Math.SQRT1_2,
 });
@@ -257,8 +292,11 @@ export const contentEnvelope = (world: World): ScreenBounds => {
 	return envelope;
 };
 
-export const contentEnvelopeIncludingPreview = (
-	authoredWorld: World,
-	previewWorld: World,
-): ScreenBounds =>
+export const contentEnvelopeIncludingPreview = ({
+	authoredWorld,
+	previewWorld,
+}: {
+	readonly authoredWorld: World;
+	readonly previewWorld: World;
+}): ScreenBounds =>
 	unionBounds(contentEnvelope(authoredWorld), contentEnvelope(previewWorld));

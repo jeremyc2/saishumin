@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { pipe } from "effect/Function";
 import { Body, Position } from "../../../world/components";
 import { crateBody, crateHeight } from "../../../world/world";
 import {
@@ -88,7 +89,7 @@ describe("camera projection", () => {
 
 	test("unprojects canvas coordinates without changing scale", () => {
 		const position = Position.make({ x: 415, y: 275 });
-		const result = unproject(project(position));
+		const result = pipe(position, project(), unproject());
 
 		expect(result.x).toBeCloseTo(position.x);
 		expect(result.y).toBeCloseTo(position.y);

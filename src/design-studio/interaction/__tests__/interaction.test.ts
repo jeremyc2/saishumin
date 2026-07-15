@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { pipe } from "effect/Function";
 import {
 	Body,
 	Decoration,
@@ -79,19 +80,25 @@ describe("Design Studio interaction", () => {
 			floorPlan: Body.make({ width: 500, depth: 300 }),
 		};
 
-		expect(contentEnvelopeIncludingPreview(committed, preview)).toEqual(
-			contentEnvelope(committed),
-		);
+		expect(
+			contentEnvelopeIncludingPreview({
+				authoredWorld: committed,
+				previewWorld: preview,
+			}),
+		).toEqual(contentEnvelope(committed));
 	});
 
 	test("shows stationary-click guidance for three seconds and fades during the final 200 milliseconds", () => {
 		const itemBounds = { left: 100, top: 100, right: 200, bottom: 160 };
-		const pressed = pressPaletteItem(initialDesignStudioInteraction, {
-			itemKind: EditorItemKinds.Plant,
-			pointer: { x: 150, y: 130 },
-			itemBounds,
-		});
-		const released = releasePalettePress(pressed, 1_000);
+		const released = pipe(
+			initialDesignStudioInteraction,
+			pressPaletteItem({
+				itemKind: EditorItemKinds.Plant,
+				pointer: { x: 150, y: 130 },
+				itemBounds,
+			}),
+			releasePalettePress(1_000),
+		);
 
 		expect(visiblePalettePopover(released, 3_799)).toEqual({
 			itemBounds,
@@ -186,7 +193,7 @@ describe("Design Studio interaction", () => {
 		};
 
 		expect(
-			floorResizePointerDelta(startPointer, screenPointer, camera),
+			floorResizePointerDelta({ startPointer, screenPointer, camera }),
 		).toEqual({ x: 0, y: 0 });
 	});
 

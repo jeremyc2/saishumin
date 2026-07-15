@@ -1,3 +1,5 @@
+import { dual } from "effect/Function";
+import type { Pipeable } from "../../pipeable";
 import { type Body, DecorationKinds, type Position } from "../components";
 import type { EntityId } from "../entity-id";
 import {
@@ -8,62 +10,87 @@ import {
 } from "../world";
 import { bodyBoundsOverlap, entityTopElevation } from "./elevation";
 
-export const isSolidEntity = (world: World, entity: EntityId): boolean =>
-	entity === lavaMonsterEntity ||
-	world.obstacles.has(entity) ||
-	(world.decorations.has(entity) &&
-		world.decorations.get(entity)?.kind !== DecorationKinds.Hopscotch);
+export const isSolidEntity: Pipeable<World, [entity: EntityId], boolean> = dual(
+	2,
+	(world: World, entity: EntityId): boolean =>
+		entity === lavaMonsterEntity ||
+		world.obstacles.has(entity) ||
+		(world.decorations.has(entity) &&
+			world.decorations.get(entity)?.kind !== DecorationKinds.Hopscotch),
+);
 
-export const overlaps = (
-	position: Position,
-	body: Body,
-	otherPosition: Position,
-	otherBody: Body,
-): boolean => bodyBoundsOverlap(position, body, otherPosition, otherBody);
+export const overlaps = ({
+	position,
+	body,
+	otherPosition,
+	otherBody,
+}: {
+	readonly position: Position;
+	readonly body: Body;
+	readonly otherPosition: Position;
+	readonly otherBody: Body;
+}): boolean => bodyBoundsOverlap({ position, body, otherPosition, otherBody });
 
-export const isPositionInsideRoom = (
-	world: World,
-	position: Position,
-): boolean =>
-	position.x >= world.floorOrigin.x &&
-	position.x <= world.floorOrigin.x + world.floorPlan.width &&
-	position.y >= world.floorOrigin.y &&
-	position.y <= world.floorOrigin.y + world.floorPlan.depth;
+export const isPositionInsideRoom: Pipeable<
+	World,
+	[position: Position],
+	boolean
+> = dual(
+	2,
+	(world: World, position: Position): boolean =>
+		position.x >= world.floorOrigin.x &&
+		position.x <= world.floorOrigin.x + world.floorPlan.width &&
+		position.y >= world.floorOrigin.y &&
+		position.y <= world.floorOrigin.y + world.floorPlan.depth,
+);
 
 export type SupportSurface = {
 	readonly elevation: number;
 	readonly entity: EntityId | null;
 };
 
-export const supportSurfaceAt = (
-	world: World,
-	position: Position,
-	body: Body,
-	maximumElevation = Number.POSITIVE_INFINITY,
-): SupportSurface => {
-	if (!isPositionInsideRoom(world, position))
-		return { elevation: Number.NEGATIVE_INFINITY, entity: null };
+export const supportSurfaceAt: Pipeable<
+	World,
+	[position: Position, body: Body, maximumElevation?: number],
+	SupportSurface
+> = dual(
+	(arguments_) =>
+		typeof arguments_[0] === "object" && "editor" in arguments_[0],
+	(
+		world: World,
+		position: Position,
+		body: Body,
+		maximumElevation: number = Number.POSITIVE_INFINITY,
+	): SupportSurface => {
+		if (!isPositionInsideRoom(world, position))
+			return { elevation: Number.NEGATIVE_INFINITY, entity: null };
 
-	let support: SupportSurface = {
-		elevation: groundElevation,
-		entity: null,
-	};
-	for (const [entity] of world.obstacles) {
-		const obstaclePosition = world.positions.get(entity);
-		const obstacleBody = world.bodies.get(entity);
-		const topElevation = entityTopElevation(world, entity);
-		if (
-			obstaclePosition !== undefined &&
-			obstacleBody !== undefined &&
-			topElevation <= maximumElevation + obstacleHeightTolerance &&
-			topElevation > support.elevation &&
-			overlaps(position, body, obstaclePosition, obstacleBody)
-		) {
-			support = { elevation: topElevation, entity };
+		let support: SupportSurface = {
+			elevation: groundElevation,
+			entity: null,
+		};
+		for (const [entity] of world.obstacles) {
+			const obstaclePosition = world.positions.get(entity);
+			const obstacleBody = world.bodies.get(entity);
+			const topElevation = entityTopElevation(world, entity);
+			if (
+				obstaclePosition !== undefined &&
+				obstacleBody !== undefined &&
+				topElevation <= maximumElevation + obstacleHeightTolerance &&
+				topElevation > support.elevation &&
+				overlaps({
+					position,
+					body,
+					otherPosition: obstaclePosition,
+					otherBody: obstacleBody,
+				})
+			) {
+				support = { elevation: topElevation, entity };
+			}
 		}
-	}
-	return support;
-};
+		return support;
+	},
+);
 
 /**
  * Uses the body's full horizontal bounds rather than only its center or wheel
@@ -71,10 +98,18 @@ export const supportSurfaceAt = (
  * even though it intersects the surfaces on either side. Once the entire body
  * clears a ledge, the lower surface naturally takes over and the body can fall.
  */
-export const surfaceAt = (
-	world: World,
-	position: Position,
-	body: Body,
-	maximumElevation = Number.POSITIVE_INFINITY,
-): number =>
-	supportSurfaceAt(world, position, body, maximumElevation).elevation;
+export const surfaceAt: Pipeable<
+	World,
+	[position: Position, body: Body, maximumElevation?: number],
+	number
+> = dual(
+	(arguments_) =>
+		typeof arguments_[0] === "object" && "editor" in arguments_[0],
+	(
+		world: World,
+		position: Position,
+		body: Body,
+		maximumElevation: number = Number.POSITIVE_INFINITY,
+	): number =>
+		supportSurfaceAt(world, position, body, maximumElevation).elevation,
+);

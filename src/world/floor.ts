@@ -1,3 +1,5 @@
+import { dual } from "effect/Function";
+import type { Pipeable } from "../pipeable";
 import type { Body, Position } from "./components";
 
 export type FloorTerrain = "grass" | "sand" | "dirt" | "cobblestone";
@@ -121,35 +123,47 @@ export const initialFloorTiles = (
 
 const tileKey = (column: number, row: number): string => `${column}:${row}`;
 
-export const floorTilesCoveringPlan = (
-	tiles: ReadonlyArray<FloorTile>,
-	origin: Position,
-	floorPlan: Body,
-	floorOrigin: Position = { x: 0, y: 0 },
-): ReadonlyArray<FloorTile> => {
-	const minimumColumn = Math.floor(
-		(floorOrigin.x - origin.x) / floorTileWorldSize.width,
-	);
-	const maximumColumn =
-		Math.ceil(
-			(floorOrigin.x + floorPlan.width - origin.x) / floorTileWorldSize.width,
-		) - 1;
-	const minimumRow = Math.floor(
-		(floorOrigin.y - origin.y) / floorTileWorldSize.depth,
-	);
-	const maximumRow =
-		Math.ceil(
-			(floorOrigin.y + floorPlan.depth - origin.y) / floorTileWorldSize.depth,
-		) - 1;
-	const existing = new Set(
-		tiles.map(({ column, row }) => tileKey(column, row)),
-	);
-	const added: Array<FloorTile> = [];
-	for (let row = minimumRow; row <= maximumRow; row++) {
-		for (let column = minimumColumn; column <= maximumColumn; column++) {
-			if (existing.has(tileKey(column, row))) continue;
-			added.push({ version: floorTileVersion, column, row, terrain: "grass" });
+export const floorTilesCoveringPlan: Pipeable<
+	ReadonlyArray<FloorTile>,
+	[origin: Position, floorPlan: Body, floorOrigin?: Position],
+	ReadonlyArray<FloorTile>
+> = dual(
+	(arguments_) => Array.isArray(arguments_[0]),
+	(
+		tiles: ReadonlyArray<FloorTile>,
+		origin: Position,
+		floorPlan: Body,
+		floorOrigin: Position = { x: 0, y: 0 },
+	): ReadonlyArray<FloorTile> => {
+		const minimumColumn = Math.floor(
+			(floorOrigin.x - origin.x) / floorTileWorldSize.width,
+		);
+		const maximumColumn =
+			Math.ceil(
+				(floorOrigin.x + floorPlan.width - origin.x) / floorTileWorldSize.width,
+			) - 1;
+		const minimumRow = Math.floor(
+			(floorOrigin.y - origin.y) / floorTileWorldSize.depth,
+		);
+		const maximumRow =
+			Math.ceil(
+				(floorOrigin.y + floorPlan.depth - origin.y) / floorTileWorldSize.depth,
+			) - 1;
+		const existing = new Set(
+			tiles.map(({ column, row }) => tileKey(column, row)),
+		);
+		const added: Array<FloorTile> = [];
+		for (let row = minimumRow; row <= maximumRow; row++) {
+			for (let column = minimumColumn; column <= maximumColumn; column++) {
+				if (existing.has(tileKey(column, row))) continue;
+				added.push({
+					version: floorTileVersion,
+					column,
+					row,
+					terrain: "grass",
+				});
+			}
 		}
-	}
-	return added.length === 0 ? tiles : [...tiles, ...added];
-};
+		return added.length === 0 ? tiles : [...tiles, ...added];
+	},
+);
