@@ -13,6 +13,7 @@ import {
 	playerEntity,
 	type World,
 } from "../ecs/world";
+import type { Body } from "../model/component";
 import type { EntityId } from "../model/entity-id";
 import { visualDepth } from "./projection";
 
@@ -82,9 +83,13 @@ const renderDepthForEntityInternal = (
 export const renderDepthForEntity = (world: World, entity: EntityId): number =>
 	renderDepthForEntityInternal(world, entity, new Set());
 
-export const renderDepthForPlayer = (world: World): number => {
-	const position = world.positions.get(playerEntity);
-	const elevation = world.elevations.get(playerEntity);
+export const renderDepthForCharacter = (
+	world: World,
+	character: EntityId,
+	body: Body,
+): number => {
+	const position = world.positions.get(character);
+	const elevation = world.elevations.get(character);
 	if (position === undefined || elevation === undefined)
 		return Number.NEGATIVE_INFINITY;
 
@@ -97,7 +102,7 @@ export const renderDepthForPlayer = (world: World): number => {
 			obstacleBody !== undefined &&
 			elevation.z >=
 				entityTopElevation(world, entity) - obstacleHeightTolerance &&
-			overlaps(position, playerBody, obstaclePosition, obstacleBody)
+			overlaps(position, body, obstaclePosition, obstacleBody)
 		) {
 			const surfaceProgress = supportSurfaceProgress(
 				obstaclePosition.y,
@@ -115,3 +120,6 @@ export const renderDepthForPlayer = (world: World): number => {
 	}
 	return depth;
 };
+
+export const renderDepthForPlayer = (world: World): number =>
+	renderDepthForCharacter(world, playerEntity, playerBody);

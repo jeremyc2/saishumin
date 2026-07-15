@@ -116,6 +116,7 @@ const program = Effect.gen(function* () {
 							next.gameCamera !== current.gameCamera ||
 							next.editor !== current.editor ||
 							next.playerFacing !== current.playerFacing ||
+							next.lavaMonsterFacing !== current.lavaMonsterFacing ||
 							next.openedChests !== current.openedChests ||
 							next.signContents !== current.signContents ||
 							next.readingSign !== current.readingSign ||

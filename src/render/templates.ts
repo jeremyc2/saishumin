@@ -634,3 +634,145 @@ export const playerTemplate = (
 		</g>
 	`;
 };
+
+type LavaMonsterView =
+	| "front"
+	| "front-quarter"
+	| "side"
+	| "rear-quarter"
+	| "back";
+
+type LavaMonsterDrawing = {
+	readonly view: LavaMonsterView;
+	readonly expression: "determined" | "wary" | "focused" | "guarded" | "hidden";
+	readonly mirror: boolean;
+	readonly bodyPath: string;
+};
+
+const lavaMonsterFrontBodyPath =
+	"M -28 45 C -35 27 -25 15 -20 3 C -16 -7 -20 -17 -12 -27 C -8 -16 -2 -13 2 -25 C 6 -36 13 -42 15 -52 C 25 -36 22 -24 28 -14 C 37 2 37 27 28 45 Z";
+const lavaMonsterQuarterBodyPath =
+	"M -24 45 C -31 28 -23 16 -17 4 C -13 -7 -16 -18 -8 -28 C -3 -16 3 -14 7 -26 C 11 -38 17 -42 19 -51 C 29 -34 25 -21 30 -11 C 38 7 35 29 26 45 Z";
+const lavaMonsterSideBodyPath =
+	"M -16 45 C -23 31 -18 17 -11 7 C -5 -2 -8 -15 0 -26 C 5 -15 10 -12 12 -24 C 16 -36 21 -40 22 -48 C 31 -31 27 -18 31 -7 C 37 10 32 31 24 45 Z";
+const lavaMonsterBackBodyPath =
+	"M -28 45 C -35 27 -25 15 -20 3 C -16 -7 -20 -17 -12 -27 C -8 -16 -2 -13 2 -25 C 6 -36 13 -42 15 -52 C 25 -36 22 -24 28 -14 C 37 2 37 27 28 45 Z";
+
+export const lavaMonsterDrawingForFacing = (
+	facing: PlayerFacing,
+): LavaMonsterDrawing => {
+	switch (facing) {
+		case "down":
+			return {
+				view: "front",
+				expression: "determined",
+				mirror: false,
+				bodyPath: lavaMonsterFrontBodyPath,
+			};
+		case "down-right":
+			return {
+				view: "front-quarter",
+				expression: "wary",
+				mirror: false,
+				bodyPath: lavaMonsterQuarterBodyPath,
+			};
+		case "down-left":
+			return {
+				view: "front-quarter",
+				expression: "wary",
+				mirror: true,
+				bodyPath: lavaMonsterQuarterBodyPath,
+			};
+		case "right":
+			return {
+				view: "side",
+				expression: "focused",
+				mirror: false,
+				bodyPath: lavaMonsterSideBodyPath,
+			};
+		case "left":
+			return {
+				view: "side",
+				expression: "focused",
+				mirror: true,
+				bodyPath: lavaMonsterSideBodyPath,
+			};
+		case "up-right":
+			return {
+				view: "rear-quarter",
+				expression: "guarded",
+				mirror: false,
+				bodyPath: lavaMonsterQuarterBodyPath,
+			};
+		case "up-left":
+			return {
+				view: "rear-quarter",
+				expression: "guarded",
+				mirror: true,
+				bodyPath: lavaMonsterQuarterBodyPath,
+			};
+		case "up":
+			return {
+				view: "back",
+				expression: "hidden",
+				mirror: false,
+				bodyPath: lavaMonsterBackBodyPath,
+			};
+	}
+};
+
+const lavaMonsterInteriorTemplate = (view: LavaMonsterView): TemplateResult => {
+	if (view === "side")
+		return svg`<path class="lava-monster-flame" d="M 1 39 C -3 24 7 18 8 7 C 16 14 15 25 21 27 C 26 28 27 20 30 15 L 30 42 Z" fill="#e75b27" />`;
+	if (view === "front-quarter" || view === "rear-quarter")
+		return svg`<path class="lava-monster-flame" d="M -15 39 C -20 25 -11 18 -10 7 C -1 14 -2 26 5 28 C 13 29 13 17 20 10 C 28 20 31 31 26 42 Z" fill="#e75b27" />`;
+	return svg`<path class="lava-monster-flame" d="M -19 39 C -24 24 -15 17 -14 6 C -4 14 -5 26 3 28 C 11 29 11 17 18 9 C 27 20 31 31 26 42 Z" fill="#e75b27" />`;
+};
+
+const lavaMonsterFaceTemplate = (view: LavaMonsterView): TemplateResult => {
+	if (view === "back") return svg``;
+	if (view === "rear-quarter")
+		return svg`<path d="M 16 5 L 21 8 L 19 14" fill="none" stroke="#4b2728" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" opacity="0.55" />`;
+	if (view === "side")
+		return svg`
+			<ellipse cx="16" cy="10" rx="3.5" ry="4" fill="#3d2529" />
+			<path d="M 11 4 L 19 6" fill="none" stroke="#3d2529" stroke-width="3" stroke-linecap="round" />
+			<path d="M 17 24 L 24 22 L 28 26 L 23 30 L 18 28 Z" fill="#3d2529" />
+		`;
+	if (view === "front-quarter")
+		return svg`
+			<ellipse cx="1" cy="10" rx="3.5" ry="4" fill="#3d2529" />
+			<ellipse cx="17" cy="9" rx="3.8" ry="4.2" fill="#3d2529" />
+			<path d="M -3 5 L 4 6 M 13 4 L 21 2" fill="none" stroke="#3d2529" stroke-width="3" stroke-linecap="round" />
+			<path d="M 2 24 L 9 21 L 19 24 L 14 30 L 6 29 Z" fill="#3d2529" />
+		`;
+	return svg`
+		<ellipse cx="-9" cy="11" rx="3.8" ry="4.2" fill="#3d2529" />
+		<ellipse cx="10" cy="9" rx="3.8" ry="4.2" fill="#3d2529" />
+		<path d="M -14 5 L -6 7 M 6 5 L 14 2" fill="none" stroke="#3d2529" stroke-width="3" stroke-linecap="round" />
+		<path d="M -10 25 L -3 21 L 3 25 L 10 21 L 12 27 L 7 31 L -5 30 Z" fill="#3d2529" />
+	`;
+};
+
+export const lavaMonsterTemplate = (
+	position: Position,
+	elevation: Elevation,
+	shadowHeight: number,
+	facing: PlayerFacing,
+): TemplateResult => {
+	const shadow = project(position, shadowHeight);
+	const base = project(position, elevation.z);
+	const drawing = lavaMonsterDrawingForFacing(facing);
+	return svg`
+		<ellipse cx=${shadow.x} cy=${shadow.y + 3} rx="30" ry="9" fill="#4b1f1d" opacity="0.3" />
+		<g data-lava-monster data-lava-monster-facing=${facing} data-lava-monster-view=${drawing.view} data-lava-monster-expression=${drawing.expression} transform=${`translate(${base.x} ${base.y - 45})`}>
+			<g class="lava-monster-bob">
+				<g transform=${drawing.mirror ? "scale(-1 1)" : "scale(1 1)"}>
+					<path d=${drawing.bodyPath} fill="#a93824" stroke="#49252a" stroke-width="6" stroke-linejoin="round" />
+					${lavaMonsterInteriorTemplate(drawing.view)}
+					${lavaMonsterFaceTemplate(drawing.view)}
+				</g>
+			</g>
+		</g>
+	`;
+};

@@ -3,6 +3,8 @@ import {
 	crateBody,
 	crateHeight,
 	initialWorld,
+	lavaMonsterBody,
+	lavaMonsterEntity,
 	playerBody,
 	playerEntity,
 } from "../ecs/world";
@@ -17,6 +19,7 @@ import {
 } from "../model/component";
 import { EntityId } from "../model/entity-id";
 import {
+	renderDepthForCharacter,
 	renderDepthForEntity,
 	renderDepthForPlayer,
 } from "./entity-render-depth";
@@ -66,6 +69,29 @@ describe("entity render depth", () => {
 		expect(renderDepthForEntity(world, frontPlant)).toBeGreaterThan(
 			platformDepth,
 		);
+	});
+
+	test("draws the lava monster over the entire platform top", () => {
+		const positionedWorld = {
+			...world,
+			positions: new Map(world.positions).set(
+				lavaMonsterEntity,
+				Position.make({ x: platformPosition.x, y: platformPosition.y - 60 }),
+			),
+			bodies: new Map(world.bodies).set(lavaMonsterEntity, lavaMonsterBody),
+			elevations: new Map(world.elevations).set(
+				lavaMonsterEntity,
+				Elevation.make({ z: platformHeight, velocity: 0 }),
+			),
+		};
+
+		expect(
+			renderDepthForCharacter(
+				positionedWorld,
+				lavaMonsterEntity,
+				lavaMonsterBody,
+			),
+		).toBeGreaterThan(renderDepthForEntity(positionedWorld, platform));
 	});
 
 	test("retains back-to-front ordering across the platform surface", () => {

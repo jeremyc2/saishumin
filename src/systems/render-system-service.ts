@@ -19,6 +19,8 @@ import {
 } from "../ecs/elevation";
 import { isSupportSurfaceOccupied } from "../ecs/support-surface";
 import {
+	lavaMonsterBody,
+	lavaMonsterEntity,
 	minimumEntityExtent,
 	minimumFloorDepth,
 	minimumFloorWidth,
@@ -60,6 +62,7 @@ import {
 import type { EntityId } from "../model/entity-id";
 import { editorPlacementPositionAtPointer } from "../render/editor-placement-projection";
 import {
+	renderDepthForCharacter,
 	renderDepthForEntity,
 	renderDepthForPlayer,
 } from "../render/entity-render-depth";
@@ -77,6 +80,7 @@ import {
 	chestTemplate,
 	crateTemplate,
 	decorationTemplate,
+	lavaMonsterTemplate,
 	playerTemplate,
 } from "../render/templates";
 import { terrainFloorTemplate } from "../render/terrain-templates";
@@ -1844,6 +1848,31 @@ export class RenderSystemService extends Context.Service<
 					});
 				}
 				if (!world.editor.open) {
+					const lavaMonsterPosition = world.positions.get(lavaMonsterEntity);
+					const lavaMonsterElevation = world.elevations.get(lavaMonsterEntity);
+					if (
+						lavaMonsterPosition !== undefined &&
+						lavaMonsterElevation !== undefined
+					) {
+						objects.push({
+							depth: renderDepthForCharacter(
+								world,
+								lavaMonsterEntity,
+								lavaMonsterBody,
+							),
+							template: lavaMonsterTemplate(
+								lavaMonsterPosition,
+								lavaMonsterElevation,
+								surfaceAt(
+									world,
+									lavaMonsterPosition,
+									lavaMonsterBody,
+									lavaMonsterElevation.z,
+								),
+								world.lavaMonsterFacing,
+							),
+						});
+					}
 					objects.push({
 						depth: playerDepth,
 						template: playerTemplate(

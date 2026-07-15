@@ -1,9 +1,15 @@
 import { type Body, DecorationKinds, type Position } from "../model/component";
 import type { EntityId } from "../model/entity-id";
 import { bodyBoundsOverlap, entityTopElevation } from "./elevation";
-import { groundElevation, obstacleHeightTolerance, type World } from "./world";
+import {
+	groundElevation,
+	lavaMonsterEntity,
+	obstacleHeightTolerance,
+	type World,
+} from "./world";
 
 export const isSolidEntity = (world: World, entity: EntityId): boolean =>
+	entity === lavaMonsterEntity ||
 	world.obstacles.has(entity) ||
 	(world.decorations.has(entity) &&
 		world.decorations.get(entity)?.kind !== DecorationKinds.Hopscotch);

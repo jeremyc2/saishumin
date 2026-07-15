@@ -30,6 +30,7 @@ export type World = {
 	readonly editor: EditorState;
 	readonly pressed: ReadonlySet<Direction>;
 	readonly playerFacing: PlayerFacing;
+	readonly lavaMonsterFacing: PlayerFacing;
 	readonly openedChests: ReadonlySet<EntityId>;
 	readonly signContents: ReadonlyMap<EntityId, SignContent>;
 	readonly readingSign: EntityId | null;
@@ -39,6 +40,7 @@ export type World = {
 };
 
 export const playerEntity = EntityId(1);
+export const lavaMonsterEntity = EntityId(2);
 export const roomWidth = 1160;
 export const roomDepth = 640;
 export const minimumFloorWidth = 360;
@@ -49,9 +51,14 @@ export const groundElevation = 0;
 export const stationaryVelocity = 0;
 export const playerSpawnPosition = Position.make({ x: 210, y: 360 });
 export const playerBody = Body.make({ width: 54, depth: 34 });
+export const lavaMonsterSpawnPosition = Position.make({ x: 1040, y: 320 });
+export const lavaMonsterBody = Body.make({ width: 68, depth: 48 });
+export const lavaMonsterCollisionHeight = 72;
 export const playerCollisionHeight = 68;
 export const crateBody = Body.make({ width: 70, depth: 70 });
 export const playerSpeed = 245;
+export const lavaMonsterSpeed = 112;
+export const lavaMonsterFollowDistance = 82;
 export const jumpSpeed = 510;
 export const gravity = 1180;
 export const obstacleHeightTolerance = 5;
@@ -97,6 +104,7 @@ const defaultFloorTiles = initialFloorTiles(defaultFloorPlan);
 
 const positions = new Map<EntityId, Position>([
 	[playerEntity, playerSpawnPosition],
+	[lavaMonsterEntity, lavaMonsterSpawnPosition],
 	[wallEntities[0], Position.make({ x: roomWidth / 2, y: wallThickness / 2 })],
 	[
 		wallEntities[1],
@@ -131,6 +139,7 @@ const positions = new Map<EntityId, Position>([
 
 const bodies = new Map<EntityId, Body>([
 	[playerEntity, playerBody],
+	[lavaMonsterEntity, lavaMonsterBody],
 	[wallEntities[0], Body.make({ width: roomWidth, depth: wallThickness })],
 	[
 		wallEntities[1],
@@ -194,6 +203,10 @@ export const initialWorld: World = {
 			playerEntity,
 			Elevation.make({ z: groundElevation, velocity: stationaryVelocity }),
 		],
+		[
+			lavaMonsterEntity,
+			Elevation.make({ z: groundElevation, velocity: stationaryVelocity }),
+		],
 	]),
 	bodies,
 	obstacles,
@@ -212,6 +225,7 @@ export const initialWorld: World = {
 	},
 	pressed: new Set(),
 	playerFacing: PlayerFacings.Down,
+	lavaMonsterFacing: PlayerFacings.Left,
 	openedChests: new Set(),
 	signContents: new Map([[signEntities[0], defaultSignContent]]),
 	readingSign: null,

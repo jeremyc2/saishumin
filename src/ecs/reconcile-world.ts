@@ -6,6 +6,9 @@ import { surfaceAt } from "./collision";
 import {
 	groundElevation,
 	initialWorld,
+	lavaMonsterBody,
+	lavaMonsterEntity,
+	lavaMonsterSpawnPosition,
 	obstacleHeightTolerance,
 	playerBody,
 	playerEntity,
@@ -53,6 +56,10 @@ export const reconcileWorld = (world: World): World => {
 			? world.floorTiles
 			: initialWorld.floorTiles;
 	bodies.set(playerEntity, playerBody);
+	bodies.set(lavaMonsterEntity, lavaMonsterBody);
+	if (!positions.has(lavaMonsterEntity)) {
+		positions.set(lavaMonsterEntity, lavaMonsterSpawnPosition);
+	}
 
 	if (!positions.has(playerEntity)) {
 		positions.set(playerEntity, {
@@ -68,6 +75,12 @@ export const reconcileWorld = (world: World): World => {
 	}
 	if (!elevations.has(playerEntity)) {
 		elevations.set(playerEntity, {
+			z: groundElevation,
+			velocity: stationaryVelocity,
+		});
+	}
+	if (!elevations.has(lavaMonsterEntity)) {
+		elevations.set(lavaMonsterEntity, {
 			z: groundElevation,
 			velocity: stationaryVelocity,
 		});
@@ -96,6 +109,9 @@ export const reconcileWorld = (world: World): World => {
 		playerFacing: isPlayerFacing(world.playerFacing)
 			? world.playerFacing
 			: PlayerFacings.Down,
+		lavaMonsterFacing: isPlayerFacing(world.lavaMonsterFacing)
+			? world.lavaMonsterFacing
+			: PlayerFacings.Left,
 		openedChests,
 		signContents,
 		readingSign: null,

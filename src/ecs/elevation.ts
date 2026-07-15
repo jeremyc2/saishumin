@@ -7,15 +7,23 @@ import {
 import { type EditorItemKind, EditorItemKinds } from "../model/editor";
 import type { EntityId } from "../model/entity-id";
 import { editorItemKindForEntity } from "./editor-sizing";
-import { groundElevation, obstacleHeightTolerance, type World } from "./world";
+import {
+	groundElevation,
+	lavaMonsterCollisionHeight,
+	lavaMonsterEntity,
+	obstacleHeightTolerance,
+	type World,
+} from "./world";
 
 export const entityBaseElevation = (world: World, entity: EntityId): number =>
 	world.elevations.get(entity)?.z ?? groundElevation;
 
 export const entityHeight = (world: World, entity: EntityId): number =>
-	world.obstacles.get(entity)?.height ??
-	world.decorations.get(entity)?.height ??
-	0;
+	entity === lavaMonsterEntity
+		? lavaMonsterCollisionHeight
+		: (world.obstacles.get(entity)?.height ??
+			world.decorations.get(entity)?.height ??
+			0);
 
 export const entityTopElevation = (world: World, entity: EntityId): number =>
 	entityBaseElevation(world, entity) + entityHeight(world, entity);

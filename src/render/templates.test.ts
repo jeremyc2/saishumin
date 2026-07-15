@@ -5,6 +5,7 @@ import {
 	closedChestTemplate,
 	crateShadowDepthOffset,
 	crateTopBoardDepthOffsets,
+	lavaMonsterDrawingForFacing,
 	openChestTemplate,
 	playerDrawingForFacing,
 	signpostTemplate,
@@ -73,6 +74,33 @@ describe("player drawings", () => {
 		].map(playerDrawingForFacing);
 
 		expect(new Set(drawings.map(({ view }) => view)).size).toBe(5);
+		expect(drawings[1]?.view).toBe(drawings[7]?.view);
+		expect(drawings[1]?.mirror).toBe(false);
+		expect(drawings[7]?.mirror).toBe(true);
+		expect(drawings[2]?.view).toBe(drawings[6]?.view);
+		expect(drawings[2]?.mirror).toBe(false);
+		expect(drawings[6]?.mirror).toBe(true);
+		expect(drawings[3]?.view).toBe(drawings[5]?.view);
+		expect(drawings[3]?.mirror).toBe(false);
+		expect(drawings[5]?.mirror).toBe(true);
+	});
+});
+
+describe("lava monster drawings", () => {
+	test("uses five authored views for eight facings", () => {
+		const drawings = [
+			PlayerFacings.Up,
+			PlayerFacings.UpRight,
+			PlayerFacings.Right,
+			PlayerFacings.DownRight,
+			PlayerFacings.Down,
+			PlayerFacings.DownLeft,
+			PlayerFacings.Left,
+			PlayerFacings.UpLeft,
+		].map(lavaMonsterDrawingForFacing);
+
+		expect(new Set(drawings.map(({ view }) => view)).size).toBe(5);
+		expect(new Set(drawings.map(({ expression }) => expression)).size).toBe(5);
 		expect(drawings[1]?.view).toBe(drawings[7]?.view);
 		expect(drawings[1]?.mirror).toBe(false);
 		expect(drawings[7]?.mirror).toBe(true);

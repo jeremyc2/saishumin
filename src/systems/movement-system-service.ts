@@ -12,6 +12,7 @@ import {
 	placementElevationForEntity,
 	verticalRangesOverlap,
 } from "../ecs/elevation";
+import { findGridPath } from "../ecs/grid-navigation";
 import {
 	isPlayerPlacementValid,
 	nearestValidPlayerPosition,
@@ -22,6 +23,13 @@ import {
 	fallResetElevation,
 	gravity,
 	groundElevation,
+	jumpSpeed,
+	lavaMonsterBody,
+	lavaMonsterCollisionHeight,
+	lavaMonsterEntity,
+	lavaMonsterFollowDistance,
+	lavaMonsterSpawnPosition,
+	lavaMonsterSpeed,
 	obstacleHeightTolerance,
 	playerBody,
 	playerCollisionHeight,
@@ -40,6 +48,7 @@ import {
 } from "../model/component";
 import { Controls } from "../model/control";
 import type { EntityId } from "../model/entity-id";
+import { type PlayerFacing, PlayerFacings } from "../model/player-facing";
 
 export class MovementSystemService extends Context.Service<
 	MovementSystemService,
@@ -513,6 +522,404 @@ export class MovementSystemService extends Context.Service<
 			return { ...world, positions };
 		};
 
+		const canPlaceLavaMonster = (
+			world: World,
+			position: Position,
+			elevation: number,
+		): boolean => {
+			const left = world.floorOrigin.x + lavaMonsterBody.width / 2;
+			const right =
+				world.floorOrigin.x + world.floorPlan.width - lavaMonsterBody.width / 2;
+			const back = world.floorOrigin.y + lavaMonsterBody.depth / 2;
+			const front =
+				world.floorOrigin.y + world.floorPlan.depth - lavaMonsterBody.depth / 2;
+			if (
+				position.x < left ||
+				position.x > right ||
+				position.y < back ||
+				position.y > front
+			)
+				return false;
+
+			for (const entity of world.positions.keys()) {
+				if (entity === lavaMonsterEntity) continue;
+				const obstaclePosition = world.positions.get(entity);
+				const obstacleBody = world.bodies.get(entity);
+				const blocksAtElevation =
+					entity === playerEntity
+						? verticalRangesOverlap(
+								elevation,
+								lavaMonsterCollisionHeight,
+								world.elevations.get(playerEntity)?.z ?? groundElevation,
+								playerCollisionHeight,
+							)
+						: isSolidEntity(world, entity) &&
+							elevation <
+								entityTopElevation(world, entity) - obstacleHeightTolerance;
+				if (
+					blocksAtElevation &&
+					obstaclePosition !== undefined &&
+					obstacleBody !== undefined &&
+					overlaps(position, lavaMonsterBody, obstaclePosition, obstacleBody)
+				)
+					return false;
+			}
+			return true;
+		};
+
+		const navigationGridSize = 28;
+
+		const lavaMonsterDirection = (
+			world: World,
+			position: Position,
+			target: Position,
+			elevation: number,
+		): Position => {
+			const offset = { x: target.x - position.x, y: target.y - position.y };
+			const distance = Math.hypot(offset.x, offset.y);
+			if (distance <= lavaMonsterFollowDistance) return { x: 0, y: 0 };
+			const direct = { x: offset.x / distance, y: offset.y / distance };
+			const directProbeDistance = Math.min(
+				navigationGridSize,
+				distance - lavaMonsterFollowDistance,
+			);
+			if (
+				canPlaceLavaMonster(
+					world,
+					{
+						x: position.x + direct.x * directProbeDistance,
+						y: position.y + direct.y * directProbeDistance,
+					},
+					elevation,
+				)
+			)
+				return direct;
+
+			const hasClearSegment = (destination: Position): boolean => {
+				const segment = {
+					x: destination.x - position.x,
+					y: destination.y - position.y,
+				};
+				const segmentDistance = Math.hypot(segment.x, segment.y);
+				const steps = Math.max(
+					1,
+					Math.ceil(segmentDistance / (navigationGridSize / 3)),
+				);
+				for (let step = 1; step <= steps; step += 1) {
+					const progress = step / steps;
+					if (
+						!canPlaceLavaMonster(
+							world,
+							{
+								x: position.x + segment.x * progress,
+								y: position.y + segment.y * progress,
+							},
+							elevation,
+						)
+					)
+						return false;
+				}
+				return true;
+			};
+			const path = findGridPath({
+				origin: position,
+				target,
+				arrivalDistance: lavaMonsterFollowDistance,
+				spacing: navigationGridSize,
+				maximumColumns:
+					Math.ceil(world.floorPlan.width / navigationGridSize) + 1,
+				maximumRows: Math.ceil(world.floorPlan.depth / navigationGridSize) + 1,
+				canOccupy: (candidate) =>
+					canPlaceLavaMonster(world, candidate, elevation),
+			});
+			let waypoint = path[0];
+			for (const pathPosition of path) {
+				if (!hasClearSegment(pathPosition)) break;
+				waypoint = pathPosition;
+			}
+			if (waypoint === undefined) {
+				for (const wander of [
+					{ x: -direct.y, y: direct.x },
+					{ x: direct.y, y: -direct.x },
+					{ x: -direct.x, y: -direct.y },
+				]) {
+					if (
+						canPlaceLavaMonster(
+							world,
+							{
+								x: position.x + wander.x * navigationGridSize,
+								y: position.y + wander.y * navigationGridSize,
+							},
+							elevation,
+						)
+					)
+						return wander;
+				}
+				return { x: 0, y: 0 };
+			}
+			const waypointOffset = {
+				x: waypoint.x - position.x,
+				y: waypoint.y - position.y,
+			};
+			const magnitude = Math.hypot(waypointOffset.x, waypointOffset.y);
+			return {
+				x: waypointOffset.x / magnitude,
+				y: waypointOffset.y / magnitude,
+			};
+		};
+
+		const lavaMonsterFacingForDelta = (
+			delta: Position,
+			previous: PlayerFacing,
+		): PlayerFacing => {
+			const horizontal = Math.sign(delta.x);
+			const vertical = Math.sign(delta.y);
+			if (vertical < 0)
+				return horizontal < 0
+					? PlayerFacings.UpLeft
+					: horizontal > 0
+						? PlayerFacings.UpRight
+						: PlayerFacings.Up;
+			if (vertical > 0)
+				return horizontal < 0
+					? PlayerFacings.DownLeft
+					: horizontal > 0
+						? PlayerFacings.DownRight
+						: PlayerFacings.Down;
+			if (horizontal < 0) return PlayerFacings.Left;
+			if (horizontal > 0) return PlayerFacings.Right;
+			return previous;
+		};
+
+		const lavaMonsterNeedsJump = (
+			world: World,
+			position: Position,
+			elevation: number,
+			target: Position,
+		): boolean => {
+			const offset = { x: target.x - position.x, y: target.y - position.y };
+			const distance = Math.hypot(offset.x, offset.y);
+			if (distance === 0) return false;
+			const probeDistance = Math.min(navigationGridSize, distance);
+			const probe = {
+				x: position.x + (offset.x / distance) * probeDistance,
+				y: position.y + (offset.y / distance) * probeDistance,
+			};
+			const maximumJumpRise = (jumpSpeed * jumpSpeed) / (2 * gravity);
+			for (const entity of world.positions.keys()) {
+				if (
+					entity === playerEntity ||
+					entity === lavaMonsterEntity ||
+					!isSolidEntity(world, entity)
+				)
+					continue;
+				const obstaclePosition = world.positions.get(entity);
+				const obstacleBody = world.bodies.get(entity);
+				const obstacleTop = entityTopElevation(world, entity);
+				if (
+					obstaclePosition !== undefined &&
+					obstacleBody !== undefined &&
+					obstacleTop > elevation + obstacleHeightTolerance &&
+					obstacleTop <= elevation + maximumJumpRise &&
+					overlaps(probe, lavaMonsterBody, obstaclePosition, obstacleBody)
+				)
+					return true;
+			}
+			return false;
+		};
+
+		const nearestValidLavaMonsterPosition = (
+			world: World,
+			origin: Position,
+			elevation: number,
+		): Position | undefined => {
+			const minimumX = world.floorOrigin.x + lavaMonsterBody.width / 2;
+			const maximumX =
+				world.floorOrigin.x + world.floorPlan.width - lavaMonsterBody.width / 2;
+			const minimumY = world.floorOrigin.y + lavaMonsterBody.depth / 2;
+			const maximumY =
+				world.floorOrigin.y + world.floorPlan.depth - lavaMonsterBody.depth / 2;
+			const clamp = (value: number, minimum: number, maximum: number): number =>
+				Math.min(Math.max(value, minimum), maximum);
+			const xCoordinates = new Set([
+				clamp(origin.x, minimumX, maximumX),
+				minimumX,
+				maximumX,
+			]);
+			const yCoordinates = new Set([
+				clamp(origin.y, minimumY, maximumY),
+				minimumY,
+				maximumY,
+			]);
+			for (const [entity, position] of world.positions) {
+				if (entity === lavaMonsterEntity) continue;
+				const body = world.bodies.get(entity);
+				if (body === undefined) continue;
+				const horizontalContact = (body.width + lavaMonsterBody.width) / 2;
+				const verticalContact = (body.depth + lavaMonsterBody.depth) / 2;
+				xCoordinates.add(
+					clamp(position.x - horizontalContact, minimumX, maximumX),
+				);
+				xCoordinates.add(
+					clamp(position.x + horizontalContact, minimumX, maximumX),
+				);
+				yCoordinates.add(
+					clamp(position.y - verticalContact, minimumY, maximumY),
+				);
+				yCoordinates.add(
+					clamp(position.y + verticalContact, minimumY, maximumY),
+				);
+			}
+
+			let nearest: Position | undefined;
+			let nearestDistance = Number.POSITIVE_INFINITY;
+			for (const x of xCoordinates) {
+				for (const y of yCoordinates) {
+					const candidate = { x, y };
+					if (!canPlaceLavaMonster(world, candidate, elevation)) continue;
+					const distance = Math.hypot(x - origin.x, y - origin.y);
+					if (distance < nearestDistance) {
+						nearest = candidate;
+						nearestDistance = distance;
+					}
+				}
+			}
+			return nearest;
+		};
+
+		const updateLavaMonster = (world: World, elapsed: number): World => {
+			const monsterPosition = world.positions.get(lavaMonsterEntity);
+			const playerPosition = world.positions.get(playerEntity);
+			const monsterElevation = world.elevations.get(lavaMonsterEntity);
+			if (
+				monsterPosition === undefined ||
+				playerPosition === undefined ||
+				monsterElevation === undefined
+			)
+				return world;
+			if (!canPlaceLavaMonster(world, monsterPosition, monsterElevation.z)) {
+				const safePosition = nearestValidLavaMonsterPosition(
+					world,
+					monsterPosition,
+					monsterElevation.z,
+				);
+				if (safePosition !== undefined) {
+					const positions = new Map(world.positions);
+					positions.set(lavaMonsterEntity, safePosition);
+					return updateLavaMonster({ ...world, positions }, elapsed);
+				}
+				if (monsterElevation.velocity !== stationaryVelocity) return world;
+				if (
+					!canPlaceLavaMonster(world, lavaMonsterSpawnPosition, groundElevation)
+				)
+					return world;
+				const positions = new Map(world.positions);
+				positions.set(lavaMonsterEntity, lavaMonsterSpawnPosition);
+				const elevations = new Map(world.elevations);
+				elevations.set(lavaMonsterEntity, {
+					z: groundElevation,
+					velocity: stationaryVelocity,
+				});
+				return { ...world, positions, elevations };
+			}
+
+			const currentSurface = surfaceAt(
+				world,
+				monsterPosition,
+				lavaMonsterBody,
+				monsterElevation.z,
+			);
+			const isGrounded =
+				monsterElevation.velocity === stationaryVelocity &&
+				Math.abs(monsterElevation.z - currentSurface) <=
+					obstacleHeightTolerance;
+			const shouldJump =
+				isGrounded &&
+				lavaMonsterNeedsJump(
+					world,
+					monsterPosition,
+					monsterElevation.z,
+					playerPosition,
+				);
+			const direction = lavaMonsterDirection(
+				world,
+				monsterPosition,
+				playerPosition,
+				monsterElevation.z,
+			);
+			const targetDistance = Math.hypot(
+				playerPosition.x - monsterPosition.x,
+				playerPosition.y - monsterPosition.y,
+			);
+			const distance = Math.min(
+				lavaMonsterSpeed * elapsed,
+				Math.max(0, targetDistance - lavaMonsterFollowDistance),
+			);
+			const delta = {
+				x: direction.x * distance,
+				y: direction.y * distance,
+			};
+			const horizontalCandidate = {
+				x: monsterPosition.x + delta.x,
+				y: monsterPosition.y,
+			};
+			const afterHorizontal = canPlaceLavaMonster(
+				world,
+				horizontalCandidate,
+				monsterElevation.z,
+			)
+				? horizontalCandidate
+				: monsterPosition;
+			const verticalCandidate = {
+				x: afterHorizontal.x,
+				y: afterHorizontal.y + delta.y,
+			};
+			const moved = canPlaceLavaMonster(
+				world,
+				verticalCandidate,
+				monsterElevation.z,
+			)
+				? verticalCandidate
+				: afterHorizontal;
+
+			const positions = new Map(world.positions);
+			positions.set(lavaMonsterEntity, moved);
+			let velocity = shouldJump ? jumpSpeed : monsterElevation.velocity;
+			velocity -= gravity * elapsed;
+			let z = monsterElevation.z + velocity * elapsed;
+			const nextSurface = surfaceAt(
+				world,
+				moved,
+				lavaMonsterBody,
+				Math.max(monsterElevation.z, z),
+			);
+			if (!shouldJump && isGrounded && nextSurface === monsterElevation.z) {
+				z = nextSurface;
+				velocity = stationaryVelocity;
+			} else if (
+				velocity <= stationaryVelocity &&
+				z <= nextSurface &&
+				monsterElevation.z >= nextSurface
+			) {
+				z = nextSurface;
+				velocity = stationaryVelocity;
+			}
+			const elevations = new Map(world.elevations);
+			elevations.set(lavaMonsterEntity, { z, velocity });
+			return {
+				...world,
+				positions,
+				elevations,
+				lavaMonsterFacing: lavaMonsterFacingForDelta(
+					{
+						x: moved.x - monsterPosition.x,
+						y: moved.y - monsterPosition.y,
+					},
+					world.lavaMonsterFacing,
+				),
+			};
+		};
+
 		const updateMovement = (world: World, elapsed: number): World => {
 			const position = world.positions.get(playerEntity);
 			const elevation = world.elevations.get(playerEntity);
@@ -676,9 +1083,12 @@ export class MovementSystemService extends Context.Service<
 		return {
 			update: (world, elapsed) =>
 				relocatePlayerIfInvalid(
-					updateFallingCrates(
-						updateMovement(
-							world.pushing === null ? world : { ...world, pushing: null },
+					updateLavaMonster(
+						updateFallingCrates(
+							updateMovement(
+								world.pushing === null ? world : { ...world, pushing: null },
+								elapsed,
+							),
 							elapsed,
 						),
 						elapsed,
