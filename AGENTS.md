@@ -6,6 +6,7 @@
 - Preserve idiomatic Effect control flow and typed error handling. Prefer Effect primitives over project-specific wrappers that hide or remap errors, requirements, dependency provision, or cleanup.
 - Treat a module as an interface plus its implementation, not as a single file. Split large implementations into private files without unnecessarily widening the module's interface.
 - Do not introduce an Effect `Context.Service` merely to reduce file size. Add one when it represents a meaningful contextual dependency, lifecycle, or substitutable implementation.
+- Do not use nested ternary operators.
 
 ## Agent skills
 
