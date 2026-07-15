@@ -3,12 +3,12 @@ import type { Action as AppAction } from "../../app/action";
 import {
 	points,
 	projectedRectangle,
-} from "../../rendering/geometry/projection";
-import type { ResizeDirection } from "../../rendering/geometry/resize";
+} from "../../presentation/geometry/projection";
+import type { ResizeDirection } from "../../presentation/geometry/resize";
 import type { Position } from "../../world/components";
 import { entityBaseElevation } from "../../world/spatial/elevation";
 import type { World } from "../../world/world";
-import type { DesignStudioInteractionRuntime } from "../interaction/runtime";
+import type { DesignStudioInteraction } from "../interaction/interaction";
 import { makeDesignStudioOverlays } from "./overlays";
 import { makeDesignStudioPanel } from "./panel";
 
@@ -24,9 +24,7 @@ const midpoint = (start: Position, end: Position): Position => ({
 
 export type DesignStudioView = ReturnType<typeof makeDesignStudioView>;
 
-export const makeDesignStudioView = (
-	interactionRuntime: DesignStudioInteractionRuntime,
-) => {
+export const makeDesignStudioView = (interaction: DesignStudioInteraction) => {
 	const selectionTemplate = (
 		world: World,
 		invalidPreview: boolean,
@@ -157,7 +155,7 @@ export const makeDesignStudioView = (
 							pointer-events="stroke"
 							class=${edge.cursor}
 							@pointerdown=${(event: PointerEvent) =>
-								interactionRuntime.startFloorResize(
+								interaction.startFloorResize(
 									event,
 									world,
 									edge.widthDirection,
@@ -178,7 +176,7 @@ export const makeDesignStudioView = (
 							stroke-width="3"
 							class=${handle.cursor}
 							@pointerdown=${(event: PointerEvent) =>
-								interactionRuntime.startFloorResize(
+								interaction.startFloorResize(
 									event,
 									world,
 									handle.widthDirection,
@@ -302,7 +300,7 @@ export const makeDesignStudioView = (
 						pointer-events="stroke"
 						class=${edge.cursor}
 						@pointerdown=${(event: PointerEvent) =>
-							interactionRuntime.startEntityResize(
+							interaction.startEntityResize(
 								event,
 								world,
 								selected,
@@ -324,7 +322,7 @@ export const makeDesignStudioView = (
 							stroke-width="3"
 							class=${handle.cursor}
 							@pointerdown=${(event: PointerEvent) =>
-								interactionRuntime.startEntityResize(
+								interaction.startEntityResize(
 									event,
 									world,
 									selected,
@@ -337,14 +335,14 @@ export const makeDesignStudioView = (
 			`;
 	};
 
-	const { editorPanelTemplate } = makeDesignStudioPanel(interactionRuntime);
+	const { editorPanelTemplate } = makeDesignStudioPanel(interaction);
 
 	const {
 		invalidPlacementTemplate,
 		signDialogTemplate,
 		createPreviewTemplate,
 		paletteGuidanceTemplate,
-	} = makeDesignStudioOverlays(interactionRuntime);
+	} = makeDesignStudioOverlays(interaction);
 
 	return {
 		selectionTemplate,

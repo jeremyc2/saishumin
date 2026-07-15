@@ -1,10 +1,10 @@
 import { describe, expect, test } from "bun:test";
-import { editSessionPresentation } from "../../../design-studio/edit-session/edit-session";
+import { editSessionStatus } from "../../../design-studio/edit-session/edit-session";
 import { makeDesignStudioView } from "../../../design-studio/view/view";
 import { initialWorld } from "../../../world/initial-world";
 import { gameSceneTemplate } from "../game-scene";
 
-const interactionRuntime = {
+const interaction = {
 	startPan: () => {},
 	startEntityMove: () => {},
 	startEntityResize: () => {},
@@ -22,10 +22,10 @@ describe("game scene", () => {
 	test("composes the room scene without owning DOM rendering", () => {
 		const scene = gameSceneTemplate({
 			world: initialWorld,
-			presentation: editSessionPresentation(initialWorld),
+			editSessionStatus: editSessionStatus(initialWorld),
 			dispatch: () => {},
-			interactionRuntime,
-			designStudioView: makeDesignStudioView(interactionRuntime),
+			interaction,
+			designStudioView: makeDesignStudioView(interaction),
 			onRootPointerDown: () => {},
 		});
 

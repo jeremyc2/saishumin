@@ -1,3 +1,4 @@
+import type { Data } from "effect";
 import { dual } from "effect/Function";
 import type { Action } from "../app/action";
 import type { Pipeable } from "../pipeable";
@@ -6,7 +7,7 @@ import { updateDesignStudioAction } from "./internal/actions";
 
 type DesignStudioAction = Exclude<
 	Action,
-	{ readonly _tag: "KeyChanged" | "Tick" | "SignDismissed" }
+	Data.TaggedEnum.Value<Action, "KeyChanged" | "Tick" | "SignDismissed">
 >;
 
 export const updateDesignStudio: Pipeable<

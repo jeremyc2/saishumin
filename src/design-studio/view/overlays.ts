@@ -5,24 +5,27 @@ import {
 	chestTemplate,
 	crateTemplate,
 	decorationTemplate,
-} from "../../rendering/artwork/entities";
+} from "../../presentation/artwork/entities";
 import {
 	points,
 	projectedRectangle,
 	viewport,
-} from "../../rendering/geometry/projection";
+} from "../../presentation/geometry/projection";
 import {
 	Decoration,
 	type DecorationKind,
 	DecorationKinds,
 	defaultSignContent,
 } from "../../world/components";
-import type { InvalidPlacement } from "../../world/editor-state";
+import type {
+	EditSessionRejectionReason,
+	InvalidPlacement,
+} from "../../world/editor-state";
 import { placementElevationForKind } from "../../world/spatial/elevation";
 import { isSupportSurfaceOccupied } from "../../world/spatial/support-surface";
 import type { World } from "../../world/world";
-import type { EditSessionPresentation } from "../edit-session/edit-session";
-import type { DesignStudioInteractionRuntime } from "../interaction/runtime";
+import { EditSessionStatus } from "../edit-session/edit-session";
+import type { DesignStudioInteraction } from "../interaction/interaction";
 import {
 	defaultEditorItemBody,
 	defaultEditorItemHeight,
@@ -33,7 +36,7 @@ import {
 type Dispatch = (action: AppAction) => void;
 
 export const invalidPreviewDescription = (input: {
-	readonly rejectionReason: EditSessionPresentation["rejectionReason"];
+	readonly rejectionReason: EditSessionRejectionReason | null;
 	readonly invalidPlacementKind: InvalidPlacement["kind"] | null;
 	readonly occupiedSupport: boolean;
 }): string => {
@@ -65,11 +68,11 @@ const decorationKindForEditorItem = (
 };
 
 export const makeDesignStudioOverlays = (
-	interactionRuntime: DesignStudioInteractionRuntime,
+	interaction: DesignStudioInteraction,
 ) => {
 	const invalidPlacementTemplate = (
 		world: World,
-		presentation: EditSessionPresentation,
+		editSessionStatus: EditSessionStatus,
 		dispatch: Dispatch,
 	): TemplateResult => {
 		const invalidPlacement = world.editor.invalidPlacement;
@@ -81,8 +84,15 @@ export const makeDesignStudioOverlays = (
 				invalidPlacement.position,
 				invalidPlacement.body,
 			);
+		const rejectionReason = EditSessionStatus.$match(editSessionStatus, {
+			Inactive: () => null,
+			Active: () => null,
+			InvalidPreview: ({ reason }) => reason,
+			InvalidReleased: ({ reason }) => reason,
+		});
+		const sessionActive = !EditSessionStatus.$is("Inactive")(editSessionStatus);
 		const description = invalidPreviewDescription({
-			rejectionReason: presentation.rejectionReason,
+			rejectionReason,
 			invalidPlacementKind: invalidPlacement?.kind ?? null,
 			occupiedSupport,
 		});
@@ -92,7 +102,7 @@ export const makeDesignStudioOverlays = (
 						<div id="invalid-position-title" class="text-[17px] font-heading font-bold tracking-[0.04em] text-[#e59a91]">Invalid position</div>
 						<p id="invalid-position-description" class="mt-2 mb-0 text-base leading-relaxed text-[#b9cbc4]">${description}</p>
 						<div class="mt-5 flex justify-end">
-							<button type="button" autofocus class="rounded-lg border border-[#9a625d] bg-[#6f3f3e] px-5 py-2 text-[11px] font-bold tracking-[0.12em] text-[#fff1ed] transition hover:bg-[#80504d]" @click=${() => dispatch(presentation.active ? Action.EditorEditSessionCancelled() : Action.EditorInvalidPlacementDismissed())}>OK</button>
+							<button type="button" autofocus class="rounded-lg border border-[#9a625d] bg-[#6f3f3e] px-5 py-2 text-[11px] font-bold tracking-[0.12em] text-[#fff1ed] transition hover:bg-[#80504d]" @click=${() => dispatch(sessionActive ? Action.EditorEditSessionCancelled() : Action.EditorInvalidPlacementDismissed())}>OK</button>
 						</div>
 					</div>
 				</div>
@@ -126,19 +136,19 @@ export const makeDesignStudioOverlays = (
 		world: World,
 		invalidPreview: boolean,
 	): TemplateResult => {
-		const interaction = interactionRuntime.createPreview();
-		if (interaction === null) return html``;
-		const body = defaultEditorItemBody(interaction.itemKind);
-		const position = interaction.position;
+		const preview = interaction.createPreview();
+		if (preview === null) return html``;
+		const body = defaultEditorItemBody(preview.itemKind);
+		const position = preview.position;
 		const baseElevation = placementElevationForKind(
 			world,
-			interaction.itemKind,
+			preview.itemKind,
 			position,
 			body,
 		);
-		const height = defaultEditorItemHeight(interaction.itemKind);
+		const height = defaultEditorItemHeight(preview.itemKind);
 		let visual: TemplateResult;
-		if (interaction.itemKind === EditorItemKinds.Crate)
+		if (preview.itemKind === EditorItemKinds.Crate)
 			visual = crateTemplate({
 				position,
 				body,
@@ -146,7 +156,7 @@ export const makeDesignStudioOverlays = (
 				grabbed: false,
 				baseElevation,
 			});
-		else if (interaction.itemKind === EditorItemKinds.Chest)
+		else if (preview.itemKind === EditorItemKinds.Chest)
 			visual = chestTemplate({
 				position,
 				body,
@@ -154,7 +164,7 @@ export const makeDesignStudioOverlays = (
 				opened: false,
 				baseElevation,
 			});
-		else if (interaction.itemKind === EditorItemKinds.Wall)
+		else if (preview.itemKind === EditorItemKinds.Wall)
 			visual = boxTemplate({
 				position,
 				body,
@@ -162,7 +172,7 @@ export const makeDesignStudioOverlays = (
 				colors: { top: "#426772", front: "#29454f" },
 				baseElevation,
 			});
-		else if (interaction.itemKind === EditorItemKinds.Platform)
+		else if (preview.itemKind === EditorItemKinds.Platform)
 			visual = boxTemplate({
 				position,
 				body,
@@ -175,14 +185,14 @@ export const makeDesignStudioOverlays = (
 				position,
 				body,
 				decoration: Decoration.make({
-					kind: decorationKindForEditorItem(interaction.itemKind),
+					kind: decorationKindForEditorItem(preview.itemKind),
 					height,
 				}),
 				baseElevation,
 			});
 		const accent = invalidPreview ? "#e59a91" : "#fff0a8";
 		return html`
-				<svg data-editor-create-preview data-can-drop=${String(interaction.canDrop)} aria-hidden="true" class="pointer-events-none absolute inset-0 z-40 h-full w-full" viewBox=${`0 0 ${viewport.width} ${viewport.height}`} preserveAspectRatio="xMidYMid meet">
+				<svg data-editor-create-preview data-can-drop=${String(preview.canDrop)} aria-hidden="true" class="pointer-events-none absolute inset-0 z-40 h-full w-full" viewBox=${`0 0 ${viewport.width} ${viewport.height}`} preserveAspectRatio="xMidYMid meet">
 					<g transform=${`translate(${world.editor.camera.x} ${world.editor.camera.y})`}>
 						<g opacity="0.82">${visual}</g>
 						<polygon data-editor-create-outline points=${points(projectedRectangle(position, body, baseElevation))} fill="none" stroke=${accent} stroke-width="4" stroke-dasharray="10 7" vector-effect="non-scaling-stroke" />

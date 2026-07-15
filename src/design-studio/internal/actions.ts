@@ -1,11 +1,12 @@
+import type { Data } from "effect";
 import { dual } from "effect/Function";
 import { Action } from "../../app/action";
 import type { Direction } from "../../app/control";
 import type { Pipeable } from "../../pipeable";
 import {
+	cameraFollowingPlayer,
 	cameraForFloor,
-	followCamera,
-} from "../../rendering/geometry/projection";
+} from "../../presentation/geometry/projection";
 import {
 	Body,
 	DecorationKinds,
@@ -49,19 +50,11 @@ import { EditorItemKinds, editorItemHeightLimits } from "../model";
 
 type DesignStudioAction = Exclude<
 	Action,
-	{ readonly _tag: "KeyChanged" | "Tick" | "SignDismissed" }
+	Data.TaggedEnum.Value<Action, "KeyChanged" | "Tick" | "SignDismissed">
 >;
 
 const clamp = (value: number, minimum: number, maximum: number): number =>
 	Math.min(Math.max(value, minimum), maximum);
-
-const cameraFollowingPlayer = (world: World, camera: Position): Position => {
-	const position = world.positions.get(playerEntity);
-	const elevation = world.elevations.get(playerEntity);
-	return position === undefined
-		? camera
-		: followCamera(camera, position, elevation?.z ?? groundElevation);
-};
 
 const sanitizedEntityBody = (
 	world: World,
@@ -185,7 +178,10 @@ const toggleDesignStudio = (world: World): World => {
 	toggled = { ...toggled, positions, elevations };
 	return {
 		...toggled,
-		gameCamera: cameraFollowingPlayer(toggled, withoutSession.gameCamera),
+		gameCamera: cameraFollowingPlayer({
+			world: toggled,
+			camera: withoutSession.gameCamera,
+		}),
 	};
 };
 
@@ -298,13 +294,13 @@ const dismissInvalidPlacement = (world: World): World => {
 		};
 		return {
 			...resized,
-			gameCamera: cameraFollowingPlayer(
-				resized,
-				cameraForFloor(
+			gameCamera: cameraFollowingPlayer({
+				world: resized,
+				camera: cameraForFloor(
 					invalidPlacement.floorPlan,
 					invalidPlacement.floorOrigin,
 				),
-			),
+			}),
 		};
 	}
 	const positions = new Map(world.positions);
@@ -456,10 +452,10 @@ const dispatchDesignStudioAction = (world: World, action: Action): World =>
 				return invalidFloorPlacement(world, world.floorPlan, world.floorOrigin);
 			return {
 				...resized,
-				gameCamera: cameraFollowingPlayer(
-					resized,
-					cameraForFloor(nextFloorPlan, world.floorOrigin),
-				),
+				gameCamera: cameraFollowingPlayer({
+					world: resized,
+					camera: cameraForFloor(nextFloorPlan, world.floorOrigin),
+				}),
 			};
 		},
 		EditorCameraChanged: ({ camera }) =>

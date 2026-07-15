@@ -1,10 +1,10 @@
 import { Effect, type Scope } from "effect";
 import { Action, type Action as AppAction } from "../../../app/action";
-import { unproject } from "../../../rendering/geometry/projection";
+import { unproject } from "../../../presentation/geometry/projection";
 import {
 	type ResizeDirection,
 	resizeFromHandle,
-} from "../../../rendering/geometry/resize";
+} from "../../../presentation/geometry/resize";
 import type { Body, Position } from "../../../world/components";
 import type { EntityId } from "../../../world/entity-id";
 import { entityBaseElevation } from "../../../world/spatial/elevation";
@@ -88,7 +88,7 @@ const maximumFloorBody = {
 } as const;
 const wheelLinePixels = 16;
 
-export type DesignStudioInteractionRuntime = {
+export type DesignStudioInteraction = {
 	readonly startPan: (event: PointerEvent, world: World) => void;
 	readonly startEntityMove: (
 		event: PointerEvent,
@@ -132,10 +132,10 @@ export type DesignStudioInteractionRuntime = {
 	} | null;
 };
 
-export const makeDesignStudioInteractionRuntime = (input: {
+export const makeDesignStudioInteraction = (input: {
 	readonly refresh: () => void;
 	readonly refreshPreview: () => void;
-}): Effect.Effect<DesignStudioInteractionRuntime, never, Scope.Scope> =>
+}): Effect.Effect<DesignStudioInteraction, never, Scope.Scope> =>
 	Effect.gen(function* () {
 		let currentWorld: World | undefined;
 		let currentDispatch: Dispatch | undefined;
@@ -741,7 +741,7 @@ export const makeDesignStudioInteractionRuntime = (input: {
 							previewWorld === world
 								? contentEnvelope(world)
 								: contentEnvelopeIncludingPreview({
-										authoredWorld: world,
+										world,
 										previewWorld,
 									}),
 						elapsedSeconds,

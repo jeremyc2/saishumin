@@ -81,53 +81,59 @@ const makeWorld = ({
 
 describe("UpdateSystemService", () => {
 	test("previews a new Editor Item without changing the authored World, then commits it", () => {
-		const editing = updateSystem.update(initialWorld, Action.EditorToggled());
-		const begun = updateSystem.update(
-			editing,
-			Action.EditorEditSessionBegan({
+		const editing = updateSystem.update({
+			world: initialWorld,
+			action: Action.EditorToggled(),
+		});
+		const begun = updateSystem.update({
+			world: editing,
+			action: Action.EditorEditSessionBegan({
 				operation: {
 					kind: "create",
 					itemKind: EditorItemKinds.Hopscotch,
 					position: Position.make({ x: 500, y: 300 }),
 				},
 			}),
-		);
+		});
 
 		const preview = editSessionView(begun);
 		expect(begun.positions).toBe(editing.positions);
 		expect(preview.positions.size).toBe(editing.positions.size + 1);
 		expect(begun.editor.editSession?.validity).toEqual({ kind: "valid" });
 
-		const committed = updateSystem.update(
-			begun,
-			Action.EditorEditSessionCommitted(),
-		);
+		const committed = updateSystem.update({
+			world: begun,
+			action: Action.EditorEditSessionCommitted(),
+		});
 		expect(committed.positions.size).toBe(editing.positions.size + 1);
 		expect(committed.editor.editSession).toBeNull();
 	});
 
 	test("advances the camera and Edit Session preview in one auto-pan snapshot", () => {
-		const editing = updateSystem.update(initialWorld, Action.EditorToggled());
-		const begun = updateSystem.update(
-			editing,
-			Action.EditorEditSessionBegan({
+		const editing = updateSystem.update({
+			world: initialWorld,
+			action: Action.EditorToggled(),
+		});
+		const begun = updateSystem.update({
+			world: editing,
+			action: Action.EditorEditSessionBegan({
 				operation: {
 					kind: "create",
 					itemKind: EditorItemKinds.Hopscotch,
 					position: Position.make({ x: 500, y: 300 }),
 				},
 			}),
-		);
-		const advanced = updateSystem.update(
-			begun,
-			Action.EditorEditSessionAutoPanned({
+		});
+		const advanced = updateSystem.update({
+			world: begun,
+			action: Action.EditorEditSessionAutoPanned({
 				camera: Position.make({ x: -120, y: 40 }),
 				preview: {
 					kind: "create",
 					position: Position.make({ x: 620, y: 260 }),
 				},
 			}),
-		);
+		});
 
 		expect(advanced.editor.camera).toEqual({ x: -120, y: 40 });
 		expect(advanced.editor.editSession?.operation).toMatchObject({
@@ -143,10 +149,13 @@ describe("UpdateSystemService", () => {
 		expect(originalPosition).toBeDefined();
 		expect(originalBody).toBeDefined();
 		if (originalPosition === undefined || originalBody === undefined) return;
-		const editing = updateSystem.update(initialWorld, Action.EditorToggled());
-		const begun = updateSystem.update(
-			editing,
-			Action.EditorEditSessionBegan({
+		const editing = updateSystem.update({
+			world: initialWorld,
+			action: Action.EditorToggled(),
+		});
+		const begun = updateSystem.update({
+			world: editing,
+			action: Action.EditorEditSessionBegan({
 				operation: {
 					kind: "move",
 					entity,
@@ -155,17 +164,17 @@ describe("UpdateSystemService", () => {
 					position: originalPosition,
 				},
 			}),
-		);
-		const previewed = updateSystem.update(
-			begun,
-			Action.EditorEditSessionPreviewed({
+		});
+		const previewed = updateSystem.update({
+			world: begun,
+			action: Action.EditorEditSessionPreviewed({
 				preview: { kind: "move", position: Position.make({ x: -100, y: 100 }) },
 			}),
-		);
-		const released = updateSystem.update(
-			previewed,
-			Action.EditorEditSessionCommitted(),
-		);
+		});
+		const released = updateSystem.update({
+			world: previewed,
+			action: Action.EditorEditSessionCommitted(),
+		});
 
 		expect(released.positions.get(entity)).toEqual(originalPosition);
 		expect(editSessionView(released).positions.get(entity)).toEqual({
@@ -177,30 +186,30 @@ describe("UpdateSystemService", () => {
 			phase: "invalid-released",
 		});
 
-		const cancelled = updateSystem.update(
-			released,
-			Action.EditorEditSessionCancelled(),
-		);
+		const cancelled = updateSystem.update({
+			world: released,
+			action: Action.EditorEditSessionCancelled(),
+		});
 		expect(cancelled.positions.get(entity)).toEqual(originalPosition);
 		expect(cancelled.editor.editSession).toBeNull();
 	});
 
 	test("faces movement input and keeps facing after release", () => {
-		const facingUp = updateSystem.update(
-			initialWorld,
-			Action.KeyChanged({ key: Controls.Up, pressed: true }),
-		);
-		const facingUpLeft = updateSystem.update(
-			facingUp,
-			Action.KeyChanged({ key: Controls.Left, pressed: true }),
-		);
-		const stopped = updateSystem.update(
-			updateSystem.update(
-				facingUpLeft,
-				Action.KeyChanged({ key: Controls.Up, pressed: false }),
-			),
-			Action.KeyChanged({ key: Controls.Left, pressed: false }),
-		);
+		const facingUp = updateSystem.update({
+			world: initialWorld,
+			action: Action.KeyChanged({ key: Controls.Up, pressed: true }),
+		});
+		const facingUpLeft = updateSystem.update({
+			world: facingUp,
+			action: Action.KeyChanged({ key: Controls.Left, pressed: true }),
+		});
+		const stopped = updateSystem.update({
+			world: updateSystem.update({
+				world: facingUpLeft,
+				action: Action.KeyChanged({ key: Controls.Up, pressed: false }),
+			}),
+			action: Action.KeyChanged({ key: Controls.Left, pressed: false }),
+		});
 
 		expect(facingUp.playerFacing).toBe(PlayerFacings.Up);
 		expect(facingUpLeft.playerFacing).toBe(PlayerFacings.UpLeft);
@@ -247,26 +256,26 @@ describe("UpdateSystemService", () => {
 			playerFacing: PlayerFacings.Up,
 		};
 
-		const opened = updateSystem.update(
-			world,
-			Action.KeyChanged({ key: Controls.Interact, pressed: true }),
-		);
+		const opened = updateSystem.update({
+			world: world,
+			action: Action.KeyChanged({ key: Controls.Interact, pressed: true }),
+		});
 		expect(opened.openedChests.has(chest)).toBe(true);
 
-		const closed = updateSystem.update(
-			opened,
-			Action.KeyChanged({ key: Controls.Interact, pressed: true }),
-		);
+		const closed = updateSystem.update({
+			world: opened,
+			action: Action.KeyChanged({ key: Controls.Interact, pressed: true }),
+		});
 		expect(closed.openedChests.has(chest)).toBe(false);
 
-		const wrongFacing = updateSystem.update(
-			{ ...world, playerFacing: PlayerFacings.Down },
-			Action.KeyChanged({ key: Controls.Interact, pressed: true }),
-		);
+		const wrongFacing = updateSystem.update({
+			world: { ...world, playerFacing: PlayerFacings.Down },
+			action: Action.KeyChanged({ key: Controls.Interact, pressed: true }),
+		});
 		expect(wrongFacing.openedChests.has(chest)).toBe(false);
 
-		const tooFar = updateSystem.update(
-			{
+		const tooFar = updateSystem.update({
+			world: {
 				...world,
 				positions: new Map(world.positions).set(
 					playerEntity,
@@ -276,8 +285,8 @@ describe("UpdateSystemService", () => {
 					}),
 				),
 			},
-			Action.KeyChanged({ key: Controls.Interact, pressed: true }),
-		);
+			action: Action.KeyChanged({ key: Controls.Interact, pressed: true }),
+		});
 		expect(tooFar.openedChests.has(chest)).toBe(false);
 	});
 
@@ -321,25 +330,26 @@ describe("UpdateSystemService", () => {
 			playerFacing: PlayerFacings.Up,
 		};
 
-		const reading = updateSystem.update(
-			world,
-			Action.KeyChanged({ key: Controls.Interact, pressed: true }),
-		);
+		const reading = updateSystem.update({
+			world: world,
+			action: Action.KeyChanged({ key: Controls.Interact, pressed: true }),
+		});
 		expect(reading.readingSign).toBe(sign);
 
-		const dismissed = updateSystem.update(
-			reading,
-			Action.KeyChanged({ key: Controls.Interact, pressed: true }),
-		);
+		const dismissed = updateSystem.update({
+			world: reading,
+			action: Action.KeyChanged({ key: Controls.Interact, pressed: true }),
+		});
 		expect(dismissed.readingSign).toBeNull();
 		expect(
-			updateSystem.update(reading, Action.SignDismissed()).readingSign,
+			updateSystem.update({ world: reading, action: Action.SignDismissed() })
+				.readingSign,
 		).toBeNull();
 
-		const wrongFacing = updateSystem.update(
-			{ ...world, playerFacing: PlayerFacings.Down },
-			Action.KeyChanged({ key: Controls.Interact, pressed: true }),
-		);
+		const wrongFacing = updateSystem.update({
+			world: { ...world, playerFacing: PlayerFacings.Down },
+			action: Action.KeyChanged({ key: Controls.Interact, pressed: true }),
+		});
 		expect(wrongFacing.readingSign).toBeNull();
 	});
 
@@ -372,10 +382,10 @@ describe("UpdateSystemService", () => {
 				]),
 			};
 
-			const grabbed = updateSystem.update(
-				world,
-				Action.KeyChanged({ key: Controls.Grab, pressed: true }),
-			);
+			const grabbed = updateSystem.update({
+				world: world,
+				action: Action.KeyChanged({ key: Controls.Grab, pressed: true }),
+			});
 
 			expect(grabbed.grabbed).toBe(entity);
 		}
@@ -384,10 +394,10 @@ describe("UpdateSystemService", () => {
 	test("releases a grabbed crate when the player jumps", () => {
 		const world = { ...initialWorld, grabbed: crateEntities[0] };
 
-		const result = updateSystem.update(
-			world,
-			Action.KeyChanged({ key: Controls.Jump, pressed: true }),
-		);
+		const result = updateSystem.update({
+			world: world,
+			action: Action.KeyChanged({ key: Controls.Jump, pressed: true }),
+		});
 
 		expect(result.grabbed).toBeNull();
 		expect(result.elevations.get(playerEntity)?.velocity).toBe(jumpSpeed);
@@ -403,10 +413,10 @@ describe("UpdateSystemService", () => {
 			grabbed: crateEntity,
 		};
 
-		const result = updateSystem.update(
-			world,
-			Action.KeyChanged({ key: Controls.Jump, pressed: true }),
-		);
+		const result = updateSystem.update({
+			world: world,
+			action: Action.KeyChanged({ key: Controls.Jump, pressed: true }),
+		});
 
 		expect(result).toBe(world);
 		expect(result.grabbed).toBe(crateEntity);
@@ -440,19 +450,22 @@ describe("UpdateSystemService", () => {
 			grabbed: crateEntity,
 		});
 
-		const jumped = updateSystem.update(
-			world,
-			Action.KeyChanged({ key: Controls.Jump, pressed: true }),
-		);
-		const firstFrame = updateSystem.update(jumped, Action.Tick({ time: 1050 }));
-		const secondFrame = updateSystem.update(
-			firstFrame,
-			Action.Tick({ time: 1100 }),
-		);
-		const thirdFrame = updateSystem.update(
-			secondFrame,
-			Action.Tick({ time: 1150 }),
-		);
+		const jumped = updateSystem.update({
+			world: world,
+			action: Action.KeyChanged({ key: Controls.Jump, pressed: true }),
+		});
+		const firstFrame = updateSystem.update({
+			world: jumped,
+			action: Action.Tick({ time: 1050 }),
+		});
+		const secondFrame = updateSystem.update({
+			world: firstFrame,
+			action: Action.Tick({ time: 1100 }),
+		});
+		const thirdFrame = updateSystem.update({
+			world: secondFrame,
+			action: Action.Tick({ time: 1150 }),
+		});
 
 		expect(thirdFrame.grabbed).toBeNull();
 		expect(thirdFrame.positions.get(playerEntity)?.x).toBe(312.25);
@@ -468,15 +481,18 @@ describe("UpdateSystemService", () => {
 			lastFrame: 1000,
 		};
 
-		const editing = updateSystem.update(playing, Action.EditorToggled());
-		const afterKey = updateSystem.update(
-			editing,
-			Action.KeyChanged({ key: Controls.Right, pressed: true }),
-		);
-		const afterTick = updateSystem.update(
-			afterKey,
-			Action.Tick({ time: 1050 }),
-		);
+		const editing = updateSystem.update({
+			world: playing,
+			action: Action.EditorToggled(),
+		});
+		const afterKey = updateSystem.update({
+			world: editing,
+			action: Action.KeyChanged({ key: Controls.Right, pressed: true }),
+		});
+		const afterTick = updateSystem.update({
+			world: afterKey,
+			action: Action.Tick({ time: 1050 }),
+		});
 
 		expect(editing.editor.open).toBe(true);
 		expect(editing.pressed.size).toBe(0);
@@ -496,10 +512,13 @@ describe("UpdateSystemService", () => {
 		expect(originalPosition).toBeDefined();
 		if (playerPosition === undefined || originalPosition === undefined) return;
 
-		const editing = updateSystem.update(initialWorld, Action.EditorToggled());
-		const begun = updateSystem.update(
-			editing,
-			Action.EditorEditSessionBegan({
+		const editing = updateSystem.update({
+			world: initialWorld,
+			action: Action.EditorToggled(),
+		});
+		const begun = updateSystem.update({
+			world: editing,
+			action: Action.EditorEditSessionBegan({
 				operation: {
 					kind: "move",
 					entity,
@@ -508,21 +527,24 @@ describe("UpdateSystemService", () => {
 					position: originalPosition,
 				},
 			}),
-		);
-		const moved = updateSystem.update(
-			begun,
-			Action.EditorEditSessionPreviewed({
+		});
+		const moved = updateSystem.update({
+			world: begun,
+			action: Action.EditorEditSessionPreviewed({
 				preview: { kind: "move", position: playerPosition },
 			}),
-		);
-		const finished = updateSystem.update(
-			moved,
-			Action.EditorEditSessionCommitted(),
-		);
+		});
+		const finished = updateSystem.update({
+			world: moved,
+			action: Action.EditorEditSessionCommitted(),
+		});
 
 		expect(finished.editor.invalidPlacement).toBeNull();
 		expect(finished.positions.get(entity)).toEqual(playerPosition);
-		const playing = updateSystem.update(finished, Action.EditorToggled());
+		const playing = updateSystem.update({
+			world: finished,
+			action: Action.EditorToggled(),
+		});
 		const relocatedPlayer = playing.positions.get(playerEntity);
 		expect(playing.editor.open).toBe(false);
 		expect(relocatedPlayer).toBeDefined();
@@ -533,7 +555,7 @@ describe("UpdateSystemService", () => {
 		).toBe(true);
 	});
 
-	test("updates the dead-zone camera after movement reaches a view edge", () => {
+	test("moves the player when a tick reaches the update interface", () => {
 		const positions = new Map([
 			[playerEntity, Position.make({ x: 1200, y: 320 })],
 		]);
@@ -549,46 +571,54 @@ describe("UpdateSystemService", () => {
 			lastFrame: 1000,
 		};
 
-		const moved = updateSystem.update(world, Action.Tick({ time: 1050 }));
+		const moved = updateSystem.update({
+			world: world,
+			action: Action.Tick({ time: 1050 }),
+		});
 
 		expect(moved.positions.get(playerEntity)?.x).toBe(1212.25);
-		expect(moved.gameCamera.x).toBe(-152.25);
 	});
 
 	test("adds, resizes, moves, and deletes editor objects", () => {
-		const editing = updateSystem.update(initialWorld, Action.EditorToggled());
-		const added = updateSystem.update(
-			editing,
-			Action.EditorItemAdded({
+		const editing = updateSystem.update({
+			world: initialWorld,
+			action: Action.EditorToggled(),
+		});
+		const added = updateSystem.update({
+			world: editing,
+			action: Action.EditorItemAdded({
 				kind: EditorItemKinds.Wall,
 				position: Position.make({ x: 520, y: 260 }),
 			}),
-		);
+		});
 		const entity = added.editor.selected;
 		expect(entity).not.toBeNull();
 		expect(entity).not.toBe("floor");
 		if (entity === null || entity === "floor") return;
 
 		expect(added.obstacles.get(entity)?.kind).toBe(ObstacleKinds.Wall);
-		const resized = updateSystem.update(
-			added,
-			Action.EditorEntityResized({
+		const resized = updateSystem.update({
+			world: added,
+			action: Action.EditorEntityResized({
 				entity,
 				body: Body.make({ width: 8, depth: 90 }),
 			}),
-		);
+		});
 		expect(resized.bodies.get(entity)?.width).toBe(minimumEntityExtent);
 
-		const moved = updateSystem.update(
-			resized,
-			Action.EditorEntityMoved({
+		const moved = updateSystem.update({
+			world: resized,
+			action: Action.EditorEntityMoved({
 				entity,
 				position: Position.make({ x: 710, y: 410 }),
 			}),
-		);
+		});
 		expect(moved.positions.get(entity)).toEqual({ x: 710, y: 410 });
 
-		const deleted = updateSystem.update(moved, Action.EditorDeleteSelected());
+		const deleted = updateSystem.update({
+			world: moved,
+			action: Action.EditorDeleteSelected(),
+		});
 		expect(deleted.positions.has(entity)).toBe(false);
 		expect(deleted.bodies.has(entity)).toBe(false);
 		expect(deleted.obstacles.has(entity)).toBe(false);
@@ -596,14 +626,17 @@ describe("UpdateSystemService", () => {
 	});
 
 	test("adds chests and signs in the design studio", () => {
-		const editing = updateSystem.update(initialWorld, Action.EditorToggled());
-		const added = updateSystem.update(
-			editing,
-			Action.EditorItemAdded({
+		const editing = updateSystem.update({
+			world: initialWorld,
+			action: Action.EditorToggled(),
+		});
+		const added = updateSystem.update({
+			world: editing,
+			action: Action.EditorItemAdded({
 				kind: EditorItemKinds.Chest,
 				position: Position.make({ x: 100, y: 250 }),
 			}),
-		);
+		});
 		const chest = added.editor.selected;
 		expect(chest).not.toBeNull();
 		expect(chest).not.toBe("floor");
@@ -612,29 +645,29 @@ describe("UpdateSystemService", () => {
 		expect(added.obstacles.get(chest)?.kind).toBe(ObstacleKinds.Chest);
 		expect(added.openedChests.has(chest)).toBe(false);
 
-		const withSign = updateSystem.update(
-			added,
-			Action.EditorItemAdded({
+		const withSign = updateSystem.update({
+			world: added,
+			action: Action.EditorItemAdded({
 				kind: EditorItemKinds.Sign,
 				position: Position.make({ x: 100, y: 400 }),
 			}),
-		);
+		});
 		const sign = withSign.editor.selected;
 		expect(sign).not.toBeNull();
 		expect(sign).not.toBe("floor");
 		if (sign === null || sign === "floor") return;
 		expect(withSign.decorations.get(sign)?.kind).toBe(DecorationKinds.Sign);
 
-		const withContent = updateSystem.update(
-			withSign,
-			Action.EditorSignContentChanged({
+		const withContent = updateSystem.update({
+			world: withSign,
+			action: Action.EditorSignContentChanged({
 				entity: sign,
 				content: {
 					title: "Wayfinder",
 					body: "Follow the lanterns to the village.",
 				},
 			}),
-		);
+		});
 		expect(withContent.signContents.get(sign)).toEqual({
 			title: "Wayfinder",
 			body: "Follow the lanterns to the village.",
@@ -652,29 +685,29 @@ describe("UpdateSystemService", () => {
 		};
 
 		for (const kind of Object.values(EditorItemKinds)) {
-			const editing = updateSystem.update(
-				emptyLargeWorld,
-				Action.EditorToggled(),
-			);
-			const added = updateSystem.update(
-				editing,
-				Action.EditorItemAdded({
+			const editing = updateSystem.update({
+				world: emptyLargeWorld,
+				action: Action.EditorToggled(),
+			});
+			const added = updateSystem.update({
+				world: editing,
+				action: Action.EditorItemAdded({
 					kind,
 					position: Position.make({ x: 4000, y: 4000 }),
 				}),
-			);
+			});
 			const entity = added.editor.selected;
 			expect(entity).not.toBeNull();
 			expect(entity).not.toBe("floor");
 			if (entity === null || entity === "floor") continue;
 
-			const resized = updateSystem.update(
-				added,
-				Action.EditorEntityResized({
+			const resized = updateSystem.update({
+				world: added,
+				action: Action.EditorEntityResized({
 					entity,
 					body: Body.make({ width: 9000, depth: 9000 }),
 				}),
-			);
+			});
 
 			expect(resized.bodies.get(entity)).toEqual(maximumEditorItemBody(kind));
 		}
@@ -711,14 +744,17 @@ describe("UpdateSystemService", () => {
 				]),
 				decorations: new Map(),
 			};
-			const editing = updateSystem.update(base, Action.EditorToggled());
-			const added = updateSystem.update(
-				editing,
-				Action.EditorItemAdded({
+			const editing = updateSystem.update({
+				world: base,
+				action: Action.EditorToggled(),
+			});
+			const added = updateSystem.update({
+				world: editing,
+				action: Action.EditorItemAdded({
 					kind,
 					position: Position.make({ x: 500, y: 400 }),
 				}),
-			);
+			});
 			const entity = added.editor.selected;
 			expect(entity).not.toBeNull();
 			expect(entity).not.toBe("floor");
@@ -727,13 +763,13 @@ describe("UpdateSystemService", () => {
 			expect(added.editor.invalidPlacement).toBeNull();
 			expect(added.elevations.get(entity)?.z).toBe(platformHeight);
 
-			const occupied = updateSystem.update(
-				added,
-				Action.EditorItemAdded({
+			const occupied = updateSystem.update({
+				world: added,
+				action: Action.EditorItemAdded({
 					kind,
 					position: Position.make({ x: 500, y: 400 }),
 				}),
-			);
+			});
 			if (kind === EditorItemKinds.Crate) {
 				const stackedEntity = occupied.editor.selected;
 				expect(stackedEntity).not.toBeNull();
@@ -805,10 +841,13 @@ describe("UpdateSystemService", () => {
 				],
 			]),
 		};
-		const editing = updateSystem.update(base, Action.EditorToggled());
-		const moved = updateSystem.update(
-			editing,
-			Action.EditorEditSessionBegan({
+		const editing = updateSystem.update({
+			world: base,
+			action: Action.EditorToggled(),
+		});
+		const moved = updateSystem.update({
+			world: editing,
+			action: Action.EditorEditSessionBegan({
 				operation: {
 					kind: "move",
 					entity: platformEntity,
@@ -817,31 +856,31 @@ describe("UpdateSystemService", () => {
 					originalBody: platformBody,
 				},
 			}),
-		);
-		const rejectedMove = updateSystem.update(
-			moved,
-			Action.EditorEditSessionCommitted(),
-		);
+		});
+		const rejectedMove = updateSystem.update({
+			world: moved,
+			action: Action.EditorEditSessionCommitted(),
+		});
 		expect(rejectedMove.editor.editSession?.validity).toEqual({
 			kind: "invalid",
 			reason: "occupied-support",
 		});
 
-		const restored = updateSystem.update(
-			rejectedMove,
-			Action.EditorEditSessionCancelled(),
-		);
+		const restored = updateSystem.update({
+			world: rejectedMove,
+			action: Action.EditorEditSessionCancelled(),
+		});
 		expect(restored.positions.get(platformEntity)).toEqual(platformPosition);
 		expect(restored.elevations.get(plantEntity)?.z).toBe(platformHeight);
 
-		const selected = updateSystem.update(
-			restored,
-			Action.EditorSelectionChanged({ selection: platformEntity }),
-		);
-		const rejectedDelete = updateSystem.update(
-			selected,
-			Action.EditorDeleteSelected(),
-		);
+		const selected = updateSystem.update({
+			world: restored,
+			action: Action.EditorSelectionChanged({ selection: platformEntity }),
+		});
+		const rejectedDelete = updateSystem.update({
+			world: selected,
+			action: Action.EditorDeleteSelected(),
+		});
 		expect(rejectedDelete.positions.has(platformEntity)).toBe(true);
 		expect(rejectedDelete.editor.invalidPlacement?.kind).toBe("entity");
 	});
@@ -896,14 +935,17 @@ describe("UpdateSystemService", () => {
 				],
 			]),
 		};
-		const editing = updateSystem.update(world, Action.EditorToggled());
-		const resized = updateSystem.update(
-			editing,
-			Action.EditorEntityHeightChanged({
+		const editing = updateSystem.update({
+			world: world,
+			action: Action.EditorToggled(),
+		});
+		const resized = updateSystem.update({
+			world: editing,
+			action: Action.EditorEntityHeightChanged({
 				entity: platformEntity,
 				height: 1000,
 			}),
-		);
+		});
 		const maximum = editorItemHeightLimits(EditorItemKinds.Platform).maximum;
 
 		expect(resized.obstacles.get(platformEntity)?.height).toBe(maximum);
@@ -917,10 +959,13 @@ describe("UpdateSystemService", () => {
 		expect(originalPosition).toBeDefined();
 		if (originalPosition === undefined) return;
 
-		const editing = updateSystem.update(initialWorld, Action.EditorToggled());
-		const moved = updateSystem.update(
-			editing,
-			Action.EditorEditSessionBegan({
+		const editing = updateSystem.update({
+			world: initialWorld,
+			action: Action.EditorToggled(),
+		});
+		const moved = updateSystem.update({
+			world: editing,
+			action: Action.EditorEditSessionBegan({
 				operation: {
 					kind: "move",
 					entity,
@@ -929,17 +974,17 @@ describe("UpdateSystemService", () => {
 					originalBody: crateBody,
 				},
 			}),
-		);
-		const invalidPreview = updateSystem.update(
-			moved,
-			Action.EditorEditSessionPreviewed({
+		});
+		const invalidPreview = updateSystem.update({
+			world: moved,
+			action: Action.EditorEditSessionPreviewed({
 				preview: { kind: "move", position: otherPosition },
 			}),
-		);
-		const invalid = updateSystem.update(
-			invalidPreview,
-			Action.EditorEditSessionCommitted(),
-		);
+		});
+		const invalid = updateSystem.update({
+			world: invalidPreview,
+			action: Action.EditorEditSessionCommitted(),
+		});
 
 		expect(editSessionView(invalidPreview).positions.get(entity)).toEqual(
 			otherPosition,
@@ -950,10 +995,10 @@ describe("UpdateSystemService", () => {
 			kind: "invalid",
 			reason: "overlaps-editor-item",
 		});
-		const restored = updateSystem.update(
-			invalid,
-			Action.EditorEditSessionCancelled(),
-		);
+		const restored = updateSystem.update({
+			world: invalid,
+			action: Action.EditorEditSessionCancelled(),
+		});
 		expect(restored.positions.get(entity)).toEqual(originalPosition);
 		expect(restored.editor.invalidPlacement).toBeNull();
 	});
@@ -963,8 +1008,8 @@ describe("UpdateSystemService", () => {
 		const otherEntity = crateEntities[1];
 		const originalPosition = Position.make({ x: 300, y: 300 });
 		const originalBody = Body.make({ width: 40, depth: 40 });
-		const editing = updateSystem.update(
-			makeWorld({
+		const editing = updateSystem.update({
+			world: makeWorld({
 				positions: new Map([
 					[entity, originalPosition],
 					[otherEntity, Position.make({ x: 400, y: 300 })],
@@ -992,11 +1037,11 @@ describe("UpdateSystemService", () => {
 				pressed: new Set(),
 				grabbed: null,
 			}),
-			Action.EditorToggled(),
-		);
-		const begun = updateSystem.update(
-			editing,
-			Action.EditorEditSessionBegan({
+			action: Action.EditorToggled(),
+		});
+		const begun = updateSystem.update({
+			world: editing,
+			action: Action.EditorEditSessionBegan({
 				operation: {
 					kind: "resize",
 					entity,
@@ -1006,31 +1051,31 @@ describe("UpdateSystemService", () => {
 					originalBody,
 				},
 			}),
-		);
-		const validIntermediate = updateSystem.update(
-			begun,
-			Action.EditorEditSessionPreviewed({
+		});
+		const validIntermediate = updateSystem.update({
+			world: begun,
+			action: Action.EditorEditSessionPreviewed({
 				preview: {
 					kind: "resize",
 					position: Position.make({ x: 320, y: 300 }),
 					body: Body.make({ width: 80, depth: 40 }),
 				},
 			}),
-		);
-		const invalidPreview = updateSystem.update(
-			validIntermediate,
-			Action.EditorEditSessionPreviewed({
+		});
+		const invalidPreview = updateSystem.update({
+			world: validIntermediate,
+			action: Action.EditorEditSessionPreviewed({
 				preview: {
 					kind: "resize",
 					position: Position.make({ x: 340, y: 300 }),
 					body: Body.make({ width: 120, depth: 40 }),
 				},
 			}),
-		);
-		const invalid = updateSystem.update(
-			invalidPreview,
-			Action.EditorEditSessionCommitted(),
-		);
+		});
+		const invalid = updateSystem.update({
+			world: invalidPreview,
+			action: Action.EditorEditSessionCommitted(),
+		});
 
 		expect(editSessionView(invalidPreview).positions.get(entity)).toEqual({
 			x: 340,
@@ -1042,50 +1087,56 @@ describe("UpdateSystemService", () => {
 		});
 		expect(invalidPreview.editor.invalidPlacement).toBeNull();
 		expect(invalid.editor.editSession?.validity.kind).toBe("invalid");
-		const restored = updateSystem.update(
-			invalid,
-			Action.EditorEditSessionCancelled(),
-		);
+		const restored = updateSystem.update({
+			world: invalid,
+			action: Action.EditorEditSessionCancelled(),
+		});
 		expect(restored.positions.get(entity)).toEqual(originalPosition);
 		expect(restored.bodies.get(entity)).toEqual(originalBody);
 		expect(restored.editor.invalidPlacement).toBeNull();
 	});
 
 	test("does not add an out-of-bounds item", () => {
-		const editing = updateSystem.update(initialWorld, Action.EditorToggled());
-		const result = updateSystem.update(
-			editing,
-			Action.EditorItemAdded({
+		const editing = updateSystem.update({
+			world: initialWorld,
+			action: Action.EditorToggled(),
+		});
+		const result = updateSystem.update({
+			world: editing,
+			action: Action.EditorItemAdded({
 				kind: EditorItemKinds.Plant,
 				position: Position.make({ x: 10, y: 10 }),
 			}),
-		);
+		});
 
 		expect(result.positions.size).toBe(editing.positions.size);
 		expect(result.editor.invalidPlacement).toEqual({ kind: "new" });
 	});
 
 	test("expands left and up without translating authored content or compensating the camera", () => {
-		const editing = updateSystem.update(initialWorld, Action.EditorToggled());
+		const editing = updateSystem.update({
+			world: initialWorld,
+			action: Action.EditorToggled(),
+		});
 		const entity = crateEntities[0];
 		const originalPosition = editing.positions.get(entity);
 		const originalTiles = editing.floorTiles;
 		expect(originalPosition).toBeDefined();
 		if (originalPosition === undefined) return;
 		const floorOrigin = Position.make({ x: -100, y: -40 });
-		const begun = updateSystem.update(
-			editing,
-			Action.EditorEditSessionBegan({
+		const begun = updateSystem.update({
+			world: editing,
+			action: Action.EditorEditSessionBegan({
 				operation: {
 					kind: "resize-floor",
 					floorPlan: editing.floorPlan,
 					floorOrigin: editing.floorOrigin,
 				},
 			}),
-		);
-		const preview = updateSystem.update(
-			begun,
-			Action.EditorEditSessionPreviewed({
+		});
+		const preview = updateSystem.update({
+			world: begun,
+			action: Action.EditorEditSessionPreviewed({
 				preview: {
 					kind: "resize-floor",
 					floorPlan: Body.make({
@@ -1095,7 +1146,7 @@ describe("UpdateSystemService", () => {
 					floorOrigin,
 				},
 			}),
-		);
+		});
 
 		const view = editSessionView(preview);
 		expect({
@@ -1120,10 +1171,10 @@ describe("UpdateSystemService", () => {
 				(tile) => tile.column < 0 || tile.row < 0,
 			),
 		).toBe(true);
-		const finished = updateSystem.update(
-			preview,
-			Action.EditorEditSessionCommitted(),
-		);
+		const finished = updateSystem.update({
+			world: preview,
+			action: Action.EditorEditSessionCommitted(),
+		});
 		expect(finished.floorPlan).toEqual({
 			width: editing.floorPlan.width + 100,
 			depth: editing.floorPlan.depth + 40,
@@ -1133,34 +1184,40 @@ describe("UpdateSystemService", () => {
 	});
 
 	test("does not impose an arbitrary maximum floor extent", () => {
-		const editing = updateSystem.update(initialWorld, Action.EditorToggled());
-		const expanded = updateSystem.update(
-			editing,
-			Action.EditorFloorResized({
+		const editing = updateSystem.update({
+			world: initialWorld,
+			action: Action.EditorToggled(),
+		});
+		const expanded = updateSystem.update({
+			world: editing,
+			action: Action.EditorFloorResized({
 				floorPlan: Body.make({ width: 8_100, depth: 8_100 }),
 			}),
-		);
+		});
 
 		expect(expanded.floorPlan).toEqual({ width: 8_100, depth: 8_100 });
 	});
 
 	test("rejects a floor resize that excludes objects after release", () => {
-		const editing = updateSystem.update(initialWorld, Action.EditorToggled());
+		const editing = updateSystem.update({
+			world: initialWorld,
+			action: Action.EditorToggled(),
+		});
 		const floorOrigin = Position.make({ x: 100, y: 60 });
 
-		const begun = updateSystem.update(
-			editing,
-			Action.EditorEditSessionBegan({
+		const begun = updateSystem.update({
+			world: editing,
+			action: Action.EditorEditSessionBegan({
 				operation: {
 					kind: "resize-floor",
 					floorPlan: editing.floorPlan,
 					floorOrigin: editing.floorOrigin,
 				},
 			}),
-		);
-		const preview = updateSystem.update(
-			begun,
-			Action.EditorEditSessionPreviewed({
+		});
+		const preview = updateSystem.update({
+			world: begun,
+			action: Action.EditorEditSessionPreviewed({
 				preview: {
 					kind: "resize-floor",
 					floorPlan: Body.make({
@@ -1170,11 +1227,11 @@ describe("UpdateSystemService", () => {
 					floorOrigin,
 				},
 			}),
-		);
-		const invalid = updateSystem.update(
-			preview,
-			Action.EditorEditSessionCommitted(),
-		);
+		});
+		const invalid = updateSystem.update({
+			world: preview,
+			action: Action.EditorEditSessionCommitted(),
+		});
 
 		expect(editSessionView(preview).floorPlan).toEqual({
 			width: minimumFloorWidth,
@@ -1185,10 +1242,10 @@ describe("UpdateSystemService", () => {
 			kind: "invalid",
 			reason: "floor-excludes-editor-item",
 		});
-		const restored = updateSystem.update(
-			invalid,
-			Action.EditorEditSessionCancelled(),
-		);
+		const restored = updateSystem.update({
+			world: invalid,
+			action: Action.EditorEditSessionCancelled(),
+		});
 		expect(restored.floorPlan).toEqual(editing.floorPlan);
 		expect(restored.positions.get(playerEntity)).toEqual(
 			editing.positions.get(playerEntity),

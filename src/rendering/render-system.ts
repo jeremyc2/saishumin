@@ -1,59 +1,68 @@
 import { Context, Effect, Layer } from "effect";
 import { html, render } from "lit-html";
 import type { Action } from "../app/action";
-import type { EditSessionPresentation } from "../design-studio/edit-session/edit-session";
-import { makeDesignStudioInteractionRuntime } from "../design-studio/interaction/runtime";
-import { makeDesignStudioView } from "../design-studio/view/view";
+import { EditSessionStatus } from "../design-studio/edit-session/edit-session";
+import {
+	type DesignStudioInteraction,
+	makeDesignStudioInteraction,
+} from "../design-studio/interaction/interaction";
+import {
+	type DesignStudioView,
+	makeDesignStudioView,
+} from "../design-studio/view/view";
 import { playerEntity, type World } from "../world/world";
 import { gameSceneTemplate } from "./internal/game-scene";
 
 type Dispatch = (action: Action) => void;
 
+type RenderInput = {
+	readonly world: World;
+	readonly previewWorld: World;
+	readonly editSessionStatus: EditSessionStatus;
+	readonly dispatch: Dispatch;
+};
+
 export class RenderSystem extends Context.Service<
 	RenderSystem,
 	{
-		readonly render: (
-			authoredWorld: World,
-			viewWorld: World,
-			presentation: EditSessionPresentation,
-			dispatch: Dispatch,
-		) => void;
+		readonly render: (input: RenderInput) => void;
 	}
 >()("saishumin/rendering/render-system/RenderSystem") {
 	static readonly layer = Layer.effect(this)(
 		Effect.gen(function* () {
 			let currentWorld: World | undefined;
-			let currentViewWorld: World | undefined;
-			let currentPresentation: EditSessionPresentation | undefined;
+			let currentPreviewWorld: World | undefined;
+			let currentEditSessionStatus: EditSessionStatus | undefined;
 			let currentDispatch: Dispatch | undefined;
-			let designStudioView:
-				| import("../design-studio/view/view").DesignStudioView
-				| undefined;
+			let designStudioView: DesignStudioView | undefined;
+			let interaction: DesignStudioInteraction | undefined;
 
-			const renderWorld = (
-				authoredWorld: World,
-				viewWorld: World,
-				presentation: EditSessionPresentation,
-				dispatch: Dispatch,
-			): void => {
-				if (designStudioView === undefined) return;
-				currentWorld = authoredWorld;
-				currentViewWorld = viewWorld;
-				currentPresentation = presentation;
+			const renderWorld = ({
+				world,
+				previewWorld,
+				editSessionStatus,
+				dispatch,
+			}: RenderInput): void => {
+				if (designStudioView === undefined || interaction === undefined) return;
+				const activeInteraction = interaction;
+				const view = designStudioView;
+				currentWorld = world;
+				currentPreviewWorld = previewWorld;
+				currentEditSessionStatus = editSessionStatus;
 				currentDispatch = dispatch;
-				interactionRuntime.update(authoredWorld, dispatch);
+				activeInteraction.update(world, dispatch);
 				if (
-					viewWorld.positions.get(playerEntity) === undefined ||
-					viewWorld.elevations.get(playerEntity) === undefined
+					previewWorld.positions.get(playerEntity) === undefined ||
+					previewWorld.elevations.get(playerEntity) === undefined
 				)
 					return;
 				render(
 					gameSceneTemplate({
-						world: viewWorld,
-						presentation,
+						world: previewWorld,
+						editSessionStatus,
 						dispatch,
-						interactionRuntime,
-						designStudioView,
+						interaction: activeInteraction,
+						designStudioView: view,
 						onRootPointerDown: (event) => {
 							const target = event.target;
 							if (
@@ -61,7 +70,7 @@ export class RenderSystem extends Context.Service<
 								target.closest("[data-palette-item]") !== null
 							)
 								return;
-							interactionRuntime.dismissPalettePopover();
+							activeInteraction.dismissPalettePopover();
 						},
 					}),
 					document.body,
@@ -73,13 +82,18 @@ export class RenderSystem extends Context.Service<
 				if (world === undefined || designStudioView === undefined) return;
 				const host = document.querySelector("#editor-create-preview-host");
 				if (!(host instanceof HTMLElement)) return;
-				const preview = interactionRuntime.createPreview();
+				const preview = interaction?.createPreview();
 				render(
-					preview === null
+					preview == null
 						? html``
 						: designStudioView.createPreviewTemplate(
 								world,
-								currentPresentation?.invalidPreview === true,
+								EditSessionStatus.$is("InvalidPreview")(
+									currentEditSessionStatus,
+								) ||
+									EditSessionStatus.$is("InvalidReleased")(
+										currentEditSessionStatus,
+									),
 							),
 					host,
 				);
@@ -87,22 +101,22 @@ export class RenderSystem extends Context.Service<
 			const refreshLocalState = (): void => {
 				if (
 					currentWorld !== undefined &&
-					currentViewWorld !== undefined &&
-					currentPresentation !== undefined &&
+					currentPreviewWorld !== undefined &&
+					currentEditSessionStatus !== undefined &&
 					currentDispatch !== undefined
 				)
-					renderWorld(
-						currentWorld,
-						currentViewWorld,
-						currentPresentation,
-						currentDispatch,
-					);
+					renderWorld({
+						world: currentWorld,
+						previewWorld: currentPreviewWorld,
+						editSessionStatus: currentEditSessionStatus,
+						dispatch: currentDispatch,
+					});
 			};
-			const interactionRuntime = yield* makeDesignStudioInteractionRuntime({
+			interaction = yield* makeDesignStudioInteraction({
 				refresh: refreshLocalState,
 				refreshPreview: refreshCreatePreview,
 			});
-			designStudioView = makeDesignStudioView(interactionRuntime);
+			designStudioView = makeDesignStudioView(interaction);
 			return { render: renderWorld };
 		}),
 	);

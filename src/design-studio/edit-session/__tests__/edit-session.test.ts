@@ -7,6 +7,8 @@ import {
 	beginEditSession,
 	cancelEditSession,
 	commitEditSession,
+	EditSessionStatus,
+	editSessionStatus,
 	editSessionView,
 	previewEditSession,
 } from "../edit-session";
@@ -30,6 +32,9 @@ describe("Edit Session", () => {
 		);
 
 		expect(preview.editor.editSession).not.toBeNull();
+		expect(EditSessionStatus.$is("Active")(editSessionStatus(preview))).toBe(
+			true,
+		);
 		expect(preview.positions.size).toBe(editingWorld.positions.size);
 		expect(editSessionView(preview).positions.size).toBe(
 			editingWorld.positions.size + 1,
@@ -48,6 +53,10 @@ describe("Edit Session", () => {
 		});
 
 		const released = commitEditSession(invalid);
+		const invalidStatus = editSessionStatus(invalid);
+		const releasedStatus = editSessionStatus(released);
+		expect(EditSessionStatus.$is("InvalidPreview")(invalidStatus)).toBe(true);
+		expect(EditSessionStatus.$is("InvalidReleased")(releasedStatus)).toBe(true);
 		expect(released.editor.editSession?.validity.kind).toBe("invalid");
 		expect(released.editor.editSession?.phase).toBe("invalid-released");
 		expect(released.positions).toBe(editingWorld.positions);
@@ -61,6 +70,9 @@ describe("Edit Session", () => {
 		});
 
 		const cancelled = cancelEditSession(editing);
+		expect(
+			EditSessionStatus.$is("Inactive")(editSessionStatus(cancelled)),
+		).toBe(true);
 		expect(cancelled.editor.editSession).toBeNull();
 		expect(cancelled.positions).toBe(editingWorld.positions);
 	});

@@ -8,6 +8,7 @@
 - For exported functions with multiple inputs, use `dual` only when there is a meaningful primary data value and a real pipeline use case. Otherwise accept one object with named fields; keep implementation-only functions unexported whenever the module seam allows it.
 - Do not introduce an Effect `Context.Service` merely to reduce file size. Add one when it represents a meaningful contextual dependency, lifecycle, or substitutable implementation.
 - Do not use nested ternary operators.
+- Never use `_tag` directly. Every Effect module (e.g. Match, Data, Predicate, Schema, Stream, Request, etc. modules) has `Tagged`/`Tag` variants you can import. That means you will never have to access that property, create/update it, or pattern match on it directly. That's why it is prefixed with an underscore: it is private to the Effect implementation.
 
 ## Agent skills
 

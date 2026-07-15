@@ -48,7 +48,10 @@ import { recoverInvalidPlayerPlacement } from "./player-recovery";
 export class MovementSystemService extends Context.Service<
 	MovementSystemService,
 	{
-		readonly update: (world: World, elapsed: number) => World;
+		readonly update: (input: {
+			readonly world: World;
+			readonly elapsed: number;
+		}) => World;
 	}
 >()(
 	"saishumin/gameplay/movement/internal/movement-runtime/MovementSystemService",
@@ -639,7 +642,7 @@ export class MovementSystemService extends Context.Service<
 			};
 		};
 		return {
-			update: (world, elapsed) =>
+			update: ({ world, elapsed }) =>
 				pipe(
 					updateMovement(
 						world.pushing === null ? world : { ...world, pushing: null },

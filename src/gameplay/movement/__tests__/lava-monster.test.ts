@@ -65,20 +65,20 @@ describe("lava-monster movement through MovementSystemService", () => {
 	test("pursues through clear space, stops at follow distance, and faces its movement", () => {
 		const player = Position.make({ x: 300, y: 300 });
 		const monster = Position.make({ x: 500, y: 300 });
-		const moved = movement.update(
-			worldWith([
+		const moved = movement.update({
+			world: worldWith([
 				[playerEntity, player],
 				[lavaMonsterEntity, monster],
 			]),
-			0.05,
-		);
+			elapsed: 0.05,
+		});
 		expect(moved.positions.get(lavaMonsterEntity)).toEqual({
 			x: monster.x - lavaMonsterSpeed * 0.05,
 			y: monster.y,
 		});
 		expect(moved.lavaMonsterFacing).toBe(PlayerFacings.Left);
-		const near = movement.update(
-			worldWith([
+		const near = movement.update({
+			world: worldWith([
 				[playerEntity, player],
 				[
 					lavaMonsterEntity,
@@ -88,8 +88,8 @@ describe("lava-monster movement through MovementSystemService", () => {
 					}),
 				],
 			]),
-			0.05,
-		);
+			elapsed: 0.05,
+		});
 		expect(near.positions.get(lavaMonsterEntity)?.x).toBe(
 			player.x + lavaMonsterFollowDistance,
 		);
@@ -109,7 +109,7 @@ describe("lava-monster movement through MovementSystemService", () => {
 			new Map([[wall, Body.make({ width: 80, depth: 220 })]]),
 		);
 		for (let frame = 0; frame < 180; frame += 1)
-			routed = movement.update(routed, 0.05);
+			routed = movement.update({ world: routed, elapsed: 0.05 });
 		expect(routed.positions.get(lavaMonsterEntity)?.x).toBeLessThan(350);
 		const barrier = EntityId(896);
 		let trapped = worldWith(
@@ -124,7 +124,7 @@ describe("lava-monster movement through MovementSystemService", () => {
 			new Map([[barrier, Body.make({ width: 80, depth: roomDepth })]]),
 		);
 		for (let frame = 0; frame < 80; frame += 1)
-			trapped = movement.update(trapped, 0.05);
+			trapped = movement.update({ world: trapped, elapsed: 0.05 });
 		expect(trapped.positions.get(lavaMonsterEntity)?.y).not.toBe(300);
 	});
 
@@ -132,8 +132,8 @@ describe("lava-monster movement through MovementSystemService", () => {
 		const obstacle = EntityId(899);
 		const embedded = Position.make({ x: 600, y: 300 });
 		const body = Body.make({ width: 100, depth: 100 });
-		const moved = movement.update(
-			worldWith(
+		const moved = movement.update({
+			world: worldWith(
 				[
 					[playerEntity, Position.make({ x: 300, y: 300 })],
 					[lavaMonsterEntity, embedded],
@@ -147,8 +147,8 @@ describe("lava-monster movement through MovementSystemService", () => {
 				]),
 				new Map([[obstacle, body]]),
 			),
-			0.05,
-		);
+			elapsed: 0.05,
+		});
 		const recovered = moved.positions.get(lavaMonsterEntity);
 		expect(recovered).toBeDefined();
 		if (recovered !== undefined) {
@@ -198,7 +198,7 @@ describe("lava-monster movement through MovementSystemService", () => {
 				),
 		};
 		for (let frame = 0; frame < 180; frame += 1)
-			world = movement.update(world, 0.05);
+			world = movement.update({ world: world, elapsed: 0.05 });
 		expect(world.elevations.get(lavaMonsterEntity)?.z).toBe(platformHeight);
 		const monster = world.positions.get(lavaMonsterEntity);
 		if (monster !== undefined)
@@ -224,7 +224,7 @@ describe("lava-monster movement through MovementSystemService", () => {
 				Elevation.make({ z: 60, velocity: 120 }),
 			),
 		};
-		const moved = movement.update(world, 0.05);
+		const moved = movement.update({ world: world, elapsed: 0.05 });
 		expect(moved.elevations.get(lavaMonsterEntity)).toEqual({
 			z: groundElevation,
 			velocity: stationaryVelocity,
@@ -256,7 +256,7 @@ describe("lava-monster movement through MovementSystemService", () => {
 		};
 		let respawned = false;
 		for (let frame = 0; frame < 4; frame += 1) {
-			world = movement.update(world, 0.05);
+			world = movement.update({ world: world, elapsed: 0.05 });
 			const position = world.positions.get(lavaMonsterEntity);
 			if (
 				position?.x === lavaMonsterSpawnPosition.x &&

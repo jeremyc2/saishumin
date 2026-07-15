@@ -1,3 +1,4 @@
+import { Data } from "effect";
 import { dual } from "effect/Function";
 import type { Pipeable } from "../../pipeable";
 import {
@@ -41,24 +42,26 @@ import {
 	isNewEditorItemPlacementValid,
 } from "./placement";
 
-export type EditSessionPresentation = {
-	readonly active: boolean;
-	readonly invalidPreview: boolean;
-	readonly invalidReleased: boolean;
-	readonly rejectionReason: EditSessionRejectionReason | null;
-};
+export type EditSessionStatus = Data.TaggedEnum<{
+	Inactive: Record<never, never>;
+	Active: Record<never, never>;
+	InvalidPreview: { readonly reason: EditSessionRejectionReason };
+	InvalidReleased: { readonly reason: EditSessionRejectionReason };
+}>;
 
-export const editSessionPresentation = (
-	world: World,
-): EditSessionPresentation => {
+export const EditSessionStatus = Data.taggedEnum<EditSessionStatus>();
+
+export const editSessionStatus = (world: World): EditSessionStatus => {
 	const session = world.editor.editSession;
-	return {
-		active: session !== null,
-		invalidPreview: session?.validity.kind === "invalid",
-		invalidReleased: session?.phase === "invalid-released",
-		rejectionReason:
-			session?.validity.kind === "invalid" ? session.validity.reason : null,
-	};
+	if (session === null) return EditSessionStatus.Inactive();
+	if (session.validity.kind === "valid") return EditSessionStatus.Active();
+	if (session.phase === "invalid-released")
+		return EditSessionStatus.InvalidReleased({
+			reason: session.validity.reason,
+		});
+	return EditSessionStatus.InvalidPreview({
+		reason: session.validity.reason,
+	});
 };
 
 const nextEntityId = (world: World): EntityIdType => {

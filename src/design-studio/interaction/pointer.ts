@@ -1,6 +1,6 @@
 import { dual } from "effect/Function";
 import type { Pipeable } from "../../pipeable";
-import { projectedRectangle } from "../../rendering/geometry/projection";
+import { projectedRectangle } from "../../presentation/geometry/projection";
 import type { Position } from "../../world/components";
 import {
 	entityBaseElevation,
@@ -293,10 +293,10 @@ export const contentEnvelope = (world: World): ScreenBounds => {
 };
 
 export const contentEnvelopeIncludingPreview = ({
-	authoredWorld,
+	world,
 	previewWorld,
 }: {
-	readonly authoredWorld: World;
+	readonly world: World;
 	readonly previewWorld: World;
 }): ScreenBounds =>
-	unionBounds(contentEnvelope(authoredWorld), contentEnvelope(previewWorld));
+	unionBounds(contentEnvelope(world), contentEnvelope(previewWorld));

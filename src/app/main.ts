@@ -2,7 +2,7 @@ import { Effect, Layer, ManagedRuntime, Queue, Ref, Stream } from "effect";
 import { run } from "otaku-hmr";
 import { State } from "otaku-state";
 import {
-	editSessionPresentation,
+	editSessionStatus,
 	editSessionView,
 } from "../design-studio/edit-session/edit-session";
 import { MovementSystemService } from "../gameplay/movement/movement-system";
@@ -12,6 +12,7 @@ import { initialWorld } from "../world/initial-world";
 import { reconcileWorld } from "../world/reconcile-world";
 import { Action } from "./action";
 import { type Control, Controls, controlForKey } from "./control";
+import { completeWorldUpdate } from "./world-update";
 
 document.body.className =
 	"m-0 overflow-hidden bg-[#14212a] font-sans scheme-dark";
@@ -86,12 +87,12 @@ const program = Effect.gen(function* () {
 	};
 
 	const initial = yield* Ref.get(world);
-	renderSystem.render(
-		initial,
-		editSessionView(initial),
-		editSessionPresentation(initial),
+	renderSystem.render({
+		world: initial,
+		previewWorld: editSessionView(initial),
+		editSessionStatus: editSessionStatus(initial),
 		dispatch,
-	);
+	});
 	yield* Effect.acquireUseRelease(
 		Effect.sync(() => {
 			window.addEventListener("keydown", onKeyDown);
@@ -104,7 +105,12 @@ const program = Effect.gen(function* () {
 				Stream.runForEach((action) =>
 					Effect.gen(function* () {
 						const current = yield* Ref.get(world);
-						const next = updateSystem.update(current, action);
+						const updated = updateSystem.update({ world: current, action });
+						const next = completeWorldUpdate({
+							previous: current,
+							updated,
+							action,
+						});
 						yield* Ref.set(world, next);
 						if (
 							next.positions !== current.positions ||
@@ -125,12 +131,12 @@ const program = Effect.gen(function* () {
 							next.readingSign !== current.readingSign ||
 							next.grabbed !== current.grabbed
 						)
-							renderSystem.render(
-								next,
-								editSessionView(next),
-								editSessionPresentation(next),
+							renderSystem.render({
+								world: next,
+								previewWorld: editSessionView(next),
+								editSessionStatus: editSessionStatus(next),
 								dispatch,
-							);
+							});
 					}),
 				),
 			),

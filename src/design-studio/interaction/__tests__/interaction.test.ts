@@ -82,7 +82,7 @@ describe("Design Studio interaction", () => {
 
 		expect(
 			contentEnvelopeIncludingPreview({
-				authoredWorld: committed,
+				world: committed,
 				previewWorld: preview,
 			}),
 		).toEqual(contentEnvelope(committed));

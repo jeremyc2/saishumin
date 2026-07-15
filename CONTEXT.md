@@ -28,6 +28,10 @@ _Avoid_: Add objects panel, item list
 A transient Design Studio gesture from its initial authored state through preview to either commit or cancel. At most one may be active; it is never persisted, its preview remains separate from the authored room until commit, and cancellation discards it.
 _Avoid_: Transaction, editor interaction
 
+**Edit Session Status**:
+The mutually exclusive condition of an Edit Session: inactive, active, showing an Invalid Preview, or awaiting dismissal after an invalid release.
+_Avoid_: Edit Session Presentation, editor status
+
 **Invalid Preview**:
 An Edit Session preview that cannot be committed to the authored room. It remains visible until dismissed, while the authored room remains unchanged.
 _Avoid_: Invalid placement state, rolled-back edit

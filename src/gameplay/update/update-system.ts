@@ -2,19 +2,16 @@ import { Context, Effect, Layer } from "effect";
 import { Action } from "../../app/action";
 import { Controls, type Direction, isDirection } from "../../app/control";
 import { updateDesignStudio } from "../../design-studio/design-studio";
-import { followCamera } from "../../rendering/geometry/projection";
 import {
 	DecorationKinds,
 	ObstacleKinds,
 	PlayerFacings,
-	type Position,
 } from "../../world/components";
 import type { EntityId as EntityIdType } from "../../world/entity-id";
 import { surfaceAt } from "../../world/spatial/collision";
 import { entityBaseElevation } from "../../world/spatial/elevation";
 import {
 	crateGrabDistance,
-	groundElevation,
 	interactionDistance,
 	jumpSpeed,
 	maximumFrameElapsedSeconds,
@@ -28,18 +25,13 @@ import {
 import { MovementSystemService } from "../movement/movement-system";
 import { playerFacingForDirections } from "./internal/player-facing";
 
-const cameraFollowingPlayer = (world: World, camera: Position): Position => {
-	const position = world.positions.get(playerEntity);
-	const elevation = world.elevations.get(playerEntity);
-	return position === undefined
-		? camera
-		: followCamera(camera, position, elevation?.z ?? groundElevation);
-};
-
 export class UpdateSystemService extends Context.Service<
 	UpdateSystemService,
 	{
-		readonly update: (world: World, action: Action) => World;
+		readonly update: (input: {
+			readonly world: World;
+			readonly action: Action;
+		}) => World;
 	}
 >()("saishumin/gameplay/update/update-system/UpdateSystemService") {
 	static readonly layer = Layer.effect(this)(
@@ -121,7 +113,7 @@ export class UpdateSystemService extends Context.Service<
 				return nearest;
 			};
 			return {
-				update: (world: World, action: Action): World =>
+				update: ({ world, action }): World =>
 					Action.$match(action, {
 						KeyChanged: ({ key, pressed }) => {
 							if (world.readingSign !== null)
@@ -213,10 +205,8 @@ export class UpdateSystemService extends Context.Service<
 								(time - world.lastFrame) / millisecondsPerSecond,
 								maximumFrameElapsedSeconds,
 							);
-							const moved = movementSystem.update(world, elapsed);
 							return {
-								...moved,
-								gameCamera: cameraFollowingPlayer(moved, world.gameCamera),
+								...movementSystem.update({ world, elapsed }),
 								lastFrame: time,
 							};
 						},

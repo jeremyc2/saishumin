@@ -17,7 +17,7 @@ import {
 	editorEntityHeightLimits,
 	maximumEditorBody,
 } from "../edit-session/edit-session";
-import type { DesignStudioInteractionRuntime } from "../interaction/runtime";
+import type { DesignStudioInteraction } from "../interaction/interaction";
 import { type EditorItemKind, EditorItemKinds } from "../model";
 
 type Dispatch = (action: AppAction) => void;
@@ -93,9 +93,7 @@ const entityLabel = (world: World, entity: EntityId): string => {
 	return "Lamp";
 };
 
-export const makeDesignStudioPanel = (
-	interactionRuntime: DesignStudioInteractionRuntime,
-) => {
+export const makeDesignStudioPanel = (interaction: DesignStudioInteraction) => {
 	const numberInput = (
 		label: string,
 		value: number,
@@ -178,11 +176,7 @@ export const makeDesignStudioPanel = (
 											type="button"
 											class="group cursor-grab touch-none rounded-xl border border-[#30464c] bg-[#17272e] p-3 text-left transition hover:-translate-y-0.5 hover:border-[#d9a969] hover:bg-[#20343b] active:cursor-grabbing"
 											@pointerdown=${(event: PointerEvent) =>
-												interactionRuntime.startPaletteDrag(
-													event,
-													item.kind,
-													world,
-												)}
+												interaction.startPaletteDrag(event, item.kind, world)}
 										>
 											<span class="text-[22px] text-[#e8b875]">${item.icon}</span>
 											<span class="mt-1 block text-[13px] font-bold">${item.label}</span>
