@@ -1,13 +1,13 @@
-import type { Position } from "../model/component";
-import type { EntityId } from "../model/entity-id";
-import { isSolidEntity, overlaps } from "./collision";
-import { entityTopElevation } from "./elevation";
+import type { Position } from "../world/components";
+import type { EntityId } from "../world/entity-id";
+import { isSolidEntity, overlaps } from "../world/spatial/collision";
+import { entityTopElevation } from "../world/spatial/elevation";
 import {
 	obstacleHeightTolerance,
 	playerBody,
 	playerEntity,
 	type World,
-} from "./world";
+} from "../world/world";
 
 const clamp = (value: number, minimum: number, maximum: number): number =>
 	Math.min(Math.max(value, minimum), maximum);

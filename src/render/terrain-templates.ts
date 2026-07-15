@@ -1,6 +1,6 @@
 import { svg, type TemplateResult } from "lit-html";
 import { repeat } from "lit-html/directives/repeat.js";
-import type { FloorTerrain } from "../model/floor-tile";
+import type { FloorTerrain } from "../world/floor";
 import {
 	type OutdoorFloorTile,
 	type TerrainCorner,

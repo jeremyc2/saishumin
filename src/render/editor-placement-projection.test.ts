@@ -1,14 +1,14 @@
 import { describe, expect, test } from "bun:test";
-import { initialWorld } from "../ecs/world";
+import { EditorItemKinds } from "../model/editor";
 import {
 	Body,
 	Elevation,
 	Obstacle,
 	ObstacleKinds,
 	Position,
-} from "../model/component";
-import { EditorItemKinds } from "../model/editor";
-import { EntityId } from "../model/entity-id";
+} from "../world/components";
+import { EntityId } from "../world/entity-id";
+import { initialWorld } from "../world/initial-world";
 import { editorPlacementPositionAtPointer } from "./editor-placement-projection";
 import { project, unproject } from "./projection";
 

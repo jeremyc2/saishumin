@@ -1,23 +1,34 @@
 import { Context, Layer } from "effect";
+import { findGridPath } from "../ecs/grid-navigation";
+import {
+	isPlayerPlacementValid,
+	nearestValidPlayerPosition,
+} from "../ecs/player-placement";
+import { Controls } from "../model/control";
+import {
+	type Body,
+	DecorationKinds,
+	type Elevation,
+	ObstacleKinds,
+	type PlayerFacing,
+	PlayerFacings,
+	type Position,
+} from "../world/components";
+import type { EntityId } from "../world/entity-id";
 import {
 	isPositionInsideRoom,
 	isSolidEntity,
 	overlaps,
 	surfaceAt,
-} from "../ecs/collision";
+} from "../world/spatial/collision";
 import {
 	entityBaseElevation,
 	entityHeight,
 	entityTopElevation,
 	placementElevationForEntity,
 	verticalRangesOverlap,
-} from "../ecs/elevation";
-import { findGridPath } from "../ecs/grid-navigation";
-import {
-	isPlayerPlacementValid,
-	nearestValidPlayerPosition,
-} from "../ecs/player-placement";
-import { isSupportSurfaceOccupied } from "../ecs/support-surface";
+} from "../world/spatial/elevation";
+import { isSupportSurfaceOccupied } from "../world/spatial/support-surface";
 import {
 	cratePushSlowdown,
 	fallResetElevation,
@@ -38,17 +49,7 @@ import {
 	playerSpeed,
 	stationaryVelocity,
 	type World,
-} from "../ecs/world";
-import {
-	type Body,
-	DecorationKinds,
-	type Elevation,
-	ObstacleKinds,
-	type Position,
-} from "../model/component";
-import { Controls } from "../model/control";
-import type { EntityId } from "../model/entity-id";
-import { type PlayerFacing, PlayerFacings } from "../model/player-facing";
+} from "../world/world";
 
 export class MovementSystemService extends Context.Service<
 	MovementSystemService,

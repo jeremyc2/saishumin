@@ -1,12 +1,14 @@
 import { describe, expect, test } from "bun:test";
-import { initialWorld, playerEntity } from "../ecs/world";
 import {
 	Body,
 	Decoration,
 	DecorationKinds,
 	Elevation,
 	Position,
-} from "./component";
+} from "../world/components";
+import { EntityId } from "../world/entity-id";
+import { initialWorld } from "../world/initial-world";
+import { playerEntity } from "../world/world";
 import {
 	autoPanCamera,
 	contentEnvelope,
@@ -20,7 +22,6 @@ import {
 	visiblePalettePopover,
 } from "./design-studio-interaction";
 import { EditorItemKinds } from "./editor";
-import { EntityId } from "./entity-id";
 
 describe("Design Studio interaction", () => {
 	test("activates a palette drag only after leaving the item rectangle expanded by 12 pixels", () => {

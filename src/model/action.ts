@@ -1,5 +1,6 @@
 import { Data } from "effect";
-import type { Body, Position, SignContent } from "./component";
+import type { Body, Position, SignContent } from "../world/components";
+import type { EntityId } from "../world/entity-id";
 import type { Control } from "./control";
 import type {
 	EditorItemKind,
@@ -7,7 +8,6 @@ import type {
 	EditSessionOperation,
 	EditSessionPreview,
 } from "./editor";
-import type { EntityId } from "./entity-id";
 
 export type Action = Data.TaggedEnum<{
 	KeyChanged: { readonly key: Control; readonly pressed: boolean };

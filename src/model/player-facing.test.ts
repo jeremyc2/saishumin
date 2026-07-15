@@ -1,10 +1,7 @@
 import { describe, expect, test } from "bun:test";
+import { type PlayerFacing, PlayerFacings } from "../world/components";
 import { Controls, type Direction } from "./control";
-import {
-	type PlayerFacing,
-	PlayerFacings,
-	playerFacingForDirections,
-} from "./player-facing";
+import { playerFacingForDirections } from "./player-facing";
 
 describe("playerFacingForDirections", () => {
 	const cases: ReadonlyArray<

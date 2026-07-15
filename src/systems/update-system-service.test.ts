@@ -1,12 +1,32 @@
 import { afterAll, describe, expect, test } from "bun:test";
 import { Layer, ManagedRuntime } from "effect";
 import { isPlayerPlacementValid } from "../ecs/player-placement";
+import { Action } from "../model/action";
+import { Controls, type Direction } from "../model/control";
+import { editSessionView } from "../model/edit-session";
+import {
+	defaultEditorItemBody,
+	EditorItemKinds,
+	editorItemHeightLimits,
+	maximumEditorItemBody,
+} from "../model/editor";
+import {
+	Body,
+	Decoration,
+	DecorationKinds,
+	Elevation,
+	Obstacle,
+	ObstacleKinds,
+	PlayerFacings,
+	Position,
+} from "../world/components";
+import { EntityId } from "../world/entity-id";
+import { initialWorld } from "../world/initial-world";
 import {
 	crateBody,
 	crateEntities,
 	crateHeight,
 	groundElevation,
-	initialWorld,
 	interactionDistance,
 	jumpSpeed,
 	minimumEntityExtent,
@@ -17,27 +37,7 @@ import {
 	playerEntity,
 	stationaryVelocity,
 	type World,
-} from "../ecs/world";
-import { Action } from "../model/action";
-import {
-	Body,
-	Decoration,
-	DecorationKinds,
-	Elevation,
-	Obstacle,
-	ObstacleKinds,
-	Position,
-} from "../model/component";
-import { Controls, type Direction } from "../model/control";
-import { editSessionView } from "../model/edit-session";
-import {
-	defaultEditorItemBody,
-	EditorItemKinds,
-	editorItemHeightLimits,
-	maximumEditorItemBody,
-} from "../model/editor";
-import { EntityId } from "../model/entity-id";
-import { PlayerFacings } from "../model/player-facing";
+} from "../world/world";
 import { MovementSystemService } from "./movement-system-service";
 import { UpdateSystemService } from "./update-system-service";
 

@@ -5,17 +5,6 @@ import {
 	isNewEditorItemPlacementValid,
 } from "../ecs/editor-placement";
 import {
-	placementElevationForEntity,
-	placementElevationForKind,
-} from "../ecs/elevation";
-import { isSupportSurfaceTransformValid } from "../ecs/support-surface";
-import {
-	crateHeight,
-	stationaryVelocity,
-	type World,
-	wallHeight,
-} from "../ecs/world";
-import {
 	Decoration,
 	DecorationKinds,
 	defaultSignContent,
@@ -23,7 +12,20 @@ import {
 	Obstacle,
 	ObstacleKinds,
 	type Position,
-} from "./component";
+} from "../world/components";
+import { EntityId, type EntityId as EntityIdType } from "../world/entity-id";
+import { floorTilesCoveringPlan } from "../world/floor";
+import {
+	placementElevationForEntity,
+	placementElevationForKind,
+} from "../world/spatial/elevation";
+import { isSupportSurfaceTransformValid } from "../world/spatial/support-surface";
+import {
+	crateHeight,
+	stationaryVelocity,
+	type World,
+	wallHeight,
+} from "../world/world";
 import {
 	defaultEditorItemBody,
 	defaultEditorItemHeight,
@@ -34,8 +36,6 @@ import {
 	type EditSessionRejectionReason,
 	type EditSessionValidity,
 } from "./editor";
-import { EntityId, type EntityId as EntityIdType } from "./entity-id";
-import { floorTilesCoveringPlan } from "./floor-tile";
 
 export type EditSessionPresentation = {
 	readonly active: boolean;

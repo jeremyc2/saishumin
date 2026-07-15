@@ -1,6 +1,5 @@
 import { Context, Effect, Layer } from "effect";
 import { html, render, svg, type TemplateResult } from "lit-html";
-import { surfaceAt } from "../ecs/collision";
 import {
 	isEntityPlacementValid,
 	isFloorPlanPlacementValid,
@@ -12,31 +11,7 @@ import {
 	editorItemKindForEntity,
 	maximumEditorBody,
 } from "../ecs/editor-sizing";
-import {
-	entityBaseElevation,
-	placementElevationForKind,
-	shadowSectionsForEntity,
-} from "../ecs/elevation";
-import { isSupportSurfaceOccupied } from "../ecs/support-surface";
-import {
-	lavaMonsterBody,
-	lavaMonsterEntity,
-	minimumEntityExtent,
-	minimumFloorDepth,
-	minimumFloorWidth,
-	playerBody,
-	playerEntity,
-	type World,
-} from "../ecs/world";
 import { Action } from "../model/action";
-import {
-	type Body,
-	Decoration,
-	DecorationKinds,
-	defaultSignContent,
-	ObstacleKinds,
-	type Position,
-} from "../model/component";
 import {
 	autoPanCamera,
 	contentEnvelope,
@@ -59,7 +34,6 @@ import {
 	type EditorItemKind,
 	EditorItemKinds,
 } from "../model/editor";
-import type { EntityId } from "../model/entity-id";
 import { editorPlacementPositionAtPointer } from "../render/editor-placement-projection";
 import {
 	renderDepthForCharacter,
@@ -84,6 +58,32 @@ import {
 	playerTemplate,
 } from "../render/templates";
 import { terrainFloorTemplate } from "../render/terrain-templates";
+import {
+	type Body,
+	Decoration,
+	DecorationKinds,
+	defaultSignContent,
+	ObstacleKinds,
+	type Position,
+} from "../world/components";
+import type { EntityId } from "../world/entity-id";
+import { surfaceAt } from "../world/spatial/collision";
+import {
+	entityBaseElevation,
+	placementElevationForKind,
+	shadowSectionsForEntity,
+} from "../world/spatial/elevation";
+import { isSupportSurfaceOccupied } from "../world/spatial/support-surface";
+import {
+	lavaMonsterBody,
+	lavaMonsterEntity,
+	minimumEntityExtent,
+	minimumFloorDepth,
+	minimumFloorWidth,
+	playerBody,
+	playerEntity,
+	type World,
+} from "../world/world";
 
 type Dispatch = (action: Action) => void;
 

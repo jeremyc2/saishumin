@@ -1,5 +1,4 @@
 import { Context, Effect, Layer } from "effect";
-import { surfaceAt } from "../ecs/collision";
 import {
 	isEntityPlacementValid,
 	isFloorPlanPlacementValid,
@@ -9,14 +8,36 @@ import {
 	maximumEditorBody,
 } from "../ecs/editor-sizing";
 import {
-	entityBaseElevation,
-	placementElevationForEntity,
-} from "../ecs/elevation";
-import {
 	isPlayerPlacementValid,
 	nearestValidPlayerPosition,
 } from "../ecs/player-placement";
-import { isSupportSurfaceOccupied } from "../ecs/support-surface";
+import { Action } from "../model/action";
+import { Controls, type Direction, isDirection } from "../model/control";
+import {
+	addEditorItemToWorld,
+	beginEditSession,
+	cancelEditSession,
+	commitEditSession,
+	previewEditSession,
+} from "../model/edit-session";
+import { EditorItemKinds, editorItemHeightLimits } from "../model/editor";
+import { playerFacingForDirections } from "../model/player-facing";
+import { cameraForFloor, followCamera } from "../render/projection";
+import {
+	Body,
+	DecorationKinds,
+	ObstacleKinds,
+	PlayerFacings,
+	type Position,
+} from "../world/components";
+import type { EntityId as EntityIdType } from "../world/entity-id";
+import { floorTilesCoveringPlan } from "../world/floor";
+import { surfaceAt } from "../world/spatial/collision";
+import {
+	entityBaseElevation,
+	placementElevationForEntity,
+} from "../world/spatial/elevation";
+import { isSupportSurfaceOccupied } from "../world/spatial/support-surface";
 import {
 	crateGrabDistance,
 	groundElevation,
@@ -32,30 +53,7 @@ import {
 	playerEntity,
 	stationaryVelocity,
 	type World,
-} from "../ecs/world";
-import { Action } from "../model/action";
-import {
-	Body,
-	DecorationKinds,
-	ObstacleKinds,
-	type Position,
-} from "../model/component";
-import { Controls, type Direction, isDirection } from "../model/control";
-import {
-	addEditorItemToWorld,
-	beginEditSession,
-	cancelEditSession,
-	commitEditSession,
-	previewEditSession,
-} from "../model/edit-session";
-import { EditorItemKinds, editorItemHeightLimits } from "../model/editor";
-import type { EntityId as EntityIdType } from "../model/entity-id";
-import { floorTilesCoveringPlan } from "../model/floor-tile";
-import {
-	PlayerFacings,
-	playerFacingForDirections,
-} from "../model/player-facing";
-import { cameraForFloor, followCamera } from "../render/projection";
+} from "../world/world";
 import { MovementSystemService } from "./movement-system-service";
 
 const clamp = (value: number, minimum: number, maximum: number): number =>

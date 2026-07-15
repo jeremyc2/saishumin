@@ -1,12 +1,12 @@
-import { type Body, DecorationKinds, type Position } from "../model/component";
-import type { EntityId } from "../model/entity-id";
-import { bodyBoundsOverlap, entityTopElevation } from "./elevation";
+import { type Body, DecorationKinds, type Position } from "../components";
+import type { EntityId } from "../entity-id";
 import {
 	groundElevation,
 	lavaMonsterEntity,
 	obstacleHeightTolerance,
 	type World,
-} from "./world";
+} from "../world";
+import { bodyBoundsOverlap, entityTopElevation } from "./elevation";
 
 export const isSolidEntity = (world: World, entity: EntityId): boolean =>
 	entity === lavaMonsterEntity ||

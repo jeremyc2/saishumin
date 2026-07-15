@@ -1,7 +1,7 @@
-import { entityBaseElevation, entityHeight } from "../ecs/elevation";
-import { playerEntity, type World } from "../ecs/world";
 import { projectedRectangle } from "../render/projection";
-import type { Position } from "./component";
+import type { Position } from "../world/components";
+import { entityBaseElevation, entityHeight } from "../world/spatial/elevation";
+import { playerEntity, type World } from "../world/world";
 import type { EditorItemKind } from "./editor";
 
 export type ScreenBounds = {

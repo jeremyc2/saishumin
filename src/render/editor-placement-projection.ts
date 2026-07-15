@@ -1,13 +1,13 @@
+import type { EditorItemKind } from "../model/editor";
+import type { Body, Position } from "../world/components";
+import type { EntityId } from "../world/entity-id";
 import {
 	bodyBoundsOverlap,
 	canSitOnPlatform,
 	canSitOnSupport,
 	entityTopElevation,
-} from "../ecs/elevation";
-import { groundElevation, type World } from "../ecs/world";
-import type { Body, Position } from "../model/component";
-import type { EditorItemKind } from "../model/editor";
-import type { EntityId } from "../model/entity-id";
+} from "../world/spatial/elevation";
+import { groundElevation, type World } from "../world/world";
 import { unproject } from "./projection";
 
 const subtract = (position: Position, offset: Position): Position => ({

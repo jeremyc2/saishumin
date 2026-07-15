@@ -1,4 +1,4 @@
-import type { Body, Position } from "./component";
+import type { Body, Position } from "./components";
 
 export type FloorTerrain = "grass" | "sand" | "dirt" | "cobblestone";
 

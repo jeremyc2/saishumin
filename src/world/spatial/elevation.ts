@@ -1,19 +1,21 @@
 import {
 	type Body,
+	type DecorationKind,
+	DecorationKinds,
+	isDecorationKind,
+	isObstacleKind,
 	type ObstacleKind,
 	ObstacleKinds,
 	type Position,
-} from "../model/component";
-import { type EditorItemKind, EditorItemKinds } from "../model/editor";
-import type { EntityId } from "../model/entity-id";
-import { editorItemKindForEntity } from "./editor-sizing";
+} from "../components";
+import type { EntityId } from "../entity-id";
 import {
 	groundElevation,
 	lavaMonsterCollisionHeight,
 	lavaMonsterEntity,
 	obstacleHeightTolerance,
 	type World,
-} from "./world";
+} from "../world";
 
 export const entityBaseElevation = (world: World, entity: EntityId): number =>
 	world.elevations.get(entity)?.z ?? groundElevation;
@@ -58,24 +60,35 @@ export const bodyBoundsOverlap = (
 	Math.abs(position.x - otherPosition.x) < (body.width + otherBody.width) / 2 &&
 	Math.abs(position.y - otherPosition.y) < (body.depth + otherBody.depth) / 2;
 
-export const canSitOnPlatform = (kind: EditorItemKind): boolean =>
-	kind === EditorItemKinds.Crate ||
-	kind === EditorItemKinds.Plant ||
-	kind === EditorItemKinds.Lamp ||
-	kind === EditorItemKinds.Sign ||
-	kind === EditorItemKinds.Chest;
+export type SpatialEntityKind = typeof ObstacleKind.Type | DecorationKind;
+
+export const spatialKindForEntity = (
+	world: World,
+	entity: EntityId,
+): SpatialEntityKind | undefined => {
+	const kind =
+		world.obstacles.get(entity)?.kind ?? world.decorations.get(entity)?.kind;
+	return isObstacleKind(kind) || isDecorationKind(kind) ? kind : undefined;
+};
+
+export const canSitOnPlatform = (kind: SpatialEntityKind): boolean =>
+	kind === ObstacleKinds.Crate ||
+	kind === DecorationKinds.Plant ||
+	kind === DecorationKinds.Lamp ||
+	kind === DecorationKinds.Sign ||
+	kind === ObstacleKinds.Chest;
 
 export const canSitOnSupport = (
-	kind: EditorItemKind,
+	kind: SpatialEntityKind,
 	supportKind: typeof ObstacleKind.Type,
 ): boolean =>
 	supportKind === ObstacleKinds.Platform
 		? canSitOnPlatform(kind)
-		: supportKind === ObstacleKinds.Crate && kind === EditorItemKinds.Crate;
+		: supportKind === ObstacleKinds.Crate && kind === ObstacleKinds.Crate;
 
 export const placementElevationForKind = (
 	world: World,
-	kind: EditorItemKind,
+	kind: SpatialEntityKind,
 	position: Position,
 	body: Body,
 	excludedEntity?: EntityId,
@@ -107,7 +120,7 @@ export const placementElevationForEntity = (
 	body: Body,
 	maximumElevation = Number.POSITIVE_INFINITY,
 ): number => {
-	const kind = editorItemKindForEntity(world, entity);
+	const kind = spatialKindForEntity(world, entity);
 	return kind === undefined
 		? entityBaseElevation(world, entity)
 		: placementElevationForKind(
@@ -127,7 +140,7 @@ export const shadowElevationForEntity = (
 	body: Body,
 ): number => {
 	const base = entityBaseElevation(world, entity);
-	const kind = editorItemKindForEntity(world, entity);
+	const kind = spatialKindForEntity(world, entity);
 	if (kind === undefined) return base;
 
 	for (const [supportEntity, support] of world.obstacles) {
@@ -194,7 +207,7 @@ export const shadowSectionsForEntity = (
 		position,
 		body,
 	);
-	const kind = editorItemKindForEntity(world, entity);
+	const kind = spatialKindForEntity(world, entity);
 	if (kind === undefined || lowerElevation === base)
 		return [{ position, body, elevation: base }];
 
