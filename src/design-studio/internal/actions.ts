@@ -4,7 +4,10 @@ import {
 } from "../../ecs/player-placement";
 import { Action } from "../../model/action";
 import type { Direction } from "../../model/control";
-import { cameraForFloor, followCamera } from "../../world/camera";
+import {
+	cameraForFloor,
+	followCamera,
+} from "../../rendering/geometry/projection";
 import {
 	Body,
 	DecorationKinds,

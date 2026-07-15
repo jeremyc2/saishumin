@@ -1,14 +1,14 @@
-import type { EditorItemKind } from "../design-studio/model";
-import type { Body, Position } from "../world/components";
-import type { EntityId } from "../world/entity-id";
+import type { EditorItemKind } from "../model";
+import type { Body, Position } from "../../world/components";
+import type { EntityId } from "../../world/entity-id";
 import {
 	bodyBoundsOverlap,
 	canSitOnPlatform,
 	canSitOnSupport,
 	entityTopElevation,
-} from "../world/spatial/elevation";
-import { groundElevation, type World } from "../world/world";
-import { unproject } from "./projection";
+} from "../../world/spatial/elevation";
+import { groundElevation, type World } from "../../world/world";
+import { unproject } from "../../rendering/geometry/projection";
 
 const subtract = (position: Position, offset: Position): Position => ({
 	x: position.x - offset.x,

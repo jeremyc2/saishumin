@@ -1,10 +1,10 @@
-import type { Position } from "../world/components";
+import type { Position } from "../../world/components";
 import {
 	type FloorTerrain,
 	type FloorTile,
 	floorTileWorldSize,
-} from "../world/floor";
-import { projectVector } from "./projection";
+} from "../../world/floor";
+import { projectVector } from "../geometry/projection";
 
 export type TerrainEdge = "top" | "right" | "bottom" | "left";
 export type TerrainCorner =

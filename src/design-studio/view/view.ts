@@ -1,7 +1,10 @@
 import { svg, type TemplateResult } from "lit-html";
 import type { Action as AppAction } from "../../model/action";
-import { points, projectedRectangle } from "../../render/projection";
-import type { ResizeDirection } from "../../render/resize";
+import {
+	points,
+	projectedRectangle,
+} from "../../rendering/geometry/projection";
+import type { ResizeDirection } from "../../rendering/geometry/resize";
 import type { Position } from "../../world/components";
 import { entityBaseElevation } from "../../world/spatial/elevation";
 import type { World } from "../../world/world";

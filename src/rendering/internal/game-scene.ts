@@ -7,14 +7,14 @@ import {
 	renderDepthForCharacter,
 	renderDepthForEntity,
 	renderDepthForPlayer,
-} from "../../render/entity-render-depth";
-import { outdoorFloorTiles } from "../../render/outdoor-floor";
+} from "../geometry/depth";
+import { outdoorFloorTiles } from "../artwork/outdoor-floor";
 import {
 	points,
 	project,
 	projectedRectangle,
 	viewport,
-} from "../../render/projection";
+} from "../geometry/projection";
 import {
 	boxTemplate,
 	chestTemplate,
@@ -22,8 +22,8 @@ import {
 	decorationTemplate,
 	lavaMonsterTemplate,
 	playerTemplate,
-} from "../../render/templates";
-import { terrainFloorTemplate } from "../../render/terrain-templates";
+} from "../artwork/entities";
+import { terrainFloorTemplate } from "../artwork/terrain";
 import { DecorationKinds, ObstacleKinds } from "../../world/components";
 import type { EntityId } from "../../world/entity-id";
 import { surfaceAt } from "../../world/spatial/collision";
