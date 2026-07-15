@@ -1,27 +1,11 @@
 import { Context, Effect, Layer } from "effect";
 import { html, render, svg, type TemplateResult } from "lit-html";
 import { Action } from "../model/action";
-import {
-	autoPanCamera,
-	contentEnvelope,
-	contentEnvelopeIncludingPreview,
-	dismissPalettePopover,
-	floorResizePointerDelta,
-	initialDesignStudioInteraction,
-	movePalettePress,
-	pressPaletteItem,
-	releasePalettePress,
-	visiblePalettePopover,
-} from "../model/design-studio-interaction";
+import { makeDesignStudioInteractionRuntime } from "../design-studio/interaction/runtime";
 import {
 	type EditSessionPresentation,
 	editorEntityHeight,
 	editorEntityHeightLimits,
-	editorItemKindForEntity,
-	editSessionView,
-	isEntityPlacementValid,
-	isFloorPlanPlacementValid,
-	isNewEditorItemPlacementValid,
 	maximumEditorBody,
 } from "../design-studio/edit-session/edit-session";
 import {
@@ -30,7 +14,6 @@ import {
 	type EditorItemKind,
 	EditorItemKinds,
 } from "../design-studio/model";
-import { editorPlacementPositionAtPointer } from "../render/editor-placement-projection";
 import {
 	renderDepthForCharacter,
 	renderDepthForEntity,
@@ -41,10 +24,9 @@ import {
 	points,
 	project,
 	projectedRectangle,
-	unproject,
 	viewport,
 } from "../render/projection";
-import { type ResizeDirection, resizeFromHandle } from "../render/resize";
+import type { ResizeDirection } from "../render/resize";
 import {
 	boxTemplate,
 	chestTemplate,
@@ -55,7 +37,6 @@ import {
 } from "../render/templates";
 import { terrainFloorTemplate } from "../render/terrain-templates";
 import {
-	type Body,
 	Decoration,
 	DecorationKinds,
 	defaultSignContent,
@@ -81,65 +62,14 @@ import {
 	type World,
 } from "../world/world";
 
-type Dispatch = (action: Action) => void;
-
-type ActiveInteraction =
-	| {
-			readonly kind: "pan";
-			readonly pointer: Position;
-			readonly camera: Position;
-	  }
-	| {
-			readonly kind: "move";
-			readonly entity: EntityId;
-			readonly grabOffset: Position;
-			readonly position: Position;
-			readonly body: Body;
-	  }
-	| {
-			readonly kind: "resize";
-			readonly entity: EntityId;
-			readonly pointer: Position;
-			readonly position: Position;
-			readonly body: Body;
-			readonly widthDirection: ResizeDirection;
-			readonly depthDirection: ResizeDirection;
-	  }
-	| {
-			readonly kind: "create";
-			readonly itemKind: EditorItemKind;
-			readonly pointer: Position;
-			readonly position: Position;
-			readonly canDrop: boolean;
-	  }
-	| {
-			readonly kind: "resize-floor";
-			readonly pointer: Position;
-			readonly floorPlan: Body;
-			readonly widthDirection: ResizeDirection;
-			readonly depthDirection: ResizeDirection;
-			readonly originalFloorOrigin: Position;
-	  };
+type Dispatch = (action: import("../model/action").Action) => void;
 
 const selectionHandleSize = 16;
 const selectionDashPattern = "13 9";
 const selectionDashPeriod = 22;
-const wheelLinePixels = 16;
 const floorGridSpacing = { x: 100, y: 80 } as const;
 const floorGridStrokeWidth = 2;
 const floorGridOpacity = 0.32;
-const minimumEntityBody = {
-	width: minimumEntityExtent,
-	depth: minimumEntityExtent,
-} as const;
-const minimumFloorBody = {
-	width: minimumFloorWidth,
-	depth: minimumFloorDepth,
-} as const;
-const maximumFloorBody = {
-	width: Number.POSITIVE_INFINITY,
-	depth: Number.POSITIVE_INFINITY,
-} as const;
 
 const midpoint = (start: Position, end: Position): Position => ({
 	x: (start.x + end.x) / 2,
@@ -238,752 +168,12 @@ export class RenderSystemService extends Context.Service<
 	}
 >()("saishumin/systems/render-system-service/RenderSystemService") {
 	static readonly layer = Layer.effect(this)(
-		Effect.gen(function* () {
-			let currentWorld: World | undefined;
-			let currentViewWorld: World | undefined;
-			let currentPresentation: EditSessionPresentation | undefined;
-			let currentDispatch: Dispatch | undefined;
-			let activeInteraction: ActiveInteraction | undefined;
-			let designStudioInteraction = initialDesignStudioInteraction;
-			let popoverAnimationFrame: number | undefined;
-			let popoverFading = false;
-			let latestPointer: Position | undefined;
-			let autoPanAnimationFrame: number | undefined;
-			let previousAutoPanTime: number | undefined;
-			let refreshCreatePreview = (): void => {};
-			let refreshLocalState = (): void => {};
-
-			const svgPosition = (
-				clientX: number,
-				clientY: number,
-			): Position | undefined => {
-				const canvas = document.querySelector("#world-canvas");
-				if (!(canvas instanceof SVGSVGElement)) return undefined;
-				const matrix = canvas.getScreenCTM();
-				if (matrix === null) return undefined;
-				const point = canvas.createSVGPoint();
-				point.x = clientX;
-				point.y = clientY;
-				const transformed = point.matrixTransform(matrix.inverse());
-				return { x: transformed.x, y: transformed.y };
-			};
-
-			const projectedPointerPosition = (
-				event: PointerEvent | DragEvent,
-				camera: Position,
-			): Position | undefined => {
-				const pointer = svgPosition(event.clientX, event.clientY);
-				return pointer === undefined
-					? undefined
-					: { x: pointer.x - camera.x, y: pointer.y - camera.y };
-			};
-
-			const pointerWorldPosition = (
-				event: PointerEvent | DragEvent,
-				camera: Position,
-			): Position | undefined => {
-				const pointer = projectedPointerPosition(event, camera);
-				return pointer === undefined ? undefined : unproject(pointer);
-			};
-
-			const startPan = (event: PointerEvent, world: World): void => {
-				if (event.button !== 0 && event.button !== 1) return;
-				const pointer = svgPosition(event.clientX, event.clientY);
-				if (pointer === undefined) return;
-				event.preventDefault();
-				activeInteraction = {
-					kind: "pan",
-					pointer,
-					camera: world.editor.camera,
-				};
-			};
-
-			const isPanGesture = (event: PointerEvent): boolean =>
-				event.button === 1 || event.metaKey || event.ctrlKey;
-
-			const startEntityMove = (
-				event: PointerEvent,
-				world: World,
-				entity: EntityId,
-				dispatch: Dispatch,
-			): void => {
-				if (!world.editor.open) return;
-				if (
-					world.editor.editSession !== null ||
-					activeInteraction !== undefined
-				)
-					return;
-				event.stopPropagation();
-				if (isPanGesture(event)) {
-					startPan(event, world);
-					return;
-				}
-				if (event.button !== 0) return;
-				const projectedPointer = projectedPointerPosition(
-					event,
-					world.editor.camera,
-				);
-				const position = world.positions.get(entity);
-				const body = world.bodies.get(entity);
-				if (
-					projectedPointer === undefined ||
-					position === undefined ||
-					body === undefined
-				)
-					return;
-				event.preventDefault();
-				latestPointer = { x: event.clientX, y: event.clientY };
-				dispatch(Action.EditorSelectionChanged({ selection: entity }));
-				const pointerAtBase = unproject(
-					projectedPointer,
-					entityBaseElevation(world, entity),
-				);
-				activeInteraction = {
-					kind: "move",
-					entity,
-					grabOffset: {
-						x: pointerAtBase.x - position.x,
-						y: pointerAtBase.y - position.y,
-					},
-					position,
-					body,
-				};
-				dispatch(
-					Action.EditorEditSessionBegan({
-						operation: {
-							kind: "move",
-							entity,
-							originalPosition: position,
-							originalBody: body,
-							position,
-						},
-					}),
-				);
-			};
-
-			const startEntityResize = (
-				event: PointerEvent,
-				world: World,
-				entity: EntityId,
-				widthDirection: ResizeDirection,
-				depthDirection: ResizeDirection,
-				dispatch: Dispatch,
-			): void => {
-				if (
-					world.editor.editSession !== null ||
-					activeInteraction !== undefined
-				)
-					return;
-				event.stopPropagation();
-				if (isPanGesture(event)) {
-					startPan(event, world);
-					return;
-				}
-				if (event.button !== 0) return;
-				const pointer = pointerWorldPosition(event, world.editor.camera);
-				const position = world.positions.get(entity);
-				const body = world.bodies.get(entity);
-				if (
-					pointer === undefined ||
-					position === undefined ||
-					body === undefined
-				)
-					return;
-				event.preventDefault();
-				latestPointer = { x: event.clientX, y: event.clientY };
-				activeInteraction = {
-					kind: "resize",
-					entity,
-					pointer,
-					position,
-					body,
-					widthDirection,
-					depthDirection,
-				};
-				dispatch(
-					Action.EditorEditSessionBegan({
-						operation: {
-							kind: "resize",
-							entity,
-							originalPosition: position,
-							originalBody: body,
-							position,
-							body,
-						},
-					}),
-				);
-			};
-
-			const startFloorResize = (
-				event: PointerEvent,
-				world: World,
-				widthDirection: ResizeDirection,
-				depthDirection: ResizeDirection,
-				dispatch: Dispatch,
-			): void => {
-				if (
-					world.editor.editSession !== null ||
-					activeInteraction !== undefined
-				)
-					return;
-				event.stopPropagation();
-				if (isPanGesture(event)) {
-					startPan(event, world);
-					return;
-				}
-				if (event.button !== 0) return;
-				const pointer = projectedPointerPosition(event, world.editor.camera);
-				if (pointer === undefined) return;
-				event.preventDefault();
-				latestPointer = { x: event.clientX, y: event.clientY };
-				activeInteraction = {
-					kind: "resize-floor",
-					pointer,
-					floorPlan: world.floorPlan,
-					widthDirection,
-					depthDirection,
-					originalFloorOrigin: world.floorOrigin,
-				};
-				dispatch(
-					Action.EditorEditSessionBegan({
-						operation: {
-							kind: "resize-floor",
-							floorPlan: world.floorPlan,
-							floorOrigin: world.floorOrigin,
-						},
-					}),
-				);
-			};
-
-			const startPaletteDrag = (
-				event: PointerEvent,
-				itemKind: EditorItemKind,
-				world: World,
-			): void => {
-				if (event.button !== 0) return;
-				if (
-					world.editor.editSession !== null ||
-					activeInteraction !== undefined
-				)
-					return;
-				event.preventDefault();
-				const target = event.currentTarget;
-				if (!(target instanceof HTMLElement)) return;
-				const bounds = target.getBoundingClientRect();
-				designStudioInteraction = pressPaletteItem(designStudioInteraction, {
-					itemKind,
-					pointer: { x: event.clientX, y: event.clientY },
-					itemBounds: {
-						left: bounds.left,
-						top: bounds.top,
-						right: bounds.right,
-						bottom: bounds.bottom,
-					},
-				});
-				popoverFading = false;
-				refreshLocalState();
-			};
-
-			const onPointerMove = (event: PointerEvent): void => {
-				latestPointer = { x: event.clientX, y: event.clientY };
-				const world = currentWorld;
-				const dispatch = currentDispatch;
-				const paletteMove = movePalettePress(designStudioInteraction, {
-					x: event.clientX,
-					y: event.clientY,
-				});
-				designStudioInteraction = paletteMove.state;
-				if (
-					paletteMove.activated !== null &&
-					world?.editor.open === true &&
-					world.editor.editSession === null &&
-					activeInteraction === undefined &&
-					dispatch !== undefined
-				) {
-					const projectedPointer = projectedPointerPosition(
-						event,
-						world.editor.camera,
-					);
-					if (projectedPointer === undefined) return;
-					const body = defaultEditorItemBody(paletteMove.activated.itemKind);
-					const position = editorPlacementPositionAtPointer(
-						world,
-						paletteMove.activated.itemKind,
-						body,
-						projectedPointer,
-					);
-					const target = document.elementFromPoint(
-						event.clientX,
-						event.clientY,
-					);
-					activeInteraction = {
-						kind: "create",
-						itemKind: paletteMove.activated.itemKind,
-						pointer: paletteMove.activated.pointer,
-						position,
-						canDrop:
-							target instanceof Element &&
-							target.closest("#world-canvas") !== null,
-					};
-					previousAutoPanTime = undefined;
-					dispatch(
-						Action.EditorEditSessionBegan({
-							operation: {
-								kind: "create",
-								itemKind: paletteMove.activated.itemKind,
-								position,
-							},
-						}),
-					);
-					return;
-				}
-				const interaction = activeInteraction;
-				if (
-					interaction === undefined ||
-					world === undefined ||
-					dispatch === undefined
-				)
-					return;
-
-				if (interaction.kind === "pan") {
-					const pointer = svgPosition(event.clientX, event.clientY);
-					if (pointer === undefined) return;
-					dispatch(
-						Action.EditorCameraChanged({
-							camera: {
-								x: interaction.camera.x + pointer.x - interaction.pointer.x,
-								y: interaction.camera.y + pointer.y - interaction.pointer.y,
-							},
-						}),
-					);
-					return;
-				}
-				if (interaction.kind === "create") {
-					const projectedPointer = projectedPointerPosition(
-						event,
-						world.editor.camera,
-					);
-					if (projectedPointer === undefined) return;
-					const body = defaultEditorItemBody(interaction.itemKind);
-					const position = editorPlacementPositionAtPointer(
-						world,
-						interaction.itemKind,
-						body,
-						projectedPointer,
-					);
-					const target = document.elementFromPoint(
-						event.clientX,
-						event.clientY,
-					);
-					activeInteraction = {
-						...interaction,
-						position,
-						canDrop:
-							target instanceof Element &&
-							target.closest("#world-canvas") !== null,
-					};
-					dispatch(
-						Action.EditorEditSessionPreviewed({
-							preview: { kind: "create", position },
-						}),
-					);
-					return;
-				}
-
-				if (interaction.kind === "resize-floor") {
-					const pointer = svgPosition(event.clientX, event.clientY);
-					if (pointer === undefined) return;
-					const resized = resizeFromHandle(
-						{
-							x:
-								interaction.originalFloorOrigin.x +
-								interaction.floorPlan.width / 2,
-							y:
-								interaction.originalFloorOrigin.y +
-								interaction.floorPlan.depth / 2,
-						},
-						interaction.floorPlan,
-						floorResizePointerDelta(
-							interaction.pointer,
-							pointer,
-							world.editor.camera,
-						),
-						interaction.widthDirection,
-						interaction.depthDirection,
-						minimumFloorBody,
-						maximumFloorBody,
-					);
-					const floorOrigin = {
-						x: resized.position.x - resized.body.width / 2,
-						y: resized.position.y - resized.body.depth / 2,
-					};
-					dispatch(
-						Action.EditorEditSessionPreviewed({
-							preview: {
-								kind: "resize-floor",
-								floorPlan: resized.body,
-								floorOrigin,
-							},
-						}),
-					);
-					return;
-				}
-
-				if (interaction.kind === "move") {
-					const projectedPointer = projectedPointerPosition(
-						event,
-						world.editor.camera,
-					);
-					const itemKind = editorItemKindForEntity(world, interaction.entity);
-					if (projectedPointer === undefined || itemKind === undefined) return;
-					const position = editorPlacementPositionAtPointer(
-						world,
-						itemKind,
-						interaction.body,
-						projectedPointer,
-						interaction.grabOffset,
-						interaction.entity,
-					);
-					dispatch(
-						Action.EditorEditSessionPreviewed({
-							preview: { kind: "move", position },
-						}),
-					);
-				} else if (interaction.kind === "resize") {
-					const pointer = pointerWorldPosition(event, world.editor.camera);
-					if (pointer === undefined) return;
-					const resized = resizeFromHandle(
-						interaction.position,
-						interaction.body,
-						{
-							x: pointer.x - interaction.pointer.x,
-							y: pointer.y - interaction.pointer.y,
-						},
-						interaction.widthDirection,
-						interaction.depthDirection,
-						minimumEntityBody,
-						maximumEditorBody(world, interaction.entity),
-					);
-					dispatch(
-						Action.EditorEditSessionPreviewed({
-							preview: {
-								kind: "resize",
-								body: resized.body,
-								position: resized.position,
-							},
-						}),
-					);
-				}
-			};
-
-			const onPointerUp = (_event: PointerEvent): void => {
-				const interaction = activeInteraction;
-				const world = currentWorld;
-				const dispatch = currentDispatch;
-				activeInteraction = undefined;
-				latestPointer = undefined;
-				previousAutoPanTime = undefined;
-				refreshCreatePreview();
-				const releasedPaletteState = releasePalettePress(
-					designStudioInteraction,
-					performance.now(),
-				);
-				if (releasedPaletteState !== designStudioInteraction) {
-					designStudioInteraction = releasedPaletteState;
-					popoverFading = false;
-					if (popoverAnimationFrame !== undefined)
-						cancelAnimationFrame(popoverAnimationFrame);
-					const animatePopover = (time: number): void => {
-						const visible = visiblePalettePopover(
-							designStudioInteraction,
-							time,
-						);
-						if (visible === null) {
-							designStudioInteraction = dismissPalettePopover(
-								designStudioInteraction,
-							);
-							popoverFading = false;
-							popoverAnimationFrame = undefined;
-							refreshLocalState();
-							return;
-						}
-						const fading = visible.opacity < 1;
-						if (fading !== popoverFading) {
-							popoverFading = fading;
-							refreshLocalState();
-						}
-						popoverAnimationFrame = requestAnimationFrame(animatePopover);
-					};
-					popoverAnimationFrame = requestAnimationFrame(animatePopover);
-					refreshLocalState();
-					return;
-				}
-				if (
-					interaction?.kind === "create" &&
-					world?.editor.open === true &&
-					dispatch !== undefined
-				) {
-					dispatch(
-						interaction.canDrop
-							? Action.EditorEditSessionCommitted()
-							: Action.EditorEditSessionCancelled(),
-					);
-				}
-				if (
-					(interaction?.kind === "move" || interaction?.kind === "resize") &&
-					dispatch !== undefined
-				) {
-					dispatch(Action.EditorEditSessionCommitted());
-				} else if (
-					interaction?.kind === "resize-floor" &&
-					dispatch !== undefined
-				) {
-					dispatch(Action.EditorEditSessionCommitted());
-				}
-			};
-			const onPointerCancel = (): void => {
-				const interaction = activeInteraction;
-				const dispatch = currentDispatch;
-				activeInteraction = undefined;
-				latestPointer = undefined;
-				previousAutoPanTime = undefined;
-				refreshCreatePreview();
-				if (interaction !== undefined && interaction.kind !== "pan")
-					dispatch?.(Action.EditorEditSessionCancelled());
-			};
-			const onWheel = (event: WheelEvent): void => {
-				const world = currentWorld;
-				const dispatch = currentDispatch;
-				if (world?.editor.open !== true || dispatch === undefined) return;
-				const target = event.target;
-				if (
-					target instanceof Element &&
-					target.closest("[data-editor-panel]") !== null
-				)
-					return;
-				event.preventDefault();
-				const canvas = document.querySelector("#world-canvas");
-				if (!(canvas instanceof SVGSVGElement)) return;
-				const matrix = canvas.getScreenCTM();
-				if (matrix === null) return;
-				const deltaFactor =
-					event.deltaMode === 1
-						? wheelLinePixels
-						: event.deltaMode === 2
-							? window.innerHeight
-							: 1;
-				const scaleX = Math.max(Number.EPSILON, Math.abs(matrix.a));
-				const scaleY = Math.max(Number.EPSILON, Math.abs(matrix.d));
-				dispatch(
-					Action.EditorCameraChanged({
-						camera: {
-							x: world.editor.camera.x - (event.deltaX * deltaFactor) / scaleX,
-							y: world.editor.camera.y - (event.deltaY * deltaFactor) / scaleY,
-						},
-					}),
-				);
-			};
-			const onKeyDown = (event: KeyboardEvent): void => {
-				const world = currentWorld;
-				const dispatch = currentDispatch;
-				if (world?.editor.open !== true || dispatch === undefined) return;
-				if (
-					world.editor.invalidPlacement !== null ||
-					(world.editor.editSession?.phase === "invalid-released" &&
-						world.editor.editSession.validity.kind === "invalid")
-				) {
-					if (event.key === "Enter" || event.key === "Escape") {
-						event.preventDefault();
-						dispatch(
-							world.editor.editSession === null
-								? Action.EditorInvalidPlacementDismissed()
-								: Action.EditorEditSessionCancelled(),
-						);
-					}
-					return;
-				}
-				const target = event.target;
-				if (
-					target instanceof HTMLInputElement ||
-					target instanceof HTMLTextAreaElement ||
-					target instanceof HTMLSelectElement
-				)
-					return;
-				if (event.key === "Delete" || event.key === "Backspace") {
-					event.preventDefault();
-					dispatch(Action.EditorDeleteSelected());
-				} else if (event.key === "Escape") {
-					event.preventDefault();
-					if (designStudioInteraction.popover !== null) {
-						designStudioInteraction = dismissPalettePopover(
-							designStudioInteraction,
-						);
-						popoverFading = false;
-						refreshLocalState();
-					} else dispatch(Action.EditorToggled());
-				}
-			};
-
-			const autoPanFrame = (time: number): void => {
-				const interaction = activeInteraction;
-				const world = currentWorld;
-				const dispatch = currentDispatch;
-				const clientPointer = latestPointer;
-				if (
-					interaction !== undefined &&
-					interaction.kind !== "pan" &&
-					world !== undefined &&
-					world.editor.editSession !== null &&
-					dispatch !== undefined &&
-					clientPointer !== undefined
-				) {
-					const pointer = svgPosition(clientPointer.x, clientPointer.y);
-					const canvas = document.querySelector("#world-canvas");
-					const matrix =
-						canvas instanceof SVGSVGElement ? canvas.getScreenCTM() : null;
-					if (
-						pointer !== undefined &&
-						canvas instanceof SVGSVGElement &&
-						matrix !== null
-					) {
-						const canvasBounds = canvas.getBoundingClientRect();
-						const elapsedSeconds =
-							previousAutoPanTime === undefined
-								? 0
-								: (time - previousAutoPanTime) / 1_000;
-						previousAutoPanTime = time;
-						const operation = world.editor.editSession.operation;
-						const previewWorld =
-							operation.kind === "resize" || operation.kind === "resize-floor"
-								? editSessionView(world)
-								: world;
-						const nextCamera = autoPanCamera({
-							camera: world.editor.camera,
-							pointer: {
-								x: clientPointer.x - canvasBounds.left,
-								y: clientPointer.y - canvasBounds.top,
-							},
-							viewport: {
-								width: canvasBounds.width,
-								height: canvasBounds.height,
-							},
-							scale: { x: matrix.a, y: matrix.d },
-							envelope:
-								previewWorld === world
-									? contentEnvelope(world)
-									: contentEnvelopeIncludingPreview(world, previewWorld),
-							elapsedSeconds,
-						});
-						if (
-							nextCamera.x !== world.editor.camera.x ||
-							nextCamera.y !== world.editor.camera.y
-						) {
-							const projectedPointer = {
-								x: pointer.x - nextCamera.x,
-								y: pointer.y - nextCamera.y,
-							};
-							if (interaction.kind === "create") {
-								const body = defaultEditorItemBody(interaction.itemKind);
-								const position = editorPlacementPositionAtPointer(
-									world,
-									interaction.itemKind,
-									body,
-									projectedPointer,
-								);
-								activeInteraction = { ...interaction, position };
-								dispatch(
-									Action.EditorEditSessionAutoPanned({
-										camera: nextCamera,
-										preview: { kind: "create", position },
-									}),
-								);
-							} else if (interaction.kind === "move") {
-								const itemKind = editorItemKindForEntity(
-									world,
-									interaction.entity,
-								);
-								if (itemKind !== undefined) {
-									const position = editorPlacementPositionAtPointer(
-										world,
-										itemKind,
-										interaction.body,
-										projectedPointer,
-										interaction.grabOffset,
-										interaction.entity,
-									);
-									dispatch(
-										Action.EditorEditSessionAutoPanned({
-											camera: nextCamera,
-											preview: { kind: "move", position },
-										}),
-									);
-								}
-							} else if (interaction.kind === "resize") {
-								const pointerWorld = unproject(projectedPointer);
-								const resized = resizeFromHandle(
-									interaction.position,
-									interaction.body,
-									{
-										x: pointerWorld.x - interaction.pointer.x,
-										y: pointerWorld.y - interaction.pointer.y,
-									},
-									interaction.widthDirection,
-									interaction.depthDirection,
-									minimumEntityBody,
-									maximumEditorBody(world, interaction.entity),
-								);
-								dispatch(
-									Action.EditorEditSessionAutoPanned({
-										camera: nextCamera,
-										preview: {
-											kind: "resize",
-											position: resized.position,
-											body: resized.body,
-										},
-									}),
-								);
-							} else {
-								const resized = resizeFromHandle(
-									{
-										x:
-											interaction.originalFloorOrigin.x +
-											interaction.floorPlan.width / 2,
-										y:
-											interaction.originalFloorOrigin.y +
-											interaction.floorPlan.depth / 2,
-									},
-									interaction.floorPlan,
-									floorResizePointerDelta(
-										interaction.pointer,
-										pointer,
-										nextCamera,
-									),
-									interaction.widthDirection,
-									interaction.depthDirection,
-									minimumFloorBody,
-									maximumFloorBody,
-								);
-								const floorOrigin = {
-									x: resized.position.x - resized.body.width / 2,
-									y: resized.position.y - resized.body.depth / 2,
-								};
-								dispatch(
-									Action.EditorEditSessionAutoPanned({
-										camera: nextCamera,
-										preview: {
-											kind: "resize-floor",
-											floorPlan: resized.body,
-											floorOrigin,
-										},
-									}),
-								);
-							}
-						}
-					}
-				} else previousAutoPanTime = undefined;
-				autoPanAnimationFrame = requestAnimationFrame(autoPanFrame);
-			};
-
+			Effect.gen(function* () {
+				let interactionRuntime: import("../design-studio/interaction/runtime").DesignStudioInteractionRuntime;
+				let currentWorld: World | undefined;
+				let currentViewWorld: World | undefined;
+				let currentPresentation: EditSessionPresentation | undefined;
+				let currentDispatch: Dispatch | undefined;
 			const selectionTemplate = (
 				world: World,
 				invalidPreview: boolean,
@@ -1117,7 +307,7 @@ export class RenderSystemService extends Context.Service<
 							pointer-events="stroke"
 							class=${edge.cursor}
 							@pointerdown=${(event: PointerEvent) =>
-								startFloorResize(
+								interactionRuntime.startFloorResize(
 									event,
 									world,
 									edge.widthDirection,
@@ -1138,7 +328,7 @@ export class RenderSystemService extends Context.Service<
 							stroke-width="3"
 							class=${handle.cursor}
 							@pointerdown=${(event: PointerEvent) =>
-								startFloorResize(
+								interactionRuntime.startFloorResize(
 									event,
 									world,
 									handle.widthDirection,
@@ -1262,7 +452,7 @@ export class RenderSystemService extends Context.Service<
 						pointer-events="stroke"
 						class=${edge.cursor}
 						@pointerdown=${(event: PointerEvent) =>
-							startEntityResize(
+							interactionRuntime.startEntityResize(
 								event,
 								world,
 								selected,
@@ -1284,7 +474,7 @@ export class RenderSystemService extends Context.Service<
 							stroke-width="3"
 							class=${handle.cursor}
 							@pointerdown=${(event: PointerEvent) =>
-								startEntityResize(
+								interactionRuntime.startEntityResize(
 									event,
 									world,
 									selected,
@@ -1379,7 +569,7 @@ export class RenderSystemService extends Context.Service<
 											type="button"
 											class="group cursor-grab touch-none rounded-xl border border-[#30464c] bg-[#17272e] p-3 text-left transition hover:-translate-y-0.5 hover:border-[#d9a969] hover:bg-[#20343b] active:cursor-grabbing"
 											@pointerdown=${(event: PointerEvent) =>
-												startPaletteDrag(event, item.kind, world)}
+												interactionRuntime.startPaletteDrag(event, item.kind, world)}
 										>
 											<span class="text-[22px] text-[#e8b875]">${item.icon}</span>
 											<span class="mt-1 block text-[13px] font-bold">${item.label}</span>
@@ -1612,42 +802,12 @@ export class RenderSystemService extends Context.Service<
 		`;
 			};
 
-			const activePlacementIsInvalid = (world: World): boolean => {
-				if (currentPresentation?.active === true)
-					return currentPresentation.invalidPreview;
-				const interaction = activeInteraction;
-				if (interaction?.kind === "create")
-					return (
-						interaction.canDrop &&
-						!isNewEditorItemPlacementValid(
-							world,
-							interaction.itemKind,
-							interaction.position,
-							defaultEditorItemBody(interaction.itemKind),
-						)
-					);
-				if (interaction?.kind === "resize-floor")
-					return !isFloorPlanPlacementValid(world, world.floorPlan);
-				if (interaction?.kind !== "move" && interaction?.kind !== "resize")
-					return false;
-				const position = world.positions.get(interaction.entity);
-				const body = world.bodies.get(interaction.entity);
-				return (
-					position !== undefined &&
-					body !== undefined &&
-					!isEntityPlacementValid(world, interaction.entity, position, body, {
-						position: interaction.position,
-						body: interaction.body,
-					})
-				);
-			};
-
 			const createPreviewTemplate = (
 				world: World,
 				invalidPreview: boolean,
 			): TemplateResult => {
-				const interaction = activeInteraction;
-				if (interaction?.kind !== "create") return html``;
+				const interaction = interactionRuntime.createPreview();
+				if (interaction === null) return html``;
 				const body = defaultEditorItemBody(interaction.itemKind);
 				const position = interaction.position;
 				const baseElevation = placementElevationForKind(
@@ -1707,6 +867,8 @@ export class RenderSystemService extends Context.Service<
 			`;
 			};
 
+
+
 			const renderWorld = (
 				authoredWorld: World,
 				world: World,
@@ -1715,10 +877,9 @@ export class RenderSystemService extends Context.Service<
 			): void => {
 				currentWorld = authoredWorld;
 				currentViewWorld = world;
-				currentPresentation = presentation;
-				currentDispatch = dispatch;
-				if (authoredWorld.editor.invalidPlacement !== null)
-					activeInteraction = undefined;
+					currentPresentation = presentation;
+					currentDispatch = dispatch;
+					interactionRuntime.update(authoredWorld, dispatch);
 				const playerPosition = world.positions.get(playerEntity);
 				const playerElevation = world.elevations.get(playerEntity);
 				if (playerPosition === undefined || playerElevation === undefined)
@@ -1733,7 +894,7 @@ export class RenderSystemService extends Context.Service<
 				const camera = world.editor.open
 					? world.editor.camera
 					: world.gameCamera;
-				const invalidPreview = activePlacementIsInvalid(authoredWorld);
+					const invalidPreview = presentation.invalidPreview;
 				const floor = projectedRectangle(
 					{
 						x: world.floorOrigin.x + world.floorPlan.width / 2,
@@ -1885,24 +1046,25 @@ export class RenderSystemService extends Context.Service<
 				const floorPointerDown = (event: PointerEvent): void => {
 					if (!world.editor.open) return;
 					event.stopPropagation();
-					if (isPanGesture(event)) {
-						startPan(event, world);
+					if (interactionRuntime.isPanGesture(event)) {
+						interactionRuntime.startPan(event, world);
 					} else if (event.button === 0) {
 						dispatch(Action.EditorSelectionChanged({ selection: "floor" }));
 					}
 				};
-				const canvasPointerDown = (event: PointerEvent): void => {
+					const canvasPointerDown = (event: PointerEvent): void => {
 					if (!world.editor.open) return;
-					if (isPanGesture(event)) {
-						startPan(event, world);
+					if (interactionRuntime.isPanGesture(event)) {
+						interactionRuntime.startPan(event, world);
 					} else if (event.button === 0) {
 						dispatch(Action.EditorSelectionChanged({ selection: null }));
-					}
-				};
+						}
+					};
+					const palettePopover = interactionRuntime.palettePopover();
 
 				render(
 					html`
-					<main class=${`relative h-screen w-screen overflow-hidden bg-[#14212a] ${activeInteraction !== undefined && activeInteraction.kind !== "pan" ? "editor-active-gesture" : ""} ${invalidPreview ? "editor-invalid-preview-root" : ""}`} @pointerdown=${(
+					<main class=${`relative h-screen w-screen overflow-hidden bg-[#14212a] ${interactionRuntime.isGestureActive() ? "editor-active-gesture" : ""} ${invalidPreview ? "editor-invalid-preview-root" : ""}`} @pointerdown=${(
 						event: PointerEvent,
 					) => {
 						const target = event.target;
@@ -1911,12 +1073,7 @@ export class RenderSystemService extends Context.Service<
 							target.closest("[data-palette-item]") !== null
 						)
 							return;
-						const dismissed = dismissPalettePopover(designStudioInteraction);
-						if (dismissed !== designStudioInteraction) {
-							designStudioInteraction = dismissed;
-							popoverFading = false;
-							refreshLocalState();
-						}
+						interactionRuntime.dismissPalettePopover();
 					}}>
 						<svg
 							id="world-canvas"
@@ -1945,7 +1102,7 @@ export class RenderSystemService extends Context.Service<
 								${objects.map(({ entity, template }) =>
 									entity === undefined
 										? template
-										: svg`<g class=${world.editor.open ? "cursor-move" : ""} @pointerdown=${(event: PointerEvent) => startEntityMove(event, world, entity, dispatch)}>${template}</g>`,
+										: svg`<g class=${world.editor.open ? "cursor-move" : ""} @pointerdown=${(event: PointerEvent) => interactionRuntime.startEntityMove(event, world, entity, dispatch)}>${template}</g>`,
 								)}
 								${world.editor.open ? selectionTemplate(world, invalidPreview, dispatch) : svg``}
 							</g>
@@ -2007,7 +1164,7 @@ export class RenderSystemService extends Context.Service<
 								`
 						}
 						<div id="editor-create-preview-host" class="contents"></div>
-						${designStudioInteraction.popover === null ? html`` : html`<div role="status" class=${`pointer-events-none fixed z-50 w-60 rounded-xl border border-[#d9a969] bg-[#17272e] px-4 py-3 text-[13px] font-semibold text-[#fff1d6] shadow-xl transition-opacity duration-200 ${popoverFading ? "opacity-0" : "opacity-100"}`} style=${`left: ${Math.max(12, designStudioInteraction.popover.itemBounds.left - 252)}px; top: ${designStudioInteraction.popover.itemBounds.top}px;`}>Drag this item onto the room to place it.</div>`}
+						${palettePopover === null ? html`` : html`<div role="status" class=${`pointer-events-none fixed z-50 w-60 rounded-xl border border-[#d9a969] bg-[#17272e] px-4 py-3 text-[13px] font-semibold text-[#fff1d6] shadow-xl transition-opacity duration-200 ${palettePopover.fading ? "opacity-0" : "opacity-100"}`} style=${`left: ${Math.max(12, palettePopover.left - 252)}px; top: ${palettePopover.top}px;`}>Drag this item onto the room to place it.</div>`}
 						${world.editor.invalidPlacement === null && !presentation.invalidReleased ? html`` : invalidPlacementTemplate(world, presentation, dispatch)}
 						${world.readingSign === null ? html`` : signDialogTemplate(world, dispatch)}
 					</main>
@@ -2015,65 +1172,31 @@ export class RenderSystemService extends Context.Service<
 					document.body,
 				);
 			};
-			refreshCreatePreview = () => {
-				const world = currentWorld;
-				const host = document.querySelector("#editor-create-preview-host");
-				if (world === undefined || !(host instanceof HTMLElement)) return;
-				const creating = activeInteraction?.kind === "create";
-				const invalid = creating && activePlacementIsInvalid(world);
-				const main = host.closest("main");
-				main?.classList.toggle(
-					"editor-active-gesture",
-					activeInteraction !== undefined && activeInteraction.kind !== "pan",
-				);
-				main?.classList.toggle("editor-invalid-preview-root", invalid);
-				document
-					.querySelector("#world-canvas")
-					?.classList.toggle("editor-invalid-preview", invalid);
-				render(creating ? html`` : createPreviewTemplate(world, invalid), host);
-			};
-			refreshLocalState = () => {
-				if (
-					currentWorld !== undefined &&
-					currentViewWorld !== undefined &&
-					currentPresentation !== undefined &&
-					currentDispatch !== undefined
-				)
-					renderWorld(
-						currentWorld,
-						currentViewWorld,
-						currentPresentation,
-						currentDispatch,
+				const refreshCreatePreview = (): void => {
+					const world = currentWorld;
+					const host = document.querySelector("#editor-create-preview-host");
+					if (world === undefined || !(host instanceof HTMLElement)) return;
+					const preview = interactionRuntime.createPreview();
+					render(
+						preview === null
+							? html``
+							: createPreviewTemplate(world, currentPresentation?.invalidPreview === true),
+						host,
 					);
-			};
-			yield* Effect.acquireRelease(
-				Effect.sync(() => {
-					window.addEventListener("pointermove", onPointerMove);
-					window.addEventListener("pointerup", onPointerUp);
-					window.addEventListener("pointercancel", onPointerCancel);
-					window.addEventListener("wheel", onWheel, { passive: false });
-					window.addEventListener("keydown", onKeyDown);
-					autoPanAnimationFrame = requestAnimationFrame(autoPanFrame);
-				}),
-				() =>
-					Effect.sync(() => {
-						window.removeEventListener("pointermove", onPointerMove);
-						window.removeEventListener("pointerup", onPointerUp);
-						window.removeEventListener("pointercancel", onPointerCancel);
-						window.removeEventListener("wheel", onWheel);
-						window.removeEventListener("keydown", onKeyDown);
-						if (autoPanAnimationFrame !== undefined)
-							cancelAnimationFrame(autoPanAnimationFrame);
-						if (popoverAnimationFrame !== undefined)
-							cancelAnimationFrame(popoverAnimationFrame);
-						activeInteraction = undefined;
-						designStudioInteraction = initialDesignStudioInteraction;
-						currentWorld = undefined;
-						currentViewWorld = undefined;
-						currentPresentation = undefined;
-						currentDispatch = undefined;
-					}),
-			);
+				};
+				const refreshLocalState = (): void => {
+					if (
+						currentWorld !== undefined &&
+						currentViewWorld !== undefined &&
+						currentPresentation !== undefined &&
+						currentDispatch !== undefined
+					)
+						renderWorld(currentWorld, currentViewWorld, currentPresentation, currentDispatch);
+				};
+				interactionRuntime = yield* makeDesignStudioInteractionRuntime({
+					refresh: refreshLocalState,
+					refreshPreview: refreshCreatePreview,
+				});
 			return { render: renderWorld };
 		}),
 	);

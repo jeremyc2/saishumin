@@ -1,8 +1,3 @@
-import {
-	defaultEditorItemHeight,
-	type EditorItemKind,
-	EditorItemKinds,
-} from "../model";
 import type { Body, Position } from "../../world/components";
 import type { EntityId } from "../../world/entity-id";
 import { isSolidEntity, overlaps } from "../../world/spatial/collision";
@@ -15,6 +10,11 @@ import {
 } from "../../world/spatial/elevation";
 import { isSupportSurfaceTransformValid } from "../../world/spatial/support-surface";
 import { playerEntity, type World } from "../../world/world";
+import {
+	defaultEditorItemHeight,
+	type EditorItemKind,
+	EditorItemKinds,
+} from "../model";
 
 export type OriginalPlacement = {
 	readonly position: Position;
