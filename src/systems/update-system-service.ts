@@ -26,7 +26,7 @@ import {
 	stationaryVelocity,
 	type World,
 } from "../world/world";
-import { MovementSystemService } from "./movement-system-service";
+import { MovementSystemService } from "../gameplay/movement/movement-system";
 
 const cameraFollowingPlayer = (world: World, camera: Position): Position => {
 	const position = world.positions.get(playerEntity);

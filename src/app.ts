@@ -7,7 +7,7 @@ import {
 	editSessionPresentation,
 	editSessionView,
 } from "./design-studio/edit-session/edit-session";
-import { MovementSystemService } from "./systems/movement-system-service";
+import { MovementSystemService } from "./gameplay/movement/movement-system";
 import { RenderSystemService } from "./systems/render-system-service";
 import { UpdateSystemService } from "./systems/update-system-service";
 import { initialWorld } from "./world/initial-world";
