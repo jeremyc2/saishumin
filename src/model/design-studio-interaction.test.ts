@@ -25,7 +25,7 @@ import { EntityId } from "./entity-id";
 describe("Design Studio interaction", () => {
 	test("activates a palette drag only after leaving the item rectangle expanded by 12 pixels", () => {
 		const pressed = pressPaletteItem(initialDesignStudioInteraction, {
-			itemKind: EditorItemKinds.Rug,
+			itemKind: EditorItemKinds.Hopscotch,
 			pointer: { x: 150, y: 130 },
 			itemBounds: { left: 100, top: 100, right: 200, bottom: 160 },
 		});
@@ -38,7 +38,7 @@ describe("Design Studio interaction", () => {
 			y: 172,
 		});
 		expect(outsideHysteresis.activated).toEqual({
-			itemKind: EditorItemKinds.Rug,
+			itemKind: EditorItemKinds.Hopscotch,
 			pointer: { x: 213, y: 172 },
 		});
 	});
@@ -53,7 +53,7 @@ describe("Design Studio interaction", () => {
 					editSession: {
 						operation: {
 							kind: "create",
-							itemKind: EditorItemKinds.Rug,
+							itemKind: EditorItemKinds.Hopscotch,
 							position: Position.make({ x: 500, y: 300 }),
 						},
 						validity: { kind: "valid" },

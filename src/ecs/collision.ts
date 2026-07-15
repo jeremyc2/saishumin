@@ -6,7 +6,7 @@ import { groundElevation, obstacleHeightTolerance, type World } from "./world";
 export const isSolidEntity = (world: World, entity: EntityId): boolean =>
 	world.obstacles.has(entity) ||
 	(world.decorations.has(entity) &&
-		world.decorations.get(entity)?.kind !== DecorationKinds.Rug);
+		world.decorations.get(entity)?.kind !== DecorationKinds.Hopscotch);
 
 export const overlaps = (
 	position: Position,

@@ -131,7 +131,7 @@ export const isNewEditorItemPlacementValid = (
 	body: Body,
 ): boolean => {
 	if (!isInsideFloorPlan(world, position, body)) return false;
-	if (kind === EditorItemKinds.Rug) return true;
+	if (kind === EditorItemKinds.Hopscotch) return true;
 	const base = placementElevationForKind(world, kind, position, body);
 	const height = defaultEditorItemHeight(kind);
 

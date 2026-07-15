@@ -36,11 +36,16 @@ export const Obstacle = Schema.Struct({
 });
 export type Obstacle = typeof Obstacle.Type;
 
-export const DecorationKind = Schema.Literals(["rug", "plant", "lamp", "sign"]);
+export const DecorationKind = Schema.Literals([
+	"hopscotch",
+	"plant",
+	"lamp",
+	"sign",
+]);
 export type DecorationKind = typeof DecorationKind.Type;
 
 export const DecorationKinds = {
-	Rug: DecorationKind.make("rug"),
+	Hopscotch: DecorationKind.make("hopscotch"),
 	Plant: DecorationKind.make("plant"),
 	Lamp: DecorationKind.make("lamp"),
 	Sign: DecorationKind.make("sign"),

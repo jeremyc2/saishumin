@@ -122,17 +122,17 @@ describe("editor placement", () => {
 		).toBe(true);
 	});
 
-	test("allows rugs to sit beneath other objects", () => {
-		const rugEntity = [...initialWorld.decorations.keys()][0];
+	test("allows hopscotch markings to sit beneath other objects", () => {
+		const hopscotchEntity = [...initialWorld.decorations.keys()][0];
 		const playerPosition = initialWorld.positions.get(playerEntity);
-		expect(rugEntity).toBeDefined();
+		expect(hopscotchEntity).toBeDefined();
 		expect(playerPosition).toBeDefined();
-		if (rugEntity === undefined || playerPosition === undefined) return;
+		if (hopscotchEntity === undefined || playerPosition === undefined) return;
 
 		expect(
 			isEntityPlacementValid(
 				initialWorld,
-				rugEntity,
+				hopscotchEntity,
 				playerPosition,
 				smallBody,
 			),

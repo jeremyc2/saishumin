@@ -512,7 +512,7 @@ export class UpdateSystemService extends Context.Service<
 						EditorEntityHeightChanged: ({ entity, height }) => {
 							if (!world.editor.open || !Number.isFinite(height)) return world;
 							const kind = editorItemKindForEntity(world, entity);
-							if (kind === undefined || kind === EditorItemKinds.Rug)
+							if (kind === undefined || kind === EditorItemKinds.Hopscotch)
 								return world;
 							const limits = editorItemHeightLimits(kind);
 							const nextHeight = clamp(height, limits.minimum, limits.maximum);

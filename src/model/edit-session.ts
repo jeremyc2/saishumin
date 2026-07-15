@@ -104,8 +104,8 @@ export const addEditorItemToWorld = (
 		obstacles.set(entity, Obstacle.make({ height, kind: ObstacleKinds.Chest }));
 	else {
 		const kind =
-			itemKind === EditorItemKinds.Rug
-				? DecorationKinds.Rug
+			itemKind === EditorItemKinds.Hopscotch
+				? DecorationKinds.Hopscotch
 				: itemKind === EditorItemKinds.Plant
 					? DecorationKinds.Plant
 					: itemKind === EditorItemKinds.Sign

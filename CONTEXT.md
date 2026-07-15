@@ -5,7 +5,7 @@ Saishumin is a room-exploration game with an integrated Design Studio for author
 ## Language
 
 **Editor Item**:
-An object that can be created and modified in the Design Studio, such as a rug, plant, lamp, wall, platform, crate, chest, or sign. The player and floor are not Editor Items.
+An object that can be created and modified in the Design Studio, such as hopscotch, plant, lamp, wall, platform, crate, chest, or sign. The player and floor are not Editor Items.
 _Avoid_: Editor object, palette object
 
 **Design Studio Panel**:

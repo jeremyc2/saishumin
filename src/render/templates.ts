@@ -490,9 +490,55 @@ export const decorationTemplate = (
 	baseElevation = 0,
 	grabbed = false,
 ): TemplateResult => {
-	if (decoration.kind === DecorationKinds.Rug) {
-		const borderWidth = Math.max(4, Math.min(12, body.width / 28));
-		return svg`<polygon points=${points(projectedRectangle(position, body))} fill="#cf8677" stroke="#e8b875" stroke-width=${borderWidth} />`;
+	if (decoration.kind === DecorationKinds.Hopscotch) {
+		const hopscotchPoint = (x: number, y: number): Position =>
+			project({
+				x: position.x + (x - 0.5) * body.width,
+				y: position.y + (y - 0.5) * body.depth,
+			});
+		const point = (x: number, y: number): string => {
+			const projected = hopscotchPoint(x, y);
+			return `${projected.x} ${projected.y}`;
+		};
+		const cell = (
+			left: number,
+			top: number,
+			right: number,
+			bottom: number,
+		): string =>
+			`M ${point(left, top)} L ${point(right, top)} L ${point(right, bottom)} L ${point(left, bottom)} Z`;
+		const markings = [
+			cell(0.34, 0.84, 0.66, 0.98),
+			cell(0.34, 0.72, 0.66, 0.84),
+			cell(0.34, 0.6, 0.66, 0.72),
+			cell(0.18, 0.46, 0.5, 0.6),
+			cell(0.5, 0.46, 0.82, 0.6),
+			cell(0.34, 0.34, 0.66, 0.46),
+			cell(0.18, 0.2, 0.5, 0.34),
+			cell(0.5, 0.2, 0.82, 0.34),
+			`M ${point(0.18, 0.2)} L ${point(0.18, 0.08)} Q ${point(0.5, -0.04)} ${point(0.82, 0.08)} L ${point(0.82, 0.2)}`,
+		].join(" ");
+		const labels = [
+			{ value: "1", x: 0.5, y: 0.91 },
+			{ value: "2", x: 0.5, y: 0.78 },
+			{ value: "3", x: 0.5, y: 0.66 },
+			{ value: "4", x: 0.34, y: 0.53 },
+			{ value: "5", x: 0.66, y: 0.53 },
+			{ value: "6", x: 0.5, y: 0.4 },
+			{ value: "7", x: 0.34, y: 0.27 },
+			{ value: "8", x: 0.66, y: 0.27 },
+		] as const;
+		const textSize = Math.max(11, Math.min(26, body.width / 8));
+		return svg`
+			<g data-decoration-kind="hopscotch" aria-label="Spray-painted hopscotch" style="user-select: none">
+				<path d=${markings} fill="none" stroke="#72542f" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" opacity="0.18" />
+				<path d=${markings} fill="none" stroke="#f2d27b" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="18 2 9 1" opacity="0.86" />
+				${labels.map(({ value, x, y }) => {
+					const labelPosition = hopscotchPoint(x, y);
+					return svg`<text x=${labelPosition.x} y=${labelPosition.y} fill="#f2d27b" font-size=${textSize} font-family="system-ui, sans-serif" font-weight="700" text-anchor="middle" dominant-baseline="middle" opacity="0.82">${value}</text>`;
+				})}
+			</g>
+		`;
 	}
 
 	const base = project(position, baseElevation);

@@ -176,7 +176,7 @@ const obstacles = new Map<EntityId, Obstacle>([
 const decorations = new Map<EntityId, Decoration>([
 	[
 		decorationEntities[0],
-		Decoration.make({ kind: DecorationKinds.Rug, height: 0 }),
+		Decoration.make({ kind: DecorationKinds.Hopscotch, height: 0 }),
 	],
 	[
 		signEntities[0],
@@ -185,7 +185,7 @@ const decorations = new Map<EntityId, Decoration>([
 ]);
 
 positions.set(decorationEntities[0], Position.make({ x: 570, y: 330 }));
-bodies.set(decorationEntities[0], Body.make({ width: 330, depth: 190 }));
+bodies.set(decorationEntities[0], Body.make({ width: 190, depth: 330 }));
 
 export const initialWorld: World = {
 	positions,

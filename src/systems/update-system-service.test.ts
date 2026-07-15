@@ -87,7 +87,7 @@ describe("UpdateSystemService", () => {
 			Action.EditorEditSessionBegan({
 				operation: {
 					kind: "create",
-					itemKind: EditorItemKinds.Rug,
+					itemKind: EditorItemKinds.Hopscotch,
 					position: Position.make({ x: 500, y: 300 }),
 				},
 			}),
@@ -113,7 +113,7 @@ describe("UpdateSystemService", () => {
 			Action.EditorEditSessionBegan({
 				operation: {
 					kind: "create",
-					itemKind: EditorItemKinds.Rug,
+					itemKind: EditorItemKinds.Hopscotch,
 					position: Position.make({ x: 500, y: 300 }),
 				},
 			}),

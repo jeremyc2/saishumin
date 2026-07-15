@@ -162,10 +162,10 @@ const paletteItems: ReadonlyArray<{
 	readonly description: string;
 }> = [
 	{
-		kind: EditorItemKinds.Rug,
-		label: "Rug",
-		icon: "▱",
-		description: "Soft floor color",
+		kind: EditorItemKinds.Hopscotch,
+		label: "Hopscotch",
+		icon: "♙",
+		description: "Spray-painted ground game",
 	},
 	{
 		kind: EditorItemKinds.Plant,
@@ -220,7 +220,7 @@ const entityLabel = (world: World, entity: EntityId): string => {
 		return "Crate";
 	}
 	const decoration = world.decorations.get(entity);
-	if (decoration?.kind === DecorationKinds.Rug) return "Rug";
+	if (decoration?.kind === DecorationKinds.Hopscotch) return "Hopscotch";
 	if (decoration?.kind === DecorationKinds.Plant) return "Plant";
 	if (decoration?.kind === DecorationKinds.Sign) return "Sign";
 	return "Lamp";
@@ -1685,8 +1685,8 @@ export class RenderSystemService extends Context.Service<
 											body,
 											Decoration.make({
 												kind:
-													interaction.itemKind === EditorItemKinds.Rug
-														? DecorationKinds.Rug
+													interaction.itemKind === EditorItemKinds.Hopscotch
+														? DecorationKinds.Hopscotch
 														: interaction.itemKind === EditorItemKinds.Plant
 															? DecorationKinds.Plant
 															: interaction.itemKind === EditorItemKinds.Sign
@@ -1830,7 +1830,7 @@ export class RenderSystemService extends Context.Service<
 					if (position === undefined || body === undefined) continue;
 					objects.push({
 						depth:
-							decoration.kind === DecorationKinds.Rug
+							decoration.kind === DecorationKinds.Hopscotch
 								? Number.NEGATIVE_INFINITY
 								: renderDepthForEntity(world, entity),
 						entity,

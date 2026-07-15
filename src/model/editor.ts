@@ -3,7 +3,7 @@ import { Body, type Position } from "./component";
 import type { EntityId } from "./entity-id";
 
 export const EditorItemKind = Schema.Literals([
-	"rug",
+	"hopscotch",
 	"plant",
 	"lamp",
 	"wall",
@@ -15,7 +15,7 @@ export const EditorItemKind = Schema.Literals([
 export type EditorItemKind = typeof EditorItemKind.Type;
 
 export const EditorItemKinds = {
-	Rug: EditorItemKind.make("rug"),
+	Hopscotch: EditorItemKind.make("hopscotch"),
 	Plant: EditorItemKind.make("plant"),
 	Lamp: EditorItemKind.make("lamp"),
 	Wall: EditorItemKind.make("wall"),
@@ -28,8 +28,8 @@ export const EditorItemKinds = {
 export const isEditorItemKind = Schema.is(EditorItemKind);
 
 export const defaultEditorItemBody = (kind: EditorItemKind): Body => {
-	if (kind === EditorItemKinds.Rug)
-		return Body.make({ width: 260, depth: 150 });
+	if (kind === EditorItemKinds.Hopscotch)
+		return Body.make({ width: 150, depth: 280 });
 	if (kind === EditorItemKinds.Plant)
 		return Body.make({ width: 72, depth: 72 });
 	if (kind === EditorItemKinds.Lamp) return Body.make({ width: 64, depth: 64 });
@@ -44,7 +44,7 @@ export const defaultEditorItemBody = (kind: EditorItemKind): Body => {
 };
 
 export const defaultEditorItemHeight = (kind: EditorItemKind): number => {
-	if (kind === EditorItemKinds.Rug) return 0;
+	if (kind === EditorItemKinds.Hopscotch) return 0;
 	if (kind === EditorItemKinds.Plant) return 84;
 	if (kind === EditorItemKinds.Lamp) return 96;
 	if (kind === EditorItemKinds.Wall) return 80;
@@ -57,7 +57,7 @@ export const defaultEditorItemHeight = (kind: EditorItemKind): number => {
 export const editorItemHeightLimits = (
 	kind: EditorItemKind,
 ): { readonly minimum: number; readonly maximum: number } => {
-	if (kind === EditorItemKinds.Rug) return { minimum: 0, maximum: 0 };
+	if (kind === EditorItemKinds.Hopscotch) return { minimum: 0, maximum: 0 };
 	if (kind === EditorItemKinds.Platform) return { minimum: 16, maximum: 160 };
 	if (kind === EditorItemKinds.Crate || kind === EditorItemKinds.Chest)
 		return { minimum: 32, maximum: 160 };
@@ -66,8 +66,8 @@ export const editorItemHeightLimits = (
 };
 
 export const maximumEditorItemBody = (kind: EditorItemKind): Body => {
-	if (kind === EditorItemKinds.Rug)
-		return Body.make({ width: 1200, depth: 800 });
+	if (kind === EditorItemKinds.Hopscotch)
+		return Body.make({ width: 800, depth: 1200 });
 	if (kind === EditorItemKinds.Plant || kind === EditorItemKinds.Lamp)
 		return Body.make({ width: 180, depth: 180 });
 	if (kind === EditorItemKinds.Wall)
