@@ -1,15 +1,27 @@
 import { Data } from "effect";
 import type { Body, Position, SignContent } from "./component";
 import type { Control } from "./control";
-import type { EditorItemKind, EditorSelection } from "./editor";
+import type {
+	EditorItemKind,
+	EditorSelection,
+	EditSessionOperation,
+	EditSessionPreview,
+} from "./editor";
 import type { EntityId } from "./entity-id";
 
 export type Action = Data.TaggedEnum<{
 	KeyChanged: { readonly key: Control; readonly pressed: boolean };
 	Tick: { readonly time: number };
 	EditorToggled: Record<never, never>;
-	TireTracksToggled: Record<never, never>;
 	EditorSelectionChanged: { readonly selection: EditorSelection };
+	EditorEditSessionBegan: { readonly operation: EditSessionOperation };
+	EditorEditSessionPreviewed: { readonly preview: EditSessionPreview };
+	EditorEditSessionAutoPanned: {
+		readonly camera: Position;
+		readonly preview: EditSessionPreview;
+	};
+	EditorEditSessionCommitted: Record<never, never>;
+	EditorEditSessionCancelled: Record<never, never>;
 	EditorItemAdded: {
 		readonly kind: EditorItemKind;
 		readonly position: Position;
@@ -17,22 +29,11 @@ export type Action = Data.TaggedEnum<{
 	EditorEntityMoved: {
 		readonly entity: EntityId;
 		readonly position: Position;
-		readonly originalPosition?: Position;
-		readonly originalBody?: Body;
-		readonly preview?: boolean;
 	};
 	EditorEntityResized: {
 		readonly entity: EntityId;
 		readonly body: Body;
 		readonly position?: Position;
-		readonly originalPosition?: Position;
-		readonly originalBody?: Body;
-		readonly preview?: boolean;
-	};
-	EditorEntityInteractionFinished: {
-		readonly entity: EntityId;
-		readonly originalPosition: Position;
-		readonly originalBody: Body;
 	};
 	EditorEntityHeightChanged: {
 		readonly entity: EntityId;
@@ -44,12 +45,6 @@ export type Action = Data.TaggedEnum<{
 	};
 	EditorFloorResized: {
 		readonly floorPlan: Body;
-		readonly originDelta?: Position;
-		readonly preview?: boolean;
-	};
-	EditorFloorInteractionFinished: {
-		readonly originalFloorPlan: Body;
-		readonly originOffset: Position;
 	};
 	EditorCameraChanged: { readonly camera: Position };
 	EditorInvalidPlacementDismissed: Record<never, never>;

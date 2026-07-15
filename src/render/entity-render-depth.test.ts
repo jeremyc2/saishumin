@@ -19,7 +19,6 @@ import { EntityId } from "../model/entity-id";
 import {
 	renderDepthForEntity,
 	renderDepthForPlayer,
-	renderDepthForSurfacePoint,
 } from "./entity-render-depth";
 
 const platform = EntityId(920);
@@ -152,33 +151,6 @@ describe("entity render depth", () => {
 		expect(renderDepthForPlayer(positionedWorld)).toBeGreaterThan(
 			renderDepthForEntity(positionedWorld, crate),
 		);
-	});
-
-	test("keeps ground trail marks beneath a crate dragged over them", () => {
-		const crate = EntityId(927);
-		const cratePosition = Position.make({ x: 500, y: 300 });
-		const markPosition = Position.make({ x: 500, y: 315 });
-		const crateWorld = {
-			...initialWorld,
-			positions: new Map(initialWorld.positions).set(crate, cratePosition),
-			bodies: new Map(initialWorld.bodies).set(crate, crateBody),
-			obstacles: new Map(initialWorld.obstacles).set(
-				crate,
-				Obstacle.make({ kind: ObstacleKinds.Crate, height: crateHeight }),
-			),
-			elevations: new Map(initialWorld.elevations).set(
-				crate,
-				Elevation.make({ z: 0, velocity: 0 }),
-			),
-		};
-		const crateDepth = renderDepthForEntity(crateWorld, crate);
-
-		expect(
-			renderDepthForSurfacePoint(crateWorld, markPosition, 0),
-		).toBeLessThan(crateDepth);
-		expect(
-			renderDepthForSurfacePoint(crateWorld, markPosition, crateHeight),
-		).toBeGreaterThan(crateDepth);
 	});
 
 	test("draws an offset upper crate after its lower crate", () => {

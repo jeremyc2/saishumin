@@ -24,21 +24,28 @@ export type OriginalPlacement = {
 const isBlockingEntity = (world: World, entity: EntityId): boolean =>
 	entity !== playerEntity && isSolidEntity(world, entity);
 
+const placementBoundaryTolerance = 0.000_001;
+
 export const isInsideFloorPlan = (
 	world: World,
 	position: Position,
 	body: Body,
-): boolean => isInsideBody(world.floorPlan, position, body);
+): boolean => isInsideBody(world.floorPlan, world.floorOrigin, position, body);
 
 const isInsideBody = (
 	container: Body,
+	containerOrigin: Position,
 	position: Position,
 	body: Body,
 ): boolean =>
-	position.x - body.width / 2 >= 0 &&
-	position.x + body.width / 2 <= container.width &&
-	position.y - body.depth / 2 >= 0 &&
-	position.y + body.depth / 2 <= container.depth;
+	position.x - body.width / 2 >=
+		containerOrigin.x - placementBoundaryTolerance &&
+	position.x + body.width / 2 <=
+		containerOrigin.x + container.width + placementBoundaryTolerance &&
+	position.y - body.depth / 2 >=
+		containerOrigin.y - placementBoundaryTolerance &&
+	position.y + body.depth / 2 <=
+		containerOrigin.y + container.depth + placementBoundaryTolerance;
 
 export const isFloorPlanPlacementValid = (
 	world: World,
@@ -47,7 +54,10 @@ export const isFloorPlanPlacementValid = (
 	for (const [entity, position] of world.positions) {
 		if (entity === playerEntity) continue;
 		const body = world.bodies.get(entity);
-		if (body !== undefined && !isInsideBody(floorPlan, position, body))
+		if (
+			body !== undefined &&
+			!isInsideBody(floorPlan, world.floorOrigin, position, body)
+		)
 			return false;
 	}
 	return true;

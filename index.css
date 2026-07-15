@@ -30,8 +30,8 @@ body {
 
 .world-editor-canvas,
 .world-editor-canvas *,
-.editor-create-drag,
-.editor-create-drag * {
+.editor-active-gesture,
+.editor-active-gesture * {
 	cursor:
 		url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'%3E%3Cpath d='M3 2L3 25L9 19L14 30L19 27L14 17L24 17Z' fill='%23fff0a8' stroke='%23503b37' stroke-width='2.5' stroke-linejoin='round'/%3E%3C/svg%3E")
 		3 2,
@@ -40,8 +40,8 @@ body {
 
 .world-editor-canvas.editor-invalid-preview,
 .world-editor-canvas.editor-invalid-preview *,
-.editor-create-drag.editor-invalid-preview-root,
-.editor-create-drag.editor-invalid-preview-root *,
+.editor-active-gesture.editor-invalid-preview-root,
+.editor-active-gesture.editor-invalid-preview-root *,
 .editor-invalid-cursor,
 .editor-invalid-cursor * {
 	cursor:

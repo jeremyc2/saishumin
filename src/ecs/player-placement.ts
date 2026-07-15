@@ -29,10 +29,12 @@ export const isPlayerPlacementValid = (
 	elevation: number,
 ): boolean => {
 	if (
-		position.x - playerBody.width / 2 < 0 ||
-		position.x + playerBody.width / 2 > world.floorPlan.width ||
-		position.y - playerBody.depth / 2 < 0 ||
-		position.y + playerBody.depth / 2 > world.floorPlan.depth
+		position.x - playerBody.width / 2 < world.floorOrigin.x ||
+		position.x + playerBody.width / 2 >
+			world.floorOrigin.x + world.floorPlan.width ||
+		position.y - playerBody.depth / 2 < world.floorOrigin.y ||
+		position.y + playerBody.depth / 2 >
+			world.floorOrigin.y + world.floorPlan.depth
 	)
 		return false;
 
@@ -57,10 +59,12 @@ export const nearestValidPlayerPosition = (
 	origin: Position,
 	elevation: number,
 ): Position | undefined => {
-	const minimumX = playerBody.width / 2;
-	const maximumX = world.floorPlan.width - playerBody.width / 2;
-	const minimumY = playerBody.depth / 2;
-	const maximumY = world.floorPlan.depth - playerBody.depth / 2;
+	const minimumX = world.floorOrigin.x + playerBody.width / 2;
+	const maximumX =
+		world.floorOrigin.x + world.floorPlan.width - playerBody.width / 2;
+	const minimumY = world.floorOrigin.y + playerBody.depth / 2;
+	const maximumY =
+		world.floorOrigin.y + world.floorPlan.depth - playerBody.depth / 2;
 	if (minimumX > maximumX || minimumY > maximumY) return undefined;
 
 	const xCoordinates = new Set([

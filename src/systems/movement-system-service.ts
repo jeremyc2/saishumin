@@ -78,9 +78,12 @@ export class MovementSystemService extends Context.Service<
 				const roomExtent = movingHorizontally
 					? world.floorPlan.width
 					: world.floorPlan.depth;
+				const roomOrigin = movingHorizontally
+					? world.floorOrigin.x
+					: world.floorOrigin.y;
 				const roomContact = movingForward
-					? roomExtent - halfExtent - center
-					: halfExtent - center;
+					? roomOrigin + roomExtent - halfExtent - center
+					: roomOrigin + halfExtent - center;
 				allowed = movingForward
 					? Math.max(0, Math.min(allowed, roomContact))
 					: Math.min(0, Math.max(allowed, roomContact));
@@ -636,12 +639,14 @@ export class MovementSystemService extends Context.Service<
 			if (z < fallResetElevation) {
 				const resetPosition = {
 					x: Math.min(
-						playerSpawnPosition.x,
-						verticalMove.world.floorPlan.width,
+						Math.max(playerSpawnPosition.x, verticalMove.world.floorOrigin.x),
+						verticalMove.world.floorOrigin.x +
+							verticalMove.world.floorPlan.width,
 					),
 					y: Math.min(
-						playerSpawnPosition.y,
-						verticalMove.world.floorPlan.depth,
+						Math.max(playerSpawnPosition.y, verticalMove.world.floorOrigin.y),
+						verticalMove.world.floorOrigin.y +
+							verticalMove.world.floorPlan.depth,
 					),
 				};
 				const resetPositions = new Map(verticalMove.world.positions);

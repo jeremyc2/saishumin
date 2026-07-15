@@ -19,10 +19,10 @@ export const isPositionInsideRoom = (
 	world: World,
 	position: Position,
 ): boolean =>
-	position.x >= 0 &&
-	position.x <= world.floorPlan.width &&
-	position.y >= 0 &&
-	position.y <= world.floorPlan.depth;
+	position.x >= world.floorOrigin.x &&
+	position.x <= world.floorOrigin.x + world.floorPlan.width &&
+	position.y >= world.floorOrigin.y &&
+	position.y <= world.floorOrigin.y + world.floorPlan.depth;
 
 export type SupportSurface = {
 	readonly elevation: number;

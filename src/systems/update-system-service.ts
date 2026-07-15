@@ -11,21 +11,17 @@ import {
 import {
 	entityBaseElevation,
 	placementElevationForEntity,
-	placementElevationForKind,
 } from "../ecs/elevation";
 import {
 	isPlayerPlacementValid,
 	nearestValidPlayerPosition,
 } from "../ecs/player-placement";
-import { advancePlayerTrail } from "../ecs/player-trail";
 import { isSupportSurfaceOccupied } from "../ecs/support-surface";
 import {
 	crateGrabDistance,
-	crateHeight,
 	groundElevation,
 	interactionDistance,
 	jumpSpeed,
-	maximumFloorExtent,
 	maximumFrameElapsedSeconds,
 	millisecondsPerSecond,
 	minimumEntityExtent,
@@ -36,36 +32,30 @@ import {
 	playerEntity,
 	stationaryVelocity,
 	type World,
-	wallHeight,
 } from "../ecs/world";
 import { Action } from "../model/action";
 import {
 	Body,
-	Decoration,
 	DecorationKinds,
-	defaultSignContent,
-	Elevation,
-	Obstacle,
 	ObstacleKinds,
 	type Position,
 } from "../model/component";
 import { Controls, type Direction, isDirection } from "../model/control";
 import {
-	defaultEditorItemBody,
-	defaultEditorItemHeight,
-	EditorItemKinds,
-	editorItemHeightLimits,
-} from "../model/editor";
-import { EntityId, type EntityId as EntityIdType } from "../model/entity-id";
+	addEditorItemToWorld,
+	beginEditSession,
+	cancelEditSession,
+	commitEditSession,
+	previewEditSession,
+} from "../model/edit-session";
+import { EditorItemKinds, editorItemHeightLimits } from "../model/editor";
+import type { EntityId as EntityIdType } from "../model/entity-id";
+import { floorTilesCoveringPlan } from "../model/floor-tile";
 import {
 	PlayerFacings,
 	playerFacingForDirections,
 } from "../model/player-facing";
-import {
-	cameraForFloor,
-	followCamera,
-	projectVector,
-} from "../render/projection";
+import { cameraForFloor, followCamera } from "../render/projection";
 import { MovementSystemService } from "./movement-system-service";
 
 const clamp = (value: number, minimum: number, maximum: number): number =>
@@ -93,25 +83,15 @@ const sanitizedEntityBody = (
 
 const sanitizedFloorPlan = (body: Body): Body =>
 	Body.make({
-		width: clamp(
-			Number.isFinite(body.width) ? body.width : minimumFloorWidth,
+		width: Math.max(
 			minimumFloorWidth,
-			maximumFloorExtent,
+			Number.isFinite(body.width) ? body.width : minimumFloorWidth,
 		),
-		depth: clamp(
-			Number.isFinite(body.depth) ? body.depth : minimumFloorDepth,
+		depth: Math.max(
 			minimumFloorDepth,
-			maximumFloorExtent,
+			Number.isFinite(body.depth) ? body.depth : minimumFloorDepth,
 		),
 	});
-
-const nextEntityId = (world: World): EntityIdType => {
-	let greatestId = 0;
-	for (const entity of world.positions.keys()) {
-		greatestId = Math.max(greatestId, entity);
-	}
-	return EntityId(greatestId + 1);
-};
 
 const cameraFollowingPlayer = (world: World, camera: Position): Position => {
 	const position = world.positions.get(playerEntity);
@@ -126,95 +106,10 @@ const addEditorItem = (
 	kind: Parameters<typeof Action.EditorItemAdded>[0]["kind"],
 	position: Position,
 ): World => {
-	const entity = nextEntityId(world);
-	const positions = new Map(world.positions);
-	const bodies = new Map(world.bodies);
-	const obstacles = new Map(world.obstacles);
-	const decorations = new Map(world.decorations);
-	const elevations = new Map(world.elevations);
-	const signContents = new Map(world.signContents);
-	positions.set(entity, position);
-	bodies.set(entity, defaultEditorItemBody(kind));
-
-	if (kind === EditorItemKinds.Wall) {
-		obstacles.set(
-			entity,
-			Obstacle.make({ height: wallHeight, kind: ObstacleKinds.Wall }),
-		);
-	} else if (kind === EditorItemKinds.Platform) {
-		obstacles.set(
-			entity,
-			Obstacle.make({ height: 40, kind: ObstacleKinds.Platform }),
-		);
-	} else if (kind === EditorItemKinds.Crate) {
-		obstacles.set(
-			entity,
-			Obstacle.make({ height: crateHeight, kind: ObstacleKinds.Crate }),
-		);
-	} else if (kind === EditorItemKinds.Chest) {
-		obstacles.set(
-			entity,
-			Obstacle.make({
-				height: defaultEditorItemHeight(kind),
-				kind: ObstacleKinds.Chest,
-			}),
-		);
-	} else if (kind === EditorItemKinds.Rug) {
-		decorations.set(
-			entity,
-			Decoration.make({
-				kind: DecorationKinds.Rug,
-				height: defaultEditorItemHeight(kind),
-			}),
-		);
-	} else if (kind === EditorItemKinds.Plant) {
-		decorations.set(
-			entity,
-			Decoration.make({
-				kind: DecorationKinds.Plant,
-				height: defaultEditorItemHeight(kind),
-			}),
-		);
-	} else if (kind === EditorItemKinds.Sign) {
-		decorations.set(
-			entity,
-			Decoration.make({
-				kind: DecorationKinds.Sign,
-				height: defaultEditorItemHeight(kind),
-			}),
-		);
-		signContents.set(entity, defaultSignContent);
-	} else {
-		decorations.set(
-			entity,
-			Decoration.make({
-				kind: DecorationKinds.Lamp,
-				height: defaultEditorItemHeight(kind),
-			}),
-		);
-	}
-	elevations.set(
-		entity,
-		Elevation.make({
-			z: placementElevationForKind(
-				world,
-				kind,
-				position,
-				bodies.get(entity) ?? defaultEditorItemBody(kind),
-			),
-			velocity: stationaryVelocity,
-		}),
-	);
-	const candidate = {
-		...world,
-		positions,
-		bodies,
-		obstacles,
-		decorations,
-		elevations,
-		signContents,
-	};
-	const body = bodies.get(entity);
+	const candidate = addEditorItemToWorld(world, kind, position);
+	const entity = candidate.editor.selected;
+	if (entity === null || entity === "floor") return world;
+	const body = candidate.bodies.get(entity);
 	if (
 		body === undefined ||
 		!isEntityPlacementValid(candidate, entity, position, body)
@@ -247,38 +142,15 @@ const invalidEntityPlacement = (
 	},
 });
 
-const translateFloorOrigin = (world: World, delta: Position): World => {
-	if (delta.x === 0 && delta.y === 0) return world;
-	const positions = new Map(world.positions);
-	for (const [entity, position] of positions) {
-		positions.set(entity, {
-			x: position.x - delta.x,
-			y: position.y - delta.y,
-		});
-	}
-	const cameraDelta = projectVector(delta);
-	return {
-		...world,
-		positions,
-		editor: {
-			...world.editor,
-			camera: {
-				x: world.editor.camera.x + cameraDelta.x,
-				y: world.editor.camera.y + cameraDelta.y,
-			},
-		},
-	};
-};
-
 const invalidFloorPlacement = (
 	world: World,
 	floorPlan: Body,
-	originOffset: Position,
+	floorOrigin: Position,
 ): World => ({
 	...world,
 	editor: {
 		...world.editor,
-		invalidPlacement: { kind: "floor", floorPlan, originOffset },
+		invalidPlacement: { kind: "floor", floorPlan, floorOrigin },
 	},
 });
 
@@ -401,7 +273,6 @@ export class UpdateSystemService extends Context.Service<
 									: {
 											...world,
 											pressed: new Set<Direction>(),
-											playerTrail: [],
 											grabbed: null,
 											pushing: null,
 											readingSign: sign,
@@ -469,49 +340,56 @@ export class UpdateSystemService extends Context.Service<
 								maximumFrameElapsedSeconds,
 							);
 							const moved = movementSystem.update(world, elapsed);
-							const withTrail = advancePlayerTrail(world, moved, elapsed);
 							return {
-								...withTrail,
-								gameCamera: cameraFollowingPlayer(withTrail, world.gameCamera),
+								...moved,
+								gameCamera: cameraFollowingPlayer(moved, world.gameCamera),
 								lastFrame: time,
 							};
 						},
 						EditorToggled: () => {
-							const open = !world.editor.open;
+							const withoutSession = cancelEditSession(world);
+							const open = !withoutSession.editor.open;
 							let toggled: World = {
-								...world,
+								...withoutSession,
 								pressed: new Set<Direction>(),
-								playerTrail: [],
 								readingSign: null,
 								grabbed: null,
 								pushing: null,
 								lastFrame: 0,
 								editor: {
-									...world.editor,
+									...withoutSession.editor,
 									open,
-									camera: open ? world.gameCamera : world.editor.camera,
+									camera: open
+										? withoutSession.gameCamera
+										: withoutSession.editor.camera,
 									selected: null,
 									invalidPlacement: null,
+									editSession: null,
 								},
 							};
 							if (open) return toggled;
-							const playerPosition = world.positions.get(playerEntity);
-							const playerElevation = world.elevations.get(playerEntity);
+							const playerPosition = withoutSession.positions.get(playerEntity);
+							const playerElevation =
+								withoutSession.elevations.get(playerEntity);
 							if (
 								playerPosition === undefined ||
 								playerElevation === undefined ||
-								isPlayerPlacementValid(world, playerPosition, playerElevation.z)
+								isPlayerPlacementValid(
+									withoutSession,
+									playerPosition,
+									playerElevation.z,
+								)
 							)
 								return toggled;
 							const safePosition = nearestValidPlayerPosition(
-								world,
+								withoutSession,
 								playerPosition,
 								groundElevation,
 							);
 							if (safePosition === undefined) return toggled;
-							const positions = new Map(world.positions);
+							const positions = new Map(withoutSession.positions);
 							positions.set(playerEntity, safePosition);
-							const elevations = new Map(world.elevations);
+							const elevations = new Map(withoutSession.elevations);
 							elevations.set(playerEntity, {
 								z: groundElevation,
 								velocity: stationaryVelocity,
@@ -519,27 +397,30 @@ export class UpdateSystemService extends Context.Service<
 							toggled = { ...toggled, positions, elevations };
 							return {
 								...toggled,
-								gameCamera: cameraFollowingPlayer(toggled, world.gameCamera),
+								gameCamera: cameraFollowingPlayer(
+									toggled,
+									withoutSession.gameCamera,
+								),
 							};
 						},
-						TireTracksToggled: () => ({
-							...world,
-							tireTracksEnabled: !world.tireTracksEnabled,
-							playerTrail: [],
-						}),
 						EditorSelectionChanged: ({ selection }) =>
 							world.editor.open
 								? { ...world, editor: { ...world.editor, selected: selection } }
 								: world,
+						EditorEditSessionBegan: ({ operation }) =>
+							beginEditSession(world, operation),
+						EditorEditSessionPreviewed: ({ preview }) =>
+							previewEditSession(world, preview),
+						EditorEditSessionAutoPanned: ({ camera, preview }) =>
+							previewEditSession(
+								{ ...world, editor: { ...world.editor, camera } },
+								preview,
+							),
+						EditorEditSessionCommitted: () => commitEditSession(world),
+						EditorEditSessionCancelled: () => cancelEditSession(world),
 						EditorItemAdded: ({ kind, position }) =>
 							world.editor.open ? addEditorItem(world, kind, position) : world,
-						EditorEntityMoved: ({
-							entity,
-							position,
-							originalPosition,
-							originalBody,
-							preview,
-						}) => {
+						EditorEntityMoved: ({ entity, position }) => {
 							if (
 								!world.editor.open ||
 								entity === playerEntity ||
@@ -551,17 +432,16 @@ export class UpdateSystemService extends Context.Service<
 							if (currentPosition === undefined || currentBody === undefined)
 								return world;
 							if (
-								preview !== true &&
 								!isEntityPlacementValid(world, entity, position, currentBody, {
-									position: originalPosition ?? currentPosition,
-									body: originalBody ?? currentBody,
+									position: currentPosition,
+									body: currentBody,
 								})
 							) {
 								return invalidEntityPlacement(
 									world,
 									entity,
-									originalPosition ?? currentPosition,
-									originalBody ?? currentBody,
+									currentPosition,
+									currentBody,
 								);
 							}
 							const positions = new Map(world.positions);
@@ -578,14 +458,7 @@ export class UpdateSystemService extends Context.Service<
 							});
 							return { ...world, positions, elevations };
 						},
-						EditorEntityResized: ({
-							entity,
-							body,
-							position,
-							originalPosition,
-							originalBody,
-							preview,
-						}) => {
+						EditorEntityResized: ({ entity, body, position }) => {
 							if (
 								!world.editor.open ||
 								entity === playerEntity ||
@@ -599,29 +472,26 @@ export class UpdateSystemService extends Context.Service<
 							const nextBody = sanitizedEntityBody(world, entity, body);
 							const nextPosition = position ?? currentPosition;
 							if (
-								preview !== true &&
 								!isEntityPlacementValid(world, entity, nextPosition, nextBody, {
-									position: originalPosition ?? currentPosition,
-									body: originalBody ?? currentBody,
+									position: currentPosition,
+									body: currentBody,
 								})
 							) {
 								return invalidEntityPlacement(
 									world,
 									entity,
-									originalPosition ?? currentPosition,
-									originalBody ?? currentBody,
+									currentPosition,
+									currentBody,
 								);
 							}
 							const bodies = new Map(world.bodies);
 							const elevations = new Map(world.elevations);
 							bodies.set(entity, nextBody);
-							const interactionPosition = originalPosition ?? currentPosition;
-							const interactionBody = originalBody ?? currentBody;
 							const originalElevation = placementElevationForEntity(
 								world,
 								entity,
-								interactionPosition,
-								interactionBody,
+								currentPosition,
+								currentBody,
 							);
 							elevations.set(entity, {
 								z: placementElevationForEntity(
@@ -638,27 +508,6 @@ export class UpdateSystemService extends Context.Service<
 							const positions = new Map(world.positions);
 							positions.set(entity, position);
 							return { ...world, bodies, positions, elevations };
-						},
-						EditorEntityInteractionFinished: ({
-							entity,
-							originalPosition,
-							originalBody,
-						}) => {
-							if (!world.editor.open || entity === playerEntity) return world;
-							const position = world.positions.get(entity);
-							const body = world.bodies.get(entity);
-							if (position === undefined || body === undefined) return world;
-							return isEntityPlacementValid(world, entity, position, body, {
-								position: originalPosition,
-								body: originalBody,
-							})
-								? world
-								: invalidEntityPlacement(
-										world,
-										entity,
-										originalPosition,
-										originalBody,
-									);
 						},
 						EditorEntityHeightChanged: ({ entity, height }) => {
 							if (!world.editor.open || !Number.isFinite(height)) return world;
@@ -722,41 +571,30 @@ export class UpdateSystemService extends Context.Service<
 							signContents.set(entity, content);
 							return { ...world, signContents };
 						},
-						EditorFloorResized: ({ floorPlan, originDelta, preview }) => {
+						EditorFloorResized: ({ floorPlan }) => {
 							if (!world.editor.open) return world;
 							const nextFloorPlan = sanitizedFloorPlan(floorPlan);
-							const offset = originDelta ?? { x: 0, y: 0 };
-							const resized = translateFloorOrigin(
-								{ ...world, floorPlan: nextFloorPlan },
-								offset,
-							);
-							if (preview === true) return resized;
+							const resized = {
+								...world,
+								floorPlan: nextFloorPlan,
+								floorTiles: floorTilesCoveringPlan(
+									world.floorTiles,
+									world.floorTileOrigin,
+									nextFloorPlan,
+									world.floorOrigin,
+								),
+							};
 							if (!isFloorPlanPlacementValid(resized, nextFloorPlan))
-								return invalidFloorPlacement(resized, world.floorPlan, offset);
+								return invalidFloorPlacement(
+									world,
+									world.floorPlan,
+									world.floorOrigin,
+								);
 							return {
 								...resized,
 								gameCamera: cameraFollowingPlayer(
 									resized,
-									cameraForFloor(nextFloorPlan),
-								),
-							};
-						},
-						EditorFloorInteractionFinished: ({
-							originalFloorPlan,
-							originOffset,
-						}) => {
-							if (!world.editor.open) return world;
-							if (!isFloorPlanPlacementValid(world, world.floorPlan))
-								return invalidFloorPlacement(
-									world,
-									originalFloorPlan,
-									originOffset,
-								);
-							return {
-								...world,
-								gameCamera: cameraFollowingPlayer(
-									world,
-									cameraForFloor(world.floorPlan),
+									cameraForFloor(nextFloorPlan, world.floorOrigin),
 								),
 							};
 						},
@@ -765,6 +603,8 @@ export class UpdateSystemService extends Context.Service<
 								? { ...world, editor: { ...world.editor, camera } }
 								: world,
 						EditorInvalidPlacementDismissed: () => {
+							if (world.editor.editSession !== null)
+								return cancelEditSession(world);
 							const invalidPlacement = world.editor.invalidPlacement;
 							if (invalidPlacement === null) return world;
 							if (invalidPlacement.kind === "new") {
@@ -774,15 +614,12 @@ export class UpdateSystemService extends Context.Service<
 								};
 							}
 							if (invalidPlacement.kind === "floor") {
-								const restoredOrigin = translateFloorOrigin(world, {
-									x: -invalidPlacement.originOffset.x,
-									y: -invalidPlacement.originOffset.y,
-								});
 								const resized = {
-									...restoredOrigin,
+									...world,
 									floorPlan: invalidPlacement.floorPlan,
+									floorOrigin: invalidPlacement.floorOrigin,
 									editor: {
-										...restoredOrigin.editor,
+										...world.editor,
 										invalidPlacement: null,
 									},
 								};
@@ -790,7 +627,10 @@ export class UpdateSystemService extends Context.Service<
 									...resized,
 									gameCamera: cameraFollowingPlayer(
 										resized,
-										cameraForFloor(invalidPlacement.floorPlan),
+										cameraForFloor(
+											invalidPlacement.floorPlan,
+											invalidPlacement.floorOrigin,
+										),
 									),
 								};
 							}

@@ -60,6 +60,22 @@ describe("camera projection", () => {
 		expect(projected.y + camera.y).toBe(viewport.height / 2);
 	});
 
+	test("centers a floor with a non-zero origin in the viewport", () => {
+		const floorPlan = Body.make({ width: 1_160, depth: 640 });
+		const floorOrigin = Position.make({ x: -240, y: -120 });
+		const floorCenter = Position.make({
+			x: floorOrigin.x + floorPlan.width / 2,
+			y: floorOrigin.y + floorPlan.depth / 2,
+		});
+		const projected = project(floorCenter);
+		const camera = cameraForFloor(floorPlan, floorOrigin);
+
+		expect({ x: projected.x + camera.x, y: projected.y + camera.y }).toEqual({
+			x: viewport.width / 2,
+			y: viewport.height / 2,
+		});
+	});
+
 	test("only follows outside the dead zone and stops when walking away", () => {
 		const centered = Position.make({ x: 0, y: 0 });
 		const nearRightEdge = Position.make({ x: 1200, y: 320 });

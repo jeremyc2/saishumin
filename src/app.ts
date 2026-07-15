@@ -4,7 +4,8 @@ import { State } from "otaku-state";
 import { reconcileWorld } from "./ecs/reconcile-world";
 import { initialWorld } from "./ecs/world";
 import { Action } from "./model/action";
-import { Controls, isControl } from "./model/control";
+import { type Control, Controls, controlForKey } from "./model/control";
+import { editSessionPresentation, editSessionView } from "./model/edit-session";
 import { MovementSystemService } from "./systems/movement-system-service";
 import { RenderSystemService } from "./systems/render-system-service";
 import { UpdateSystemService } from "./systems/update-system-service";
@@ -22,6 +23,8 @@ const applicationLayer = Layer.mergeAll(
 );
 const runtime = ManagedRuntime.make(applicationLayer);
 
+const heldControlsByKey = new Map<string, Control>();
+
 const program = Effect.gen(function* () {
 	const state = yield* State;
 	const updateSystem = yield* UpdateSystemService;
@@ -36,21 +39,32 @@ const program = Effect.gen(function* () {
 		runtime.runFork(Queue.offer(actions, action));
 	};
 
-	window.addEventListener("keydown", (event) => {
-		const key = event.key === "X" ? Controls.Interact : event.key;
-		if (!isControl(key)) return;
+	const changeKey = (event: KeyboardEvent, pressed: boolean): void => {
+		const control = controlForKey(event.key);
+		if (control === undefined) return;
 		event.preventDefault();
-		if (event.repeat && (key === Controls.Jump || key === Controls.Interact))
+		if (pressed) {
+			if (heldControlsByKey.has(event.code)) return;
+			const wasHeld = [...heldControlsByKey.values()].includes(control);
+			heldControlsByKey.set(event.code, control);
+			if (!wasHeld)
+				dispatch(Action.KeyChanged({ key: control, pressed: true }));
 			return;
-		dispatch(Action.KeyChanged({ key, pressed: true }));
-	});
-	window.addEventListener("keyup", (event) => {
-		const key = event.key === "X" ? Controls.Interact : event.key;
-		if (!isControl(key)) return;
-		event.preventDefault();
-		dispatch(Action.KeyChanged({ key, pressed: false }));
-	});
-	window.addEventListener("blur", () => {
+		}
+		const heldControl = heldControlsByKey.get(event.code);
+		if (heldControl === undefined) return;
+		heldControlsByKey.delete(event.code);
+		if (![...heldControlsByKey.values()].includes(heldControl))
+			dispatch(Action.KeyChanged({ key: heldControl, pressed: false }));
+	};
+	const onKeyDown = (event: KeyboardEvent): void => {
+		changeKey(event, true);
+	};
+	const onKeyUp = (event: KeyboardEvent): void => {
+		changeKey(event, false);
+	};
+	const onBlur = (): void => {
+		heldControlsByKey.clear();
 		for (const key of [
 			Controls.Up,
 			Controls.Down,
@@ -60,40 +74,71 @@ const program = Effect.gen(function* () {
 		] as const) {
 			dispatch(Action.KeyChanged({ key, pressed: false }));
 		}
-	});
+	};
 
+	let animationFrame: number | undefined;
 	const frame = (time: number): void => {
 		dispatch(Action.Tick({ time }));
-		window.requestAnimationFrame(frame);
+		animationFrame = window.requestAnimationFrame(frame);
 	};
-	window.requestAnimationFrame(frame);
 
-	renderSystem.render(yield* Ref.get(world), dispatch);
-	yield* Stream.fromQueue(actions).pipe(
-		Stream.runForEach((action) =>
-			Effect.gen(function* () {
-				const current = yield* Ref.get(world);
-				const next = updateSystem.update(current, action);
-				yield* Ref.set(world, next);
-				if (
-					next.positions !== current.positions ||
-					next.elevations !== current.elevations ||
-					next.bodies !== current.bodies ||
-					next.obstacles !== current.obstacles ||
-					next.decorations !== current.decorations ||
-					next.floorPlan !== current.floorPlan ||
-					next.gameCamera !== current.gameCamera ||
-					next.editor !== current.editor ||
-					next.playerFacing !== current.playerFacing ||
-					next.playerTrail !== current.playerTrail ||
-					next.openedChests !== current.openedChests ||
-					next.signContents !== current.signContents ||
-					next.readingSign !== current.readingSign ||
-					next.grabbed !== current.grabbed
-				)
-					renderSystem.render(next, dispatch);
+	const initial = yield* Ref.get(world);
+	renderSystem.render(
+		initial,
+		editSessionView(initial),
+		editSessionPresentation(initial),
+		dispatch,
+	);
+	yield* Effect.acquireUseRelease(
+		Effect.sync(() => {
+			window.addEventListener("keydown", onKeyDown);
+			window.addEventListener("keyup", onKeyUp);
+			window.addEventListener("blur", onBlur);
+			animationFrame = window.requestAnimationFrame(frame);
+		}),
+		() =>
+			Stream.fromQueue(actions).pipe(
+				Stream.runForEach((action) =>
+					Effect.gen(function* () {
+						const current = yield* Ref.get(world);
+						const next = updateSystem.update(current, action);
+						yield* Ref.set(world, next);
+						if (
+							next.positions !== current.positions ||
+							next.elevations !== current.elevations ||
+							next.bodies !== current.bodies ||
+							next.obstacles !== current.obstacles ||
+							next.decorations !== current.decorations ||
+							next.floorPlan !== current.floorPlan ||
+							next.floorOrigin !== current.floorOrigin ||
+							next.floorTiles !== current.floorTiles ||
+							next.floorTileOrigin !== current.floorTileOrigin ||
+							next.gameCamera !== current.gameCamera ||
+							next.editor !== current.editor ||
+							next.playerFacing !== current.playerFacing ||
+							next.openedChests !== current.openedChests ||
+							next.signContents !== current.signContents ||
+							next.readingSign !== current.readingSign ||
+							next.grabbed !== current.grabbed
+						)
+							renderSystem.render(
+								next,
+								editSessionView(next),
+								editSessionPresentation(next),
+								dispatch,
+							);
+					}),
+				),
+			),
+		() =>
+			Effect.sync(() => {
+				window.removeEventListener("keydown", onKeyDown);
+				window.removeEventListener("keyup", onKeyUp);
+				window.removeEventListener("blur", onBlur);
+				if (animationFrame !== undefined)
+					window.cancelAnimationFrame(animationFrame);
+				heldControlsByKey.clear();
 			}),
-		),
 	);
 });
 

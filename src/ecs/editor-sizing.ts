@@ -8,7 +8,6 @@ import {
 } from "../model/editor";
 import type { EntityId } from "../model/entity-id";
 import type { World } from "./world";
-import { maximumFloorExtent } from "./world";
 
 export const editorItemKindForEntity = (
 	world: World,
@@ -22,7 +21,10 @@ export const editorItemKindForEntity = (
 export const maximumEditorBody = (world: World, entity: EntityId): Body => {
 	const kind = editorItemKindForEntity(world, entity);
 	return kind === undefined
-		? Body.make({ width: maximumFloorExtent, depth: maximumFloorExtent })
+		? Body.make({
+				width: Number.POSITIVE_INFINITY,
+				depth: Number.POSITIVE_INFINITY,
+			})
 		: maximumEditorItemBody(kind);
 };
 

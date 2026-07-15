@@ -26,10 +26,13 @@ export const unproject = (position: Position, z = 0): Position => ({
 	y: (position.y - cameraOrigin.y + z) / depthProjectionScale,
 });
 
-export const cameraForFloor = (floorPlan: Body): Position => {
+export const cameraForFloor = (
+	floorPlan: Body,
+	floorOrigin: Position = { x: 0, y: 0 },
+): Position => {
 	const projected = project({
-		x: floorPlan.width / 2,
-		y: floorPlan.depth / 2,
+		x: floorOrigin.x + floorPlan.width / 2,
+		y: floorOrigin.y + floorPlan.depth / 2,
 	});
 	return {
 		x: viewport.width / 2 - projected.x,

@@ -1,5 +1,6 @@
 import { DecorationKinds, defaultSignContent } from "../model/component";
 import { defaultEditorItemHeight, isEditorItemKind } from "../model/editor";
+import { floorTileVersion } from "../model/floor-tile";
 import { isPlayerFacing, PlayerFacings } from "../model/player-facing";
 import { surfaceAt } from "./collision";
 import {
@@ -46,12 +47,23 @@ export const reconcileWorld = (world: World): World => {
 			signContents.delete(entity);
 	}
 	const editor = world.editor ?? initialWorld.editor;
+	const floorTiles =
+		world.floorTiles?.every(({ version }) => version === floorTileVersion) ===
+		true
+			? world.floorTiles
+			: initialWorld.floorTiles;
 	bodies.set(playerEntity, playerBody);
 
 	if (!positions.has(playerEntity)) {
 		positions.set(playerEntity, {
-			x: Math.min(playerSpawnPosition.x, floorPlan.width),
-			y: Math.min(playerSpawnPosition.y, floorPlan.depth),
+			x: Math.min(
+				Math.max(playerSpawnPosition.x, world.floorOrigin?.x ?? 0),
+				(world.floorOrigin?.x ?? 0) + floorPlan.width,
+			),
+			y: Math.min(
+				Math.max(playerSpawnPosition.y, world.floorOrigin?.y ?? 0),
+				(world.floorOrigin?.y ?? 0) + floorPlan.depth,
+			),
 		});
 	}
 	if (!elevations.has(playerEntity)) {
@@ -69,20 +81,21 @@ export const reconcileWorld = (world: World): World => {
 		obstacles,
 		decorations,
 		floorPlan,
+		floorOrigin: world.floorOrigin ?? initialWorld.floorOrigin,
+		floorTiles,
+		floorTileOrigin: world.floorTileOrigin ?? initialWorld.floorTileOrigin,
 		gameCamera: world.gameCamera ?? initialWorld.gameCamera,
 		editor: {
 			...editor,
 			open: false,
 			selected: null,
 			invalidPlacement: null,
+			editSession: null,
 		},
 		pressed: new Set(),
 		playerFacing: isPlayerFacing(world.playerFacing)
 			? world.playerFacing
 			: PlayerFacings.Down,
-		playerTrail: [],
-		tireTracksEnabled:
-			world.tireTracksEnabled ?? initialWorld.tireTracksEnabled,
 		openedChests,
 		signContents,
 		readingSign: null,

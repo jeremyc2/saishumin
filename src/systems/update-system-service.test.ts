@@ -17,7 +17,6 @@ import {
 	playerEntity,
 	stationaryVelocity,
 	type World,
-	wallEntities,
 } from "../ecs/world";
 import { Action } from "../model/action";
 import {
@@ -30,6 +29,7 @@ import {
 	Position,
 } from "../model/component";
 import { Controls, type Direction } from "../model/control";
+import { editSessionView } from "../model/edit-session";
 import {
 	defaultEditorItemBody,
 	EditorItemKinds,
@@ -80,6 +80,111 @@ const makeWorld = ({
 });
 
 describe("UpdateSystemService", () => {
+	test("previews a new Editor Item without changing the authored World, then commits it", () => {
+		const editing = updateSystem.update(initialWorld, Action.EditorToggled());
+		const begun = updateSystem.update(
+			editing,
+			Action.EditorEditSessionBegan({
+				operation: {
+					kind: "create",
+					itemKind: EditorItemKinds.Rug,
+					position: Position.make({ x: 500, y: 300 }),
+				},
+			}),
+		);
+
+		const preview = editSessionView(begun);
+		expect(begun.positions).toBe(editing.positions);
+		expect(preview.positions.size).toBe(editing.positions.size + 1);
+		expect(begun.editor.editSession?.validity).toEqual({ kind: "valid" });
+
+		const committed = updateSystem.update(
+			begun,
+			Action.EditorEditSessionCommitted(),
+		);
+		expect(committed.positions.size).toBe(editing.positions.size + 1);
+		expect(committed.editor.editSession).toBeNull();
+	});
+
+	test("advances the camera and Edit Session preview in one auto-pan snapshot", () => {
+		const editing = updateSystem.update(initialWorld, Action.EditorToggled());
+		const begun = updateSystem.update(
+			editing,
+			Action.EditorEditSessionBegan({
+				operation: {
+					kind: "create",
+					itemKind: EditorItemKinds.Rug,
+					position: Position.make({ x: 500, y: 300 }),
+				},
+			}),
+		);
+		const advanced = updateSystem.update(
+			begun,
+			Action.EditorEditSessionAutoPanned({
+				camera: Position.make({ x: -120, y: 40 }),
+				preview: {
+					kind: "create",
+					position: Position.make({ x: 620, y: 260 }),
+				},
+			}),
+		);
+
+		expect(advanced.editor.camera).toEqual({ x: -120, y: 40 });
+		expect(advanced.editor.editSession?.operation).toMatchObject({
+			kind: "create",
+			position: { x: 620, y: 260 },
+		});
+	});
+
+	test("keeps an invalid move preview visible until cancellation without changing the authored World", () => {
+		const entity = crateEntities[0];
+		const originalPosition = initialWorld.positions.get(entity);
+		const originalBody = initialWorld.bodies.get(entity);
+		expect(originalPosition).toBeDefined();
+		expect(originalBody).toBeDefined();
+		if (originalPosition === undefined || originalBody === undefined) return;
+		const editing = updateSystem.update(initialWorld, Action.EditorToggled());
+		const begun = updateSystem.update(
+			editing,
+			Action.EditorEditSessionBegan({
+				operation: {
+					kind: "move",
+					entity,
+					originalPosition,
+					originalBody,
+					position: originalPosition,
+				},
+			}),
+		);
+		const previewed = updateSystem.update(
+			begun,
+			Action.EditorEditSessionPreviewed({
+				preview: { kind: "move", position: Position.make({ x: -100, y: 100 }) },
+			}),
+		);
+		const released = updateSystem.update(
+			previewed,
+			Action.EditorEditSessionCommitted(),
+		);
+
+		expect(released.positions.get(entity)).toEqual(originalPosition);
+		expect(editSessionView(released).positions.get(entity)).toEqual({
+			x: -100,
+			y: 100,
+		});
+		expect(released.editor.editSession).toMatchObject({
+			validity: { kind: "invalid", reason: "outside-floor" },
+			phase: "invalid-released",
+		});
+
+		const cancelled = updateSystem.update(
+			released,
+			Action.EditorEditSessionCancelled(),
+		);
+		expect(cancelled.positions.get(entity)).toEqual(originalPosition);
+		expect(cancelled.editor.editSession).toBeNull();
+	});
+
 	test("faces movement input and keeps facing after release", () => {
 		const facingUp = updateSystem.update(
 			initialWorld,
@@ -383,28 +488,6 @@ describe("UpdateSystemService", () => {
 		expect(afterTick.lastFrame).toBe(1050);
 	});
 
-	test("toggles tire tracks and clears existing marks", () => {
-		const world = {
-			...initialWorld,
-			playerTrail: [
-				{
-					position: { x: 210, y: 360 },
-					elevation: groundElevation,
-					supportEntity: null,
-					facing: PlayerFacings.Down,
-					age: 0,
-				},
-			],
-		};
-
-		const hidden = updateSystem.update(world, Action.TireTracksToggled());
-		const shown = updateSystem.update(hidden, Action.TireTracksToggled());
-
-		expect(hidden.tireTracksEnabled).toBe(false);
-		expect(hidden.playerTrail).toEqual([]);
-		expect(shown.tireTracksEnabled).toBe(true);
-	});
-
 	test("allows editing over the hidden player and relocates them for play", () => {
 		const entity = crateEntities[0];
 		const playerPosition = initialWorld.positions.get(playerEntity);
@@ -414,21 +497,27 @@ describe("UpdateSystemService", () => {
 		if (playerPosition === undefined || originalPosition === undefined) return;
 
 		const editing = updateSystem.update(initialWorld, Action.EditorToggled());
-		const moved = updateSystem.update(
+		const begun = updateSystem.update(
 			editing,
-			Action.EditorEntityMoved({
-				entity,
-				position: playerPosition,
-				preview: true,
+			Action.EditorEditSessionBegan({
+				operation: {
+					kind: "move",
+					entity,
+					originalPosition,
+					originalBody: crateBody,
+					position: originalPosition,
+				},
+			}),
+		);
+		const moved = updateSystem.update(
+			begun,
+			Action.EditorEditSessionPreviewed({
+				preview: { kind: "move", position: playerPosition },
 			}),
 		);
 		const finished = updateSystem.update(
 			moved,
-			Action.EditorEntityInteractionFinished({
-				entity,
-				originalPosition,
-				originalBody: crateBody,
-			}),
+			Action.EditorEditSessionCommitted(),
 		);
 
 		expect(finished.editor.invalidPlacement).toBeNull();
@@ -719,27 +808,28 @@ describe("UpdateSystemService", () => {
 		const editing = updateSystem.update(base, Action.EditorToggled());
 		const moved = updateSystem.update(
 			editing,
-			Action.EditorEntityMoved({
-				entity: platformEntity,
-				position: Position.make({ x: 700, y: 400 }),
-				originalPosition: platformPosition,
-				originalBody: platformBody,
-				preview: true,
+			Action.EditorEditSessionBegan({
+				operation: {
+					kind: "move",
+					entity: platformEntity,
+					position: Position.make({ x: 700, y: 400 }),
+					originalPosition: platformPosition,
+					originalBody: platformBody,
+				},
 			}),
 		);
 		const rejectedMove = updateSystem.update(
 			moved,
-			Action.EditorEntityInteractionFinished({
-				entity: platformEntity,
-				originalPosition: platformPosition,
-				originalBody: platformBody,
-			}),
+			Action.EditorEditSessionCommitted(),
 		);
-		expect(rejectedMove.editor.invalidPlacement?.kind).toBe("entity");
+		expect(rejectedMove.editor.editSession?.validity).toEqual({
+			kind: "invalid",
+			reason: "occupied-support",
+		});
 
 		const restored = updateSystem.update(
 			rejectedMove,
-			Action.EditorInvalidPlacementDismissed(),
+			Action.EditorEditSessionCancelled(),
 		);
 		expect(restored.positions.get(platformEntity)).toEqual(platformPosition);
 		expect(restored.elevations.get(plantEntity)?.z).toBe(platformHeight);
@@ -822,50 +912,47 @@ describe("UpdateSystemService", () => {
 
 	test("rejects an overlapping drag and restores its starting position", () => {
 		const entity = crateEntities[0];
-		const otherEntity = wallEntities[3];
 		const originalPosition = initialWorld.positions.get(entity);
-		const otherPosition = initialWorld.positions.get(otherEntity);
+		const otherPosition = Position.make({ x: 328, y: 600 });
 		expect(originalPosition).toBeDefined();
-		expect(otherPosition).toBeDefined();
-		if (originalPosition === undefined || otherPosition === undefined) return;
+		if (originalPosition === undefined) return;
 
 		const editing = updateSystem.update(initialWorld, Action.EditorToggled());
 		const moved = updateSystem.update(
 			editing,
-			Action.EditorEntityMoved({
-				entity,
-				position: Position.make({ x: 500, y: 350 }),
-				originalPosition,
-				originalBody: crateBody,
-				preview: true,
+			Action.EditorEditSessionBegan({
+				operation: {
+					kind: "move",
+					entity,
+					position: Position.make({ x: 500, y: 350 }),
+					originalPosition,
+					originalBody: crateBody,
+				},
 			}),
 		);
 		const invalidPreview = updateSystem.update(
 			moved,
-			Action.EditorEntityMoved({
-				entity,
-				position: otherPosition,
-				originalPosition,
-				originalBody: crateBody,
-				preview: true,
+			Action.EditorEditSessionPreviewed({
+				preview: { kind: "move", position: otherPosition },
 			}),
 		);
 		const invalid = updateSystem.update(
 			invalidPreview,
-			Action.EditorEntityInteractionFinished({
-				entity,
-				originalPosition,
-				originalBody: crateBody,
-			}),
+			Action.EditorEditSessionCommitted(),
 		);
 
-		expect(invalidPreview.positions.get(entity)).toEqual(otherPosition);
+		expect(editSessionView(invalidPreview).positions.get(entity)).toEqual(
+			otherPosition,
+		);
 		expect(invalidPreview.editor.invalidPlacement).toBeNull();
-		expect(invalid.positions.get(entity)).toEqual(otherPosition);
-		expect(invalid.editor.invalidPlacement?.kind).toBe("entity");
+		expect(invalid.positions.get(entity)).toEqual(originalPosition);
+		expect(invalid.editor.editSession?.validity).toEqual({
+			kind: "invalid",
+			reason: "overlaps-editor-item",
+		});
 		const restored = updateSystem.update(
 			invalid,
-			Action.EditorInvalidPlacementDismissed(),
+			Action.EditorEditSessionCancelled(),
 		);
 		expect(restored.positions.get(entity)).toEqual(originalPosition);
 		expect(restored.editor.invalidPlacement).toBeNull();
@@ -907,47 +994,57 @@ describe("UpdateSystemService", () => {
 			}),
 			Action.EditorToggled(),
 		);
-		const validIntermediate = updateSystem.update(
+		const begun = updateSystem.update(
 			editing,
-			Action.EditorEntityResized({
-				entity,
-				position: Position.make({ x: 320, y: 300 }),
-				body: Body.make({ width: 80, depth: 40 }),
-				originalPosition,
-				originalBody,
-				preview: true,
+			Action.EditorEditSessionBegan({
+				operation: {
+					kind: "resize",
+					entity,
+					position: originalPosition,
+					body: originalBody,
+					originalPosition,
+					originalBody,
+				},
+			}),
+		);
+		const validIntermediate = updateSystem.update(
+			begun,
+			Action.EditorEditSessionPreviewed({
+				preview: {
+					kind: "resize",
+					position: Position.make({ x: 320, y: 300 }),
+					body: Body.make({ width: 80, depth: 40 }),
+				},
 			}),
 		);
 		const invalidPreview = updateSystem.update(
 			validIntermediate,
-			Action.EditorEntityResized({
-				entity,
-				position: Position.make({ x: 340, y: 300 }),
-				body: Body.make({ width: 120, depth: 40 }),
-				originalPosition,
-				originalBody,
-				preview: true,
+			Action.EditorEditSessionPreviewed({
+				preview: {
+					kind: "resize",
+					position: Position.make({ x: 340, y: 300 }),
+					body: Body.make({ width: 120, depth: 40 }),
+				},
 			}),
 		);
 		const invalid = updateSystem.update(
 			invalidPreview,
-			Action.EditorEntityInteractionFinished({
-				entity,
-				originalPosition,
-				originalBody,
-			}),
+			Action.EditorEditSessionCommitted(),
 		);
 
-		expect(invalidPreview.positions.get(entity)).toEqual({ x: 340, y: 300 });
-		expect(invalidPreview.bodies.get(entity)).toEqual({
+		expect(editSessionView(invalidPreview).positions.get(entity)).toEqual({
+			x: 340,
+			y: 300,
+		});
+		expect(editSessionView(invalidPreview).bodies.get(entity)).toEqual({
 			width: 120,
 			depth: 40,
 		});
 		expect(invalidPreview.editor.invalidPlacement).toBeNull();
-		expect(invalid.editor.invalidPlacement?.kind).toBe("entity");
+		expect(invalid.editor.editSession?.validity.kind).toBe("invalid");
 		const restored = updateSystem.update(
 			invalid,
-			Action.EditorInvalidPlacementDismissed(),
+			Action.EditorEditSessionCancelled(),
 		);
 		expect(restored.positions.get(entity)).toEqual(originalPosition);
 		expect(restored.bodies.get(entity)).toEqual(originalBody);
@@ -968,76 +1065,129 @@ describe("UpdateSystemService", () => {
 		expect(result.editor.invalidPlacement).toEqual({ kind: "new" });
 	});
 
-	test("keeps the opposite floor edges fixed when expanding left and up", () => {
+	test("expands left and up without translating authored content or compensating the camera", () => {
 		const editing = updateSystem.update(initialWorld, Action.EditorToggled());
 		const entity = crateEntities[0];
 		const originalPosition = editing.positions.get(entity);
+		const originalTiles = editing.floorTiles;
 		expect(originalPosition).toBeDefined();
 		if (originalPosition === undefined) return;
-		const originOffset = Position.make({ x: -100, y: -40 });
-		const preview = updateSystem.update(
+		const floorOrigin = Position.make({ x: -100, y: -40 });
+		const begun = updateSystem.update(
 			editing,
-			Action.EditorFloorResized({
-				floorPlan: Body.make({
-					width: editing.floorPlan.width + 100,
-					depth: editing.floorPlan.depth + 40,
-				}),
-				originDelta: originOffset,
-				preview: true,
+			Action.EditorEditSessionBegan({
+				operation: {
+					kind: "resize-floor",
+					floorPlan: editing.floorPlan,
+					floorOrigin: editing.floorOrigin,
+				},
+			}),
+		);
+		const preview = updateSystem.update(
+			begun,
+			Action.EditorEditSessionPreviewed({
+				preview: {
+					kind: "resize-floor",
+					floorPlan: Body.make({
+						width: editing.floorPlan.width + 100,
+						depth: editing.floorPlan.depth + 40,
+					}),
+					floorOrigin,
+				},
 			}),
 		);
 
-		expect(preview.positions.get(entity)).toEqual({
-			x: originalPosition.x + 100,
-			y: originalPosition.y + 40,
+		const view = editSessionView(preview);
+		expect({
+			floorOrigin:
+				"floorOrigin" in view
+					? (view as World & { readonly floorOrigin: Position }).floorOrigin
+					: null,
+			position: view.positions.get(entity),
+			camera: preview.editor.camera,
+		}).toEqual({
+			floorOrigin,
+			position: originalPosition,
+			camera: editing.editor.camera,
 		});
-		expect(preview.editor.camera).toEqual({
-			x: editing.editor.camera.x - 100,
-			y: editing.editor.camera.y - 40 * Math.SQRT1_2,
-		});
+		expect(
+			originalTiles.every((tile) =>
+				editSessionView(preview).floorTiles.includes(tile),
+			),
+		).toBe(true);
+		expect(
+			editSessionView(preview).floorTiles.some(
+				(tile) => tile.column < 0 || tile.row < 0,
+			),
+		).toBe(true);
 		const finished = updateSystem.update(
 			preview,
-			Action.EditorFloorInteractionFinished({
-				originalFloorPlan: editing.floorPlan,
-				originOffset,
-			}),
+			Action.EditorEditSessionCommitted(),
 		);
 		expect(finished.floorPlan).toEqual({
 			width: editing.floorPlan.width + 100,
 			depth: editing.floorPlan.depth + 40,
 		});
+		expect(finished.floorTileOrigin).toEqual({ x: 0, y: 0 });
 		expect(finished.editor.invalidPlacement).toBeNull();
+	});
+
+	test("does not impose an arbitrary maximum floor extent", () => {
+		const editing = updateSystem.update(initialWorld, Action.EditorToggled());
+		const expanded = updateSystem.update(
+			editing,
+			Action.EditorFloorResized({
+				floorPlan: Body.make({ width: 8_100, depth: 8_100 }),
+			}),
+		);
+
+		expect(expanded.floorPlan).toEqual({ width: 8_100, depth: 8_100 });
 	});
 
 	test("rejects a floor resize that excludes objects after release", () => {
 		const editing = updateSystem.update(initialWorld, Action.EditorToggled());
-		const originOffset = Position.make({ x: 100, y: 60 });
+		const floorOrigin = Position.make({ x: 100, y: 60 });
 
-		const preview = updateSystem.update(
+		const begun = updateSystem.update(
 			editing,
-			Action.EditorFloorResized({
-				floorPlan: Body.make({ width: 100, depth: 100 }),
-				originDelta: originOffset,
-				preview: true,
+			Action.EditorEditSessionBegan({
+				operation: {
+					kind: "resize-floor",
+					floorPlan: editing.floorPlan,
+					floorOrigin: editing.floorOrigin,
+				},
+			}),
+		);
+		const preview = updateSystem.update(
+			begun,
+			Action.EditorEditSessionPreviewed({
+				preview: {
+					kind: "resize-floor",
+					floorPlan: Body.make({
+						width: minimumFloorWidth,
+						depth: minimumFloorDepth,
+					}),
+					floorOrigin,
+				},
 			}),
 		);
 		const invalid = updateSystem.update(
 			preview,
-			Action.EditorFloorInteractionFinished({
-				originalFloorPlan: editing.floorPlan,
-				originOffset,
-			}),
+			Action.EditorEditSessionCommitted(),
 		);
 
-		expect(preview.floorPlan).toEqual({
+		expect(editSessionView(preview).floorPlan).toEqual({
 			width: minimumFloorWidth,
 			depth: minimumFloorDepth,
 		});
 		expect(preview.editor.invalidPlacement).toBeNull();
-		expect(invalid.editor.invalidPlacement?.kind).toBe("floor");
+		expect(invalid.editor.editSession?.validity).toEqual({
+			kind: "invalid",
+			reason: "floor-excludes-editor-item",
+		});
 		const restored = updateSystem.update(
 			invalid,
-			Action.EditorInvalidPlacementDismissed(),
+			Action.EditorEditSessionCancelled(),
 		);
 		expect(restored.floorPlan).toEqual(editing.floorPlan);
 		expect(restored.positions.get(playerEntity)).toEqual(

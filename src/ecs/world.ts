@@ -12,8 +12,8 @@ import {
 import type { Direction } from "../model/control";
 import type { EditorState } from "../model/editor";
 import { EntityId } from "../model/entity-id";
+import { type FloorTile, initialFloorTiles } from "../model/floor-tile";
 import { type PlayerFacing, PlayerFacings } from "../model/player-facing";
-import type { PlayerTrailMark } from "../model/player-trail";
 import { cameraForFloor } from "../render/projection";
 
 export type World = {
@@ -23,12 +23,13 @@ export type World = {
 	readonly obstacles: ReadonlyMap<EntityId, Obstacle>;
 	readonly decorations: ReadonlyMap<EntityId, Decoration>;
 	readonly floorPlan: Body;
+	readonly floorOrigin: Position;
+	readonly floorTiles: ReadonlyArray<FloorTile>;
+	readonly floorTileOrigin: Position;
 	readonly gameCamera: Position;
 	readonly editor: EditorState;
 	readonly pressed: ReadonlySet<Direction>;
 	readonly playerFacing: PlayerFacing;
-	readonly playerTrail: ReadonlyArray<PlayerTrailMark>;
-	readonly tireTracksEnabled: boolean;
 	readonly openedChests: ReadonlySet<EntityId>;
 	readonly signContents: ReadonlyMap<EntityId, SignContent>;
 	readonly readingSign: EntityId | null;
@@ -42,7 +43,6 @@ export const roomWidth = 1160;
 export const roomDepth = 640;
 export const minimumFloorWidth = 360;
 export const minimumFloorDepth = 280;
-export const maximumFloorExtent = 8000;
 export const minimumEntityExtent = 24;
 export const wallThickness = 36;
 export const groundElevation = 0;
@@ -92,6 +92,8 @@ export const defaultFloorPlan = Body.make({
 	width: roomWidth,
 	depth: roomDepth,
 });
+
+const defaultFloorTiles = initialFloorTiles(defaultFloorPlan);
 
 const positions = new Map<EntityId, Position>([
 	[playerEntity, playerSpawnPosition],
@@ -197,17 +199,19 @@ export const initialWorld: World = {
 	obstacles,
 	decorations,
 	floorPlan: defaultFloorPlan,
+	floorOrigin: Position.make({ x: 0, y: 0 }),
+	floorTiles: defaultFloorTiles,
+	floorTileOrigin: Position.make({ x: 0, y: 0 }),
 	gameCamera: cameraForFloor(defaultFloorPlan),
 	editor: {
 		open: false,
 		camera: Position.make({ x: 0, y: 0 }),
 		selected: null,
 		invalidPlacement: null,
+		editSession: null,
 	},
 	pressed: new Set(),
 	playerFacing: PlayerFacings.Down,
-	playerTrail: [],
-	tireTracksEnabled: true,
 	openedChests: new Set(),
 	signContents: new Map([[signEntities[0], defaultSignContent]]),
 	readingSign: null,

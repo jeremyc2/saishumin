@@ -35,6 +35,17 @@ describe("editor placement", () => {
 		).toBe(false);
 	});
 
+	test("uses the authored floor origin for placement bounds", () => {
+		const shifted = { ...initialWorld, floorOrigin: { x: -100, y: -40 } };
+
+		expect(
+			isInsideFloorPlan(shifted, Position.make({ x: -80, y: -20 }), smallBody),
+		).toBe(true);
+		expect(
+			isInsideFloorPlan(shifted, Position.make({ x: -81, y: -20 }), smallBody),
+		).toBe(false);
+	});
+
 	test("rejects a floor plan that would exclude an existing object", () => {
 		expect(
 			isFloorPlanPlacementValid(initialWorld, initialWorld.floorPlan),
@@ -48,6 +59,23 @@ describe("editor placement", () => {
 				}),
 			),
 		).toBe(false);
+	});
+
+	test("accepts an object on a fixed floor edge after sub-pixel resize rounding", () => {
+		const shifted = {
+			...initialWorld,
+			floorOrigin: { x: -3_000.000_000_1, y: initialWorld.floorOrigin.y },
+		};
+
+		expect(
+			isFloorPlanPlacementValid(
+				shifted,
+				Body.make({
+					width: initialWorld.floorPlan.width + 3_000,
+					depth: initialWorld.floorPlan.depth,
+				}),
+			),
+		).toBe(true);
 	});
 
 	test("ignores the hidden player but rejects overlap with world objects", () => {

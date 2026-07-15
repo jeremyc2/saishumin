@@ -1,16 +1,12 @@
 import { describe, expect, test } from "bun:test";
 import { Body, Position } from "../model/component";
 import { PlayerFacings } from "../model/player-facing";
-import type { PlayerTrailMark } from "../model/player-trail";
 import {
-	clipTireTrackPolygonToSurface,
 	closedChestTemplate,
 	crateShadowDepthOffset,
 	crateTopBoardDepthOffsets,
 	openChestTemplate,
 	playerDrawingForFacing,
-	playerTireTrackDirection,
-	playerTireTrackIsTurning,
 	signpostTemplate,
 } from "./templates";
 
@@ -86,75 +82,5 @@ describe("player drawings", () => {
 		expect(drawings[3]?.view).toBe(drawings[5]?.view);
 		expect(drawings[3]?.mirror).toBe(false);
 		expect(drawings[5]?.mirror).toBe(true);
-	});
-});
-
-describe("player tire tracks", () => {
-	const mark = (
-		x: number,
-		y: number,
-		facing = PlayerFacings.Right,
-	): PlayerTrailMark => ({
-		position: Position.make({ x, y }),
-		elevation: 0,
-		supportEntity: null,
-		facing,
-		age: 0,
-	});
-
-	test("blends tread direction through a tight corner", () => {
-		const direction = playerTireTrackDirection(
-			mark(-12, 0),
-			mark(0, 0),
-			mark(0, 12, PlayerFacings.Down),
-		);
-
-		expect(direction.x).toBeCloseTo(Math.SQRT1_2);
-		expect(direction.y).toBeCloseTo(Math.SQRT1_2);
-		expect(
-			playerTireTrackIsTurning(
-				mark(-12, 0),
-				mark(0, 0),
-				mark(0, 12, PlayerFacings.Down),
-			),
-		).toBe(true);
-	});
-
-	test("uses movement instead of a stale facing for straight tread", () => {
-		const direction = playerTireTrackDirection(
-			mark(0, 0, PlayerFacings.Up),
-			mark(12, 0, PlayerFacings.Up),
-			undefined,
-		);
-
-		expect(direction).toEqual({ x: 1, y: 0 });
-		expect(
-			playerTireTrackIsTurning(
-				mark(0, 0, PlayerFacings.Up),
-				mark(12, 0, PlayerFacings.Up),
-				mark(24, 0, PlayerFacings.Up),
-			),
-		).toBe(false);
-	});
-
-	test("trims tread polygons at a supporting surface edge", () => {
-		const clipped = clipTireTrackPolygonToSurface(
-			[
-				{ x: 8, y: 4 },
-				{ x: 14, y: 4 },
-				{ x: 14, y: 8 },
-				{ x: 8, y: 8 },
-			],
-			[
-				{ x: 0, y: 0 },
-				{ x: 10, y: 0 },
-				{ x: 10, y: 10 },
-				{ x: 0, y: 10 },
-			],
-		);
-
-		expect(clipped.length).toBeGreaterThanOrEqual(3);
-		expect(clipped.every(({ x }) => x <= 10)).toBe(true);
-		expect(Math.max(...clipped.map(({ x }) => x))).toBe(10);
 	});
 });
