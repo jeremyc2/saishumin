@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { Controls } from "../../model/control";
+import { Controls } from "../../app/control";
 import {
 	Body,
 	Decoration,

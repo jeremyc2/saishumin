@@ -1,15 +1,15 @@
 import { afterAll, describe, expect, test } from "bun:test";
 import { Layer, ManagedRuntime } from "effect";
-import { isPlayerPlacementValid } from "../ecs/player-placement";
-import { Action } from "../model/action";
-import { Controls, type Direction } from "../model/control";
-import { editSessionView } from "../design-studio/edit-session/edit-session";
+import { isPlayerPlacementValid } from "../../../world/spatial/player-placement";
+import { Action } from "../../../app/action";
+import { Controls, type Direction } from "../../../app/control";
+import { editSessionView } from "../../../design-studio/edit-session/edit-session";
 import {
 	defaultEditorItemBody,
 	EditorItemKinds,
 	editorItemHeightLimits,
 	maximumEditorItemBody,
-} from "../design-studio/model";
+} from "../../../design-studio/model";
 import {
 	Body,
 	Decoration,
@@ -19,9 +19,9 @@ import {
 	ObstacleKinds,
 	PlayerFacings,
 	Position,
-} from "../world/components";
-import { EntityId } from "../world/entity-id";
-import { initialWorld } from "../world/initial-world";
+} from "../../../world/components";
+import { EntityId } from "../../../world/entity-id";
+import { initialWorld } from "../../../world/initial-world";
 import {
 	crateBody,
 	crateEntities,
@@ -37,9 +37,9 @@ import {
 	playerEntity,
 	stationaryVelocity,
 	type World,
-} from "../world/world";
-import { MovementSystemService } from "../gameplay/movement/movement-system";
-import { UpdateSystemService } from "./update-system-service";
+} from "../../../world/world";
+import { MovementSystemService } from "../../movement/movement-system";
+import { UpdateSystemService } from "../update-system";
 
 const runtime = ManagedRuntime.make(
 	UpdateSystemService.layer.pipe(Layer.provide(MovementSystemService.layer)),

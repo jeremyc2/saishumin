@@ -1,4 +1,7 @@
-import { isPlayerPlacementValid, nearestValidPlayerPosition } from "../../../ecs/player-placement";
+import {
+	isPlayerPlacementValid,
+	nearestValidPlayerPosition,
+} from "../../../world/spatial/player-placement";
 import { playerEntity, type World } from "../../../world/world";
 
 /** Restores a player displaced into an invalid position by a world transition. */

@@ -1,5 +1,5 @@
 import { svg, type TemplateResult } from "lit-html";
-import type { Action as AppAction } from "../../model/action";
+import type { Action as AppAction } from "../../app/action";
 import {
 	points,
 	projectedRectangle,

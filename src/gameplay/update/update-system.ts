@@ -1,18 +1,18 @@
 import { Context, Effect, Layer } from "effect";
-import { updateDesignStudio } from "../design-studio/design-studio";
-import { Action } from "../model/action";
-import { Controls, type Direction, isDirection } from "../model/control";
-import { playerFacingForDirections } from "../model/player-facing";
-import { followCamera } from "../rendering/geometry/projection";
+import { updateDesignStudio } from "../../design-studio/design-studio";
+import { Action } from "../../app/action";
+import { Controls, type Direction, isDirection } from "../../app/control";
+import { playerFacingForDirections } from "./internal/player-facing";
+import { followCamera } from "../../rendering/geometry/projection";
 import {
 	DecorationKinds,
 	ObstacleKinds,
 	PlayerFacings,
 	type Position,
-} from "../world/components";
-import type { EntityId as EntityIdType } from "../world/entity-id";
-import { surfaceAt } from "../world/spatial/collision";
-import { entityBaseElevation } from "../world/spatial/elevation";
+} from "../../world/components";
+import type { EntityId as EntityIdType } from "../../world/entity-id";
+import { surfaceAt } from "../../world/spatial/collision";
+import { entityBaseElevation } from "../../world/spatial/elevation";
 import {
 	crateGrabDistance,
 	groundElevation,
@@ -25,8 +25,8 @@ import {
 	playerEntity,
 	stationaryVelocity,
 	type World,
-} from "../world/world";
-import { MovementSystemService } from "../gameplay/movement/movement-system";
+} from "../../world/world";
+import { MovementSystemService } from "../movement/movement-system";
 
 const cameraFollowingPlayer = (world: World, camera: Position): Position => {
 	const position = world.positions.get(playerEntity);
@@ -41,7 +41,7 @@ export class UpdateSystemService extends Context.Service<
 	{
 		readonly update: (world: World, action: Action) => World;
 	}
->()("saishumin/systems/update-system-service/UpdateSystemService") {
+>()("saishumin/gameplay/update/update-system/UpdateSystemService") {
 	static readonly layer = Layer.effect(this)(
 		Effect.gen(function* () {
 			const movementSystem = yield* MovementSystemService;

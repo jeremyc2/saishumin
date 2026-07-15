@@ -14,6 +14,12 @@ import {
 	type Position,
 } from "../../world/components";
 import { EntityId, type EntityId as EntityIdType } from "../../world/entity-id";
+import type {
+	EditSessionOperation,
+	EditSessionPreview,
+	EditSessionRejectionReason,
+	EditSessionValidity,
+} from "../../world/editor-state";
 import { floorTilesCoveringPlan } from "../../world/floor";
 import {
 	placementElevationForEntity,
@@ -31,10 +37,6 @@ import {
 	defaultEditorItemHeight,
 	type EditorItemKind,
 	EditorItemKinds,
-	type EditSessionOperation,
-	type EditSessionPreview,
-	type EditSessionRejectionReason,
-	type EditSessionValidity,
 } from "../model";
 
 export type EditSessionPresentation = {

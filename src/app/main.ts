@@ -4,14 +4,14 @@ import { State } from "otaku-state";
 import {
 	editSessionPresentation,
 	editSessionView,
-} from "./design-studio/edit-session/edit-session";
-import { MovementSystemService } from "./gameplay/movement/movement-system";
-import { Action } from "./model/action";
-import { type Control, Controls, controlForKey } from "./model/control";
-import { RenderSystem } from "./rendering/render-system";
-import { UpdateSystemService } from "./systems/update-system-service";
-import { initialWorld } from "./world/initial-world";
-import { reconcileWorld } from "./world/reconcile-world";
+} from "../design-studio/edit-session/edit-session";
+import { MovementSystemService } from "../gameplay/movement/movement-system";
+import { Action } from "./action";
+import { type Control, Controls, controlForKey } from "./control";
+import { RenderSystem } from "../rendering/render-system";
+import { UpdateSystemService } from "../gameplay/update/update-system";
+import { initialWorld } from "../world/initial-world";
+import { reconcileWorld } from "../world/reconcile-world";
 
 document.body.className =
 	"m-0 overflow-hidden bg-[#14212a] font-sans scheme-dark";

@@ -1,9 +1,9 @@
 import {
 	isPlayerPlacementValid,
 	nearestValidPlayerPosition,
-} from "../../ecs/player-placement";
-import { Action } from "../../model/action";
-import type { Direction } from "../../model/control";
+} from "../../world/spatial/player-placement";
+import { Action } from "../../app/action";
+import type { Direction } from "../../app/control";
 import {
 	cameraForFloor,
 	followCamera,

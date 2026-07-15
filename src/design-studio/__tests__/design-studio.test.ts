@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { Action } from "../../model/action";
+import { Action } from "../../app/action";
 import { Body, Position } from "../../world/components";
 import { initialWorld } from "../../world/initial-world";
 import { crateEntities } from "../../world/world";

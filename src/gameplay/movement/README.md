@@ -8,3 +8,6 @@ The lava monster owns its pursuit, recovery, jump, and facing decisions in one
 private module. Its deterministic grid navigation is private to that behavior.
 
 The colocated tests assert observable World positions and elevations.
+
+Movement may depend on World spatial facts and application control vocabulary;
+it does not own input dispatch, Design Studio transitions, or rendering.

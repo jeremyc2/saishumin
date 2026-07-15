@@ -1,5 +1,5 @@
-import { type PlayerFacing, PlayerFacings } from "../world/components";
-import { Controls, type Direction } from "./control";
+import { type PlayerFacing, PlayerFacings } from "../../../world/components";
+import { Controls, type Direction } from "../../../app/control";
 
 /**
  * Resolves the same signed input vector used by movement into one of the eight

@@ -2,12 +2,12 @@ import { Data } from "effect";
 import type { Body, Position, SignContent } from "../world/components";
 import type { EntityId } from "../world/entity-id";
 import type { Control } from "./control";
+import type { EditorItemKind } from "../design-studio/model";
 import type {
-	EditorItemKind,
 	EditorSelection,
 	EditSessionOperation,
 	EditSessionPreview,
-} from "../design-studio/model";
+} from "../world/editor-state";
 
 export type Action = Data.TaggedEnum<{
 	KeyChanged: { readonly key: Control; readonly pressed: boolean };
