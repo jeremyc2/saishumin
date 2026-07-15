@@ -1,4 +1,4 @@
-import type { Body, Position } from "../world/components";
+import type { Body, Position } from "../../world/components";
 
 export type ResizeDirection = -1 | 0 | 1;
 

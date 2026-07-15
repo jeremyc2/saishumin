@@ -6,14 +6,14 @@ import {
 	type Elevation,
 	type PlayerFacing,
 	type Position,
-} from "../world/components";
-import type { ShadowSection } from "../world/spatial/elevation";
+} from "../../../world/components";
+import type { ShadowSection } from "../../../world/spatial/elevation";
 import {
 	insetRectangle,
 	points,
 	project,
 	projectedRectangle,
-} from "./projection";
+} from "../../geometry/projection";
 
 const boxOutlineWidth = 3;
 
@@ -83,7 +83,7 @@ const playerSideBodyPath =
 const playerBackBodyPath =
 	"M -21 35 Q -27 9 -18 -10 Q 0 -29 18 -10 Q 27 9 21 35 Z";
 
-export const playerDrawingForFacing = (facing: PlayerFacing): PlayerDrawing => {
+const playerDrawingForFacing = (facing: PlayerFacing): PlayerDrawing => {
 	switch (facing) {
 		case "down":
 			return { view: "front", mirror: false, bodyPath: playerFrontBodyPath };
@@ -120,13 +120,13 @@ export const playerDrawingForFacing = (facing: PlayerFacing): PlayerDrawing => {
 	}
 };
 
-export const crateShadowDepthOffset = (
+const crateShadowDepthOffset = (
 	baseElevation: number,
 	shadowElevation: number,
 ): number =>
 	shadowElevation < baseElevation ? crateVisual.shadowDepthOffset : 0;
 
-export const crateTopBoardDepthOffsets = (
+const crateTopBoardDepthOffsets = (
 	depth: number,
 ): readonly [number, number] => {
 	const insetDepth = Math.max(4, depth - crateVisual.topInsetDepth);
@@ -658,7 +658,7 @@ const lavaMonsterSideBodyPath =
 const lavaMonsterBackBodyPath =
 	"M -28 45 C -35 27 -25 15 -20 3 C -16 -7 -20 -17 -12 -27 C -8 -16 -2 -13 2 -25 C 6 -36 13 -42 15 -52 C 25 -36 22 -24 28 -14 C 37 2 37 27 28 45 Z";
 
-export const lavaMonsterDrawingForFacing = (
+const lavaMonsterDrawingForFacing = (
 	facing: PlayerFacing,
 ): LavaMonsterDrawing => {
 	switch (facing) {

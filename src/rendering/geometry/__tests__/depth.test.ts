@@ -7,9 +7,9 @@ import {
 	Obstacle,
 	ObstacleKinds,
 	Position,
-} from "../world/components";
-import { EntityId } from "../world/entity-id";
-import { initialWorld } from "../world/initial-world";
+} from "../../../world/components";
+import { EntityId } from "../../../world/entity-id";
+import { initialWorld } from "../../../world/initial-world";
 import {
 	crateBody,
 	crateHeight,
@@ -17,12 +17,12 @@ import {
 	lavaMonsterEntity,
 	playerBody,
 	playerEntity,
-} from "../world/world";
+} from "../../../world/world";
 import {
 	renderDepthForCharacter,
 	renderDepthForEntity,
 	renderDepthForPlayer,
-} from "./entity-render-depth";
+} from "../depth";
 
 const platform = EntityId(920);
 const backPlant = EntityId(921);

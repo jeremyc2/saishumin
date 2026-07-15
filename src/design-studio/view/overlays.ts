@@ -1,12 +1,16 @@
 import { html, type TemplateResult } from "lit-html";
 import { Action, type Action as AppAction } from "../../model/action";
-import { points, projectedRectangle, viewport } from "../../render/projection";
+import {
+	points,
+	projectedRectangle,
+	viewport,
+} from "../../rendering/geometry/projection";
 import {
 	boxTemplate,
 	chestTemplate,
 	crateTemplate,
 	decorationTemplate,
-} from "../../render/templates";
+} from "../../rendering/artwork/entities";
 import {
 	Decoration,
 	DecorationKinds,

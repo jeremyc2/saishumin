@@ -1,20 +1,20 @@
-import { editorItemKindForEntity } from "../design-studio/edit-session/edit-session";
-import type { Body } from "../world/components";
-import type { EntityId } from "../world/entity-id";
-import { overlaps } from "../world/spatial/collision";
+import type { Body } from "../../world/components";
+import type { EntityId } from "../../world/entity-id";
+import { overlaps } from "../../world/spatial/collision";
 import {
 	bodyBoundsOverlap,
 	canSitOnSupport,
 	entityBaseElevation,
 	entityTopElevation,
-} from "../world/spatial/elevation";
+	spatialKindForEntity,
+} from "../../world/spatial/elevation";
 import {
 	groundElevation,
 	obstacleHeightTolerance,
 	playerBody,
 	playerEntity,
 	type World,
-} from "../world/world";
+} from "../../world/world";
 import { visualDepth } from "./projection";
 
 export const supportedObjectDepthOffset = 0.5;
@@ -43,7 +43,7 @@ const renderDepthForEntityInternal = (
 	let depth = visualDepth(position);
 	const baseElevation = entityBaseElevation(world, entity);
 	if (baseElevation <= groundElevation) return depth;
-	const kind = editorItemKindForEntity(world, entity);
+	const kind = spatialKindForEntity(world, entity);
 	if (kind === undefined || visited.has(entity)) return depth;
 	const nextVisited = new Set(visited).add(entity);
 

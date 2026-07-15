@@ -3,7 +3,7 @@ import { updateDesignStudio } from "../design-studio/design-studio";
 import { Action } from "../model/action";
 import { Controls, type Direction, isDirection } from "../model/control";
 import { playerFacingForDirections } from "../model/player-facing";
-import { followCamera } from "../world/camera";
+import { followCamera } from "../rendering/geometry/projection";
 import {
 	DecorationKinds,
 	ObstacleKinds,

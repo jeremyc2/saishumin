@@ -1,16 +1,19 @@
 import { describe, expect, test } from "bun:test";
-import { EditorItemKinds } from "../design-studio/model";
+import { EditorItemKinds } from "../../model";
 import {
 	Body,
 	Elevation,
 	Obstacle,
 	ObstacleKinds,
 	Position,
-} from "../world/components";
-import { EntityId } from "../world/entity-id";
-import { initialWorld } from "../world/initial-world";
-import { editorPlacementPositionAtPointer } from "./editor-placement-projection";
-import { project, unproject } from "./projection";
+} from "../../../world/components";
+import { EntityId } from "../../../world/entity-id";
+import { initialWorld } from "../../../world/initial-world";
+import { editorPlacementPositionAtPointer } from "../placement";
+import {
+	project,
+	unproject,
+} from "../../../rendering/geometry/projection";
 
 const platform = EntityId(900);
 const platformPosition = Position.make({ x: 520, y: 300 });

@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { Body, Position } from "../world/components";
-import { crateBody, crateHeight } from "../world/world";
+import { Body, Position } from "../../../world/components";
+import { crateBody, crateHeight } from "../../../world/world";
 import {
 	cameraForFloor,
 	followCamera,
@@ -9,7 +9,7 @@ import {
 	projectedRectangle,
 	unproject,
 	viewport,
-} from "./projection";
+} from "../projection";
 
 const outlineWidth = 3;
 

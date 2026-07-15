@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { Body, Position } from "../world/components";
-import { resizeFromHandle } from "./resize";
+import { Body, Position } from "../../../world/components";
+import { resizeFromHandle } from "../resize";
 
 const position = Position.make({ x: 50, y: 40 });
 const body = Body.make({ width: 100, depth: 80 });

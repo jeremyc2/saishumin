@@ -1,5 +1,5 @@
 import type { EditorItemKind } from "../model";
-import { projectedRectangle } from "../../render/projection";
+import { projectedRectangle } from "../../rendering/geometry/projection";
 import type { Position } from "../../world/components";
 import { entityBaseElevation, entityHeight } from "../../world/spatial/elevation";
 import { playerEntity, type World } from "../../world/world";

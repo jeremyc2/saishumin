@@ -18,9 +18,12 @@ import {
 	maximumEditorBody,
 } from "../../edit-session/edit-session";
 import { defaultEditorItemBody, type EditorItemKind } from "../../model";
-import { editorPlacementPositionAtPointer } from "../../../render/editor-placement-projection";
-import { unproject } from "../../../render/projection";
-import { type ResizeDirection, resizeFromHandle } from "../../../render/resize";
+import { editorPlacementPositionAtPointer } from "../placement";
+import { unproject } from "../../../rendering/geometry/projection";
+import {
+	type ResizeDirection,
+	resizeFromHandle,
+} from "../../../rendering/geometry/resize";
 import type { Body, Position } from "../../../world/components";
 import type { EntityId } from "../../../world/entity-id";
 import { entityBaseElevation } from "../../../world/spatial/elevation";
