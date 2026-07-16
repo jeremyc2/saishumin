@@ -1,20 +1,38 @@
 import { dual } from "effect/Function";
-import type { Body, Position } from "../../world/components";
+import {
+	type Body,
+	CharacterKinds,
+	type Position,
+} from "../../world/components";
 import type { EntityId } from "../../world/entity-id";
-import { isSolidEntity, overlaps } from "../../world/spatial/collision";
+import {
+	isSolidEntity,
+	overlaps,
+	surfaceAt,
+} from "../../world/spatial/collision";
 import {
 	entityBaseElevation,
 	entityHeight,
+	entityTopElevation,
 	placementElevationForEntity,
 	placementElevationForKind,
 	verticalRangesOverlap,
 } from "../../world/spatial/elevation";
 import { isSupportSurfaceTransformValid } from "../../world/spatial/support-surface";
-import { isPlayerEntity, type World } from "../../world/world";
 import {
+	characterSpawnPosition,
+	isPlayerEntity,
+	lavaMonsterCollisionHeight,
+	obstacleHeightTolerance,
+	playerCollisionHeight,
+	type World,
+} from "../../world/world";
+import {
+	CharacterSpawnKinds,
+	type DesignStudioItemKind,
 	defaultEditorItemHeight,
-	type EditorItemKind,
 	EditorItemKinds,
+	spatialEditorItemKind,
 } from "../model";
 
 export type OriginalPlacement = {
@@ -54,7 +72,15 @@ export const isFloorPlanPlacementValid = dual<
 	(self: World, floorPlan: Body) => boolean
 >(2, (world: World, floorPlan: Body): boolean => {
 	for (const [entity, position] of world.positions) {
-		if (isPlayerEntity(world, entity)) continue;
+		if (world.characters.has(entity)) continue;
+		const body = world.bodies.get(entity);
+		if (
+			body !== undefined &&
+			!isInsideBody(floorPlan, world.floorOrigin, position, body)
+		)
+			return false;
+	}
+	for (const [entity, position] of world.characterSpawns) {
 		const body = world.bodies.get(entity);
 		if (
 			body !== undefined &&
@@ -145,22 +171,39 @@ export const isEntityPlacementValid = dual<
 
 export const isNewEditorItemPlacementValid = dual<
 	(
-		kind: EditorItemKind,
+		kind: DesignStudioItemKind,
 		position: Position,
 		body: Body,
 	) => (self: World) => boolean,
-	(self: World, kind: EditorItemKind, position: Position, body: Body) => boolean
+	(
+		self: World,
+		kind: DesignStudioItemKind,
+		position: Position,
+		body: Body,
+	) => boolean
 >(
 	4,
 	(
 		world: World,
-		kind: EditorItemKind,
+		kind: DesignStudioItemKind,
 		position: Position,
 		body: Body,
 	): boolean => {
+		if (
+			kind === CharacterSpawnKinds.Player ||
+			kind === CharacterSpawnKinds.LavaMonster
+		)
+			return isCharacterSpawnPlacementValid({
+				world,
+				kind,
+				position,
+				body,
+			});
 		if (!isInsideFloorPlan(world, position, body)) return false;
 		if (kind === EditorItemKinds.Hopscotch) return true;
-		const base = placementElevationForKind(world, kind, position, body);
+		const spatialKind = spatialEditorItemKind(kind);
+		if (spatialKind === undefined) return false;
+		const base = placementElevationForKind(world, spatialKind, position, body);
 		const height = defaultEditorItemHeight(kind);
 
 		for (const [entity, otherPosition] of world.positions) {
@@ -181,3 +224,77 @@ export const isNewEditorItemPlacementValid = dual<
 		return true;
 	},
 );
+
+export const isCharacterSpawnPlacementValid = ({
+	world,
+	kind,
+	position,
+	body,
+	entity,
+}: {
+	readonly world: World;
+	readonly kind:
+		| typeof CharacterSpawnKinds.Player
+		| typeof CharacterSpawnKinds.LavaMonster;
+	readonly position: Position;
+	readonly body: Body;
+	readonly entity?: EntityId;
+}): boolean => {
+	if (!isInsideFloorPlan(world, position, body)) return false;
+	if (
+		kind === CharacterSpawnKinds.Player &&
+		[...world.characters].some(
+			([otherEntity, character]) =>
+				otherEntity !== entity && character.kind === CharacterKinds.Player,
+		)
+	)
+		return false;
+
+	const elevation = surfaceAt(world, position, body);
+	for (const [otherEntity, otherPosition] of world.positions) {
+		if (
+			otherEntity === entity ||
+			world.characters.has(otherEntity) ||
+			!isSolidEntity(world, otherEntity) ||
+			elevation >=
+				entityTopElevation(world, otherEntity) - obstacleHeightTolerance
+		)
+			continue;
+		const otherBody = world.bodies.get(otherEntity);
+		if (
+			otherBody !== undefined &&
+			overlaps({ position, body, otherPosition, otherBody })
+		)
+			return false;
+	}
+
+	const height =
+		kind === CharacterSpawnKinds.Player
+			? playerCollisionHeight
+			: lavaMonsterCollisionHeight;
+	for (const [otherEntity, character] of world.characters) {
+		if (otherEntity === entity) continue;
+		const otherPosition = characterSpawnPosition({
+			world,
+			entity: otherEntity,
+		});
+		const otherBody = world.bodies.get(otherEntity);
+		if (otherPosition === undefined || otherBody === undefined) continue;
+		const otherElevation = surfaceAt(world, otherPosition, otherBody);
+		const otherHeight =
+			character.kind === CharacterKinds.Player
+				? playerCollisionHeight
+				: lavaMonsterCollisionHeight;
+		if (
+			overlaps({ position, body, otherPosition, otherBody }) &&
+			verticalRangesOverlap({
+				base: elevation,
+				height,
+				otherBase: otherElevation,
+				otherHeight,
+			})
+		)
+			return false;
+	}
+	return true;
+};

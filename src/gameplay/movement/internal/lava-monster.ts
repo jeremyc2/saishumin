@@ -4,6 +4,7 @@ import { LavaMonsterSteering, PlayerFacings } from "../../../world/components";
 import type { EntityId } from "../../../world/entity-id";
 import { surfaceAt } from "../../../world/spatial/collision";
 import {
+	characterSpawnPosition,
 	gravity,
 	groundElevation,
 	jumpSpeed,
@@ -93,19 +94,21 @@ const updateOneLavaMonster = (
 				elapsed,
 				entity,
 			);
+		const spawnPosition =
+			characterSpawnPosition({ world, entity }) ?? lavaMonsterSpawnPosition;
 		if (
 			elevation.velocity !== stationaryVelocity ||
 			!canPlaceLavaMonster({
 				world,
 				entity,
-				position: lavaMonsterSpawnPosition,
+				position: spawnPosition,
 				elevation: groundElevation,
 			})
 		)
 			return world;
 		return {
 			...world,
-			positions: new Map(world.positions).set(entity, lavaMonsterSpawnPosition),
+			positions: new Map(world.positions).set(entity, spawnPosition),
 			elevations: new Map(world.elevations).set(entity, {
 				z: groundElevation,
 				velocity: stationaryVelocity,

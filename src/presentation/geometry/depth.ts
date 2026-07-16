@@ -1,5 +1,5 @@
 import { dual } from "effect/Function";
-import type { Body } from "../../world/components";
+import type { Body, Position } from "../../world/components";
 import type { EntityId } from "../../world/entity-id";
 import { overlaps } from "../../world/spatial/collision";
 import {
@@ -93,15 +93,17 @@ export const renderDepthForEntity = dual<
 	renderDepthForEntityInternal(world, entity, new Set()),
 );
 
-export const renderDepthForCharacter = dual<
-	(character: EntityId, body: Body) => (self: World) => number,
-	(self: World, character: EntityId, body: Body) => number
->(3, (world: World, character: EntityId, body: Body): number => {
-	const position = world.positions.get(character);
-	const elevation = world.elevations.get(character);
-	if (position === undefined || elevation === undefined)
-		return Number.NEGATIVE_INFINITY;
-
+export const renderDepthForCharacterAt = ({
+	world,
+	body,
+	position,
+	elevation,
+}: {
+	readonly world: World;
+	readonly body: Body;
+	readonly position: Position;
+	readonly elevation: number;
+}): number => {
 	let depth = visualDepth(position);
 	for (const [entity] of world.obstacles) {
 		const obstaclePosition = world.positions.get(entity);
@@ -109,7 +111,7 @@ export const renderDepthForCharacter = dual<
 		if (
 			obstaclePosition !== undefined &&
 			obstacleBody !== undefined &&
-			elevation.z >=
+			elevation >=
 				entityTopElevation(world, entity) - obstacleHeightTolerance &&
 			overlaps({
 				position,
@@ -133,6 +135,22 @@ export const renderDepthForCharacter = dual<
 		}
 	}
 	return depth;
+};
+
+export const renderDepthForCharacter = dual<
+	(character: EntityId, body: Body) => (self: World) => number,
+	(self: World, character: EntityId, body: Body) => number
+>(3, (world: World, character: EntityId, body: Body): number => {
+	const position = world.positions.get(character);
+	const elevation = world.elevations.get(character);
+	return position === undefined || elevation === undefined
+		? Number.NEGATIVE_INFINITY
+		: renderDepthForCharacterAt({
+				world,
+				body,
+				position,
+				elevation: elevation.z,
+			});
 });
 
 export const renderDepthForPlayer = (world: World): number => {

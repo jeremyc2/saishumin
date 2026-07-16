@@ -6,12 +6,15 @@ import {
 	loadAuthoredRoomFromClipboard,
 } from "../../world/authored-room";
 import {
+	CharacterKinds,
 	DecorationKinds,
 	defaultSignContent,
 	ObstacleKinds,
+	type Position,
 } from "../../world/components";
 import type { EntityId } from "../../world/entity-id";
 import {
+	characterSpawnPosition,
 	minimumEntityExtent,
 	minimumFloorDepth,
 	minimumFloorWidth,
@@ -23,17 +26,33 @@ import {
 	maximumEditorBody,
 } from "../edit-session/edit-session";
 import type { DesignStudioInteraction } from "../interaction/interaction";
-import { type EditorItemKind, EditorItemKinds } from "../model";
+import {
+	CharacterSpawnKinds,
+	type DesignStudioItemKind,
+	EditorItemKinds,
+} from "../model";
 import { loadClipboardWithStatus } from "./clipboard-status";
 
 type Dispatch = (action: AppAction) => void;
 
 const paletteItems: ReadonlyArray<{
-	readonly kind: EditorItemKind;
+	readonly kind: DesignStudioItemKind;
 	readonly label: string;
 	readonly icon: string;
 	readonly description: string;
 }> = [
+	{
+		kind: CharacterSpawnKinds.Player,
+		label: "Player spawn",
+		icon: "●",
+		description: "One player starting point",
+	},
+	{
+		kind: CharacterSpawnKinds.LavaMonster,
+		label: "Lava Monster",
+		icon: "●",
+		description: "Add a monster starting point",
+	},
 	{
 		kind: EditorItemKinds.Hopscotch,
 		label: "Hopscotch",
@@ -85,6 +104,10 @@ const paletteItems: ReadonlyArray<{
 ];
 
 const entityLabel = (world: World, entity: EntityId): string => {
+	const character = world.characters.get(entity);
+	if (character?.kind === CharacterKinds.Player) return "Player spawn";
+	if (character?.kind === CharacterKinds.LavaMonster)
+		return "Lava Monster spawn";
 	const obstacle = world.obstacles.get(entity);
 	if (obstacle !== undefined) {
 		if (obstacle.kind === ObstacleKinds.Wall) return "Wall";
@@ -183,10 +206,12 @@ export const makeDesignStudioPanel = (interaction: DesignStudioInteraction) => {
 			selectedEntity === undefined
 				? undefined
 				: world.bodies.get(selectedEntity);
-		const selectedPosition =
-			selectedEntity === undefined
-				? undefined
+		let selectedPosition: Position | undefined;
+		if (selectedEntity !== undefined) {
+			selectedPosition = world.characters.has(selectedEntity)
+				? characterSpawnPosition({ world, entity: selectedEntity })
 				: world.positions.get(selectedEntity);
+		}
 		const selectedMaximumBody =
 			selectedEntity === undefined
 				? undefined
@@ -204,6 +229,11 @@ export const makeDesignStudioPanel = (interaction: DesignStudioInteraction) => {
 			world.decorations.get(selectedEntity)?.kind !== DecorationKinds.Sign
 				? undefined
 				: (world.signContents.get(selectedEntity) ?? defaultSignContent);
+		const characterSelected =
+			selectedEntity !== undefined && world.characters.has(selectedEntity);
+		const hasPlayer = [...world.characters.values()].some(
+			(character) => character.kind === CharacterKinds.Player,
+		);
 		return html`
 				<aside data-editor-panel class=${`absolute top-0 right-0 z-30 flex h-full w-85 flex-col overscroll-contain border-l border-[#41565a] bg-[#0d181f]/98 text-[#fff1d6] shadow-[-18px_0_44px_rgba(3,9,12,0.38)] transition-transform duration-180 ease-out motion-reduce:transition-none ${panelVisible ? "translate-x-0" : "pointer-events-none translate-x-full"}`}>
 					<header class="border-b border-[#30434a] px-5 pt-6 pb-4">
@@ -223,7 +253,8 @@ export const makeDesignStudioPanel = (interaction: DesignStudioInteraction) => {
 										<button
 											data-palette-item
 											type="button"
-											class="group cursor-grab touch-none rounded-xl border border-[#30464c] bg-[#17272e] p-3 text-left transition hover:-translate-y-0.5 hover:border-[#d9a969] hover:bg-[#20343b] active:cursor-grabbing"
+											?disabled=${item.kind === CharacterSpawnKinds.Player && hasPlayer}
+											class="group cursor-grab touch-none rounded-xl border border-[#30464c] bg-[#17272e] p-3 text-left transition hover:-translate-y-0.5 hover:border-[#d9a969] hover:bg-[#20343b] active:cursor-grabbing disabled:cursor-not-allowed disabled:opacity-40"
 											@pointerdown=${(event: PointerEvent) =>
 												interaction.startPaletteDrag(event, item.kind, world)}
 										>
@@ -287,7 +318,10 @@ export const makeDesignStudioPanel = (interaction: DesignStudioInteraction) => {
 													</div>
 									<button type="button" class="rounded-lg border border-[#704a45] px-2.5 py-1.5 text-[10px] font-bold text-[#ef9f8e] hover:bg-[#3a2425]" @click=${() => dispatch(Action.EditorDeleteSelected())}>DELETE</button>
 												</div>
-												<div class="mt-4 flex gap-3">
+												${
+													characterSelected
+														? html``
+														: html`<div class="mt-4 flex gap-3">
 													${numberInput(
 														"Width",
 														selectedBody.width,
@@ -333,7 +367,8 @@ export const makeDesignStudioPanel = (interaction: DesignStudioInteraction) => {
 														)
 													: html``
 											}
-										</div>
+										</div>`
+												}
 										${
 											selectedSignContent === undefined
 												? html``

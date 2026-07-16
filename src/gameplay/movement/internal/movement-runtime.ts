@@ -28,6 +28,7 @@ import {
 } from "../../../world/spatial/player-placement";
 import { isSupportSurfaceOccupied } from "../../../world/spatial/support-surface";
 import {
+	characterSpawnPosition,
 	cratePushSlowdown,
 	fallResetElevation,
 	gravity,
@@ -608,14 +609,19 @@ export class MovementSystemService extends Context.Service<
 			}
 
 			if (z < fallResetElevation) {
+				const authoredSpawn =
+					characterSpawnPosition({
+						world: verticalMove.world,
+						entity: playerEntity,
+					}) ?? playerSpawnPosition;
 				const resetPosition = {
 					x: Math.min(
-						Math.max(playerSpawnPosition.x, verticalMove.world.floorOrigin.x),
+						Math.max(authoredSpawn.x, verticalMove.world.floorOrigin.x),
 						verticalMove.world.floorOrigin.x +
 							verticalMove.world.floorPlan.width,
 					),
 					y: Math.min(
-						Math.max(playerSpawnPosition.y, verticalMove.world.floorOrigin.y),
+						Math.max(authoredSpawn.y, verticalMove.world.floorOrigin.y),
 						verticalMove.world.floorOrigin.y +
 							verticalMove.world.floorPlan.depth,
 					),

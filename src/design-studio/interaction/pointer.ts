@@ -6,7 +6,7 @@ import {
 	entityHeight,
 } from "../../world/spatial/elevation";
 import { isPlayerEntity, type World } from "../../world/world";
-import type { EditorItemKind } from "../model";
+import type { DesignStudioItemKind } from "../model";
 
 export type ScreenBounds = {
 	readonly left: number;
@@ -18,7 +18,7 @@ export type ScreenBounds = {
 export type ViewportSize = { readonly width: number; readonly height: number };
 
 type PalettePress = {
-	readonly itemKind: EditorItemKind;
+	readonly itemKind: DesignStudioItemKind;
 	readonly pointer: Position;
 	readonly itemBounds: ScreenBounds;
 };
@@ -75,7 +75,7 @@ const isInsideActivationBounds = (
 type PalettePressMovement = {
 	readonly state: DesignStudioInteraction;
 	readonly activated: {
-		readonly itemKind: EditorItemKind;
+		readonly itemKind: DesignStudioItemKind;
 		readonly pointer: Position;
 	} | null;
 };

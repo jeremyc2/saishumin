@@ -9,7 +9,8 @@ import {
 } from "../../../world/components";
 import { EntityId } from "../../../world/entity-id";
 import { initialWorld } from "../../../world/initial-world";
-import { EditorItemKinds } from "../../model";
+import { lavaMonsterBody, playerBody } from "../../../world/world";
+import { CharacterSpawnKinds, EditorItemKinds } from "../../model";
 import { editorPlacementPositionAtPointer } from "../placement";
 
 const platform = EntityId(900);
@@ -28,6 +29,39 @@ const world = {
 };
 
 describe("editor placement projection", () => {
+	test("projects Character Spawns onto every standable obstacle surface", () => {
+		const surfaces = [
+			{ kind: ObstacleKinds.Platform, height: 48 },
+			{ kind: ObstacleKinds.Crate, height: 62 },
+			{ kind: ObstacleKinds.Wall, height: 80 },
+		] as const;
+		const characterSpawns = [
+			{ kind: CharacterSpawnKinds.Player, body: playerBody },
+			{ kind: CharacterSpawnKinds.LavaMonster, body: lavaMonsterBody },
+		] as const;
+		const desiredPosition = Position.make({ x: 520, y: 300 });
+
+		for (const surface of surfaces) {
+			const surfaceWorld = {
+				...world,
+				obstacles: new Map(world.obstacles).set(
+					platform,
+					Obstacle.make(surface),
+				),
+			};
+			for (const characterSpawn of characterSpawns) {
+				expect(
+					editorPlacementPositionAtPointer({
+						world: surfaceWorld,
+						kind: characterSpawn.kind,
+						body: characterSpawn.body,
+						projectedPointer: project(desiredPosition, surface.height),
+					}),
+				).toEqual(desiredPosition);
+			}
+		}
+	});
+
 	test("inverse-projects the cursor across the full raised top surface", () => {
 		const desiredPosition = Position.make({ x: 520, y: 250 });
 		const pointer = project(desiredPosition, platformHeight);

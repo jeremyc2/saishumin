@@ -1,9 +1,10 @@
-import { Body } from "../../world/components";
+import { Body, CharacterKinds } from "../../world/components";
 import type { EntityId } from "../../world/entity-id";
 import type { World } from "../../world/world";
 import {
+	CharacterSpawnKinds,
+	type DesignStudioItemKind,
 	defaultEditorItemHeight,
-	type EditorItemKind,
 	editorItemHeightLimits,
 	isEditorItemKind,
 	maximumEditorItemBody,
@@ -14,7 +15,12 @@ type EditorEntityInput = { readonly world: World; readonly entity: EntityId };
 export const editorItemKindForEntity = ({
 	world,
 	entity,
-}: EditorEntityInput): EditorItemKind | undefined => {
+}: EditorEntityInput): DesignStudioItemKind | undefined => {
+	const character = world.characters.get(entity);
+	if (character?.kind === CharacterKinds.Player)
+		return CharacterSpawnKinds.Player;
+	if (character?.kind === CharacterKinds.LavaMonster)
+		return CharacterSpawnKinds.LavaMonster;
 	const kind =
 		world.obstacles.get(entity)?.kind ?? world.decorations.get(entity)?.kind;
 	return kind !== undefined && isEditorItemKind(kind) ? kind : undefined;
@@ -56,5 +62,5 @@ export const editorEntityHeightLimits = ({
 		: editorItemHeightLimits(kind);
 };
 
-export const defaultEntityHeight = (kind: EditorItemKind): number =>
+export const defaultEntityHeight = (kind: DesignStudioItemKind): number =>
 	defaultEditorItemHeight(kind);

@@ -87,6 +87,11 @@ export const makeInitialWorld = Effect.fnUntraced(function* ({
 				character === undefined ? [] : [[entity, character] as const],
 			),
 		),
+		characterSpawns: new Map(
+			entities.flatMap(({ entity, character, position }) =>
+				character === undefined ? [] : [[entity, position] as const],
+			),
+		),
 		lavaMonsterSteering: new Map(),
 		floorPlan,
 		floorOrigin,
@@ -99,6 +104,7 @@ export const makeInitialWorld = Effect.fnUntraced(function* ({
 			selected: null,
 			invalidPlacement: null,
 			editSession: null,
+			changedCharacterSpawns: new Set(),
 		},
 		pressed: new Set(),
 		openedChests: new Set(),

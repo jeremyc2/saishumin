@@ -7,8 +7,10 @@ import {
 } from "../../../presentation/geometry/resize";
 import type { Body, Position } from "../../../world/components";
 import type { EntityId } from "../../../world/entity-id";
+import { surfaceAt } from "../../../world/spatial/collision";
 import { entityBaseElevation } from "../../../world/spatial/elevation";
 import {
+	characterSpawnPosition,
 	minimumEntityExtent,
 	minimumFloorDepth,
 	minimumFloorWidth,
@@ -19,7 +21,7 @@ import {
 	editSessionView,
 	maximumEditorBody,
 } from "../../edit-session/edit-session";
-import { defaultEditorItemBody, type EditorItemKind } from "../../model";
+import { type DesignStudioItemKind, defaultEditorItemBody } from "../../model";
 import { editorPlacementPositionAtPointer } from "../placement";
 import {
 	autoPanCamera,
@@ -60,7 +62,7 @@ type ActiveInteraction =
 	  }
 	| {
 			readonly kind: "create";
-			readonly itemKind: EditorItemKind;
+			readonly itemKind: DesignStudioItemKind;
 			readonly pointer: Position;
 			readonly position: Position;
 			readonly canDrop: boolean;
@@ -113,7 +115,7 @@ export type DesignStudioInteraction = {
 	) => void;
 	readonly startPaletteDrag: (
 		event: PointerEvent,
-		itemKind: EditorItemKind,
+		itemKind: DesignStudioItemKind,
 		world: World,
 	) => void;
 	readonly update: (world: World, dispatch: Dispatch) => void;
@@ -121,7 +123,7 @@ export type DesignStudioInteraction = {
 	readonly isPanGesture: (event: PointerEvent) => boolean;
 	readonly isGestureActive: () => boolean;
 	readonly createPreview: () => {
-		readonly itemKind: EditorItemKind;
+		readonly itemKind: DesignStudioItemKind;
 		readonly position: Position;
 		readonly canDrop: boolean;
 	} | null;
@@ -214,7 +216,9 @@ export const makeDesignStudioInteraction = (input: {
 				event,
 				world.editor.camera,
 			);
-			const position = world.positions.get(entity);
+			const position = world.characters.has(entity)
+				? characterSpawnPosition({ world, entity })
+				: world.positions.get(entity);
 			const body = world.bodies.get(entity);
 			if (
 				projectedPointer === undefined ||
@@ -227,7 +231,9 @@ export const makeDesignStudioInteraction = (input: {
 			dispatch(Action.EditorSelectionChanged({ selection: entity }));
 			const pointerAtBase = unproject(
 				projectedPointer,
-				entityBaseElevation(world, entity),
+				world.characters.has(entity)
+					? surfaceAt(world, position, body)
+					: entityBaseElevation(world, entity),
 			);
 			activeInteraction = {
 				kind: "move",
@@ -338,7 +344,7 @@ export const makeDesignStudioInteraction = (input: {
 
 		const startPaletteDrag = (
 			event: PointerEvent,
-			itemKind: EditorItemKind,
+			itemKind: DesignStudioItemKind,
 			world: World,
 		): void => {
 			if (event.button !== 0) return;

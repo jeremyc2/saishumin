@@ -8,7 +8,11 @@ import {
 	entityTopElevation,
 } from "../../world/spatial/elevation";
 import { groundElevation, type World } from "../../world/world";
-import type { EditorItemKind } from "../model";
+import {
+	CharacterSpawnKinds,
+	type DesignStudioItemKind,
+	spatialEditorItemKind,
+} from "../model";
 
 const subtract = (position: Position, offset: Position): Position => ({
 	x: position.x - offset.x,
@@ -30,7 +34,7 @@ export const editorPlacementPositionAtPointer = ({
 	excludedEntity,
 }: {
 	readonly world: World;
-	readonly kind: EditorItemKind;
+	readonly kind: DesignStudioItemKind;
 	readonly body: Body;
 	readonly projectedPointer: Position;
 	readonly grabOffset?: Position;
@@ -40,13 +44,23 @@ export const editorPlacementPositionAtPointer = ({
 		unproject(projectedPointer, groundElevation),
 		grabOffset,
 	);
-	if (!canSitOnPlatform(kind)) return resolvedPosition;
+	const characterSpawn =
+		kind === CharacterSpawnKinds.Player ||
+		kind === CharacterSpawnKinds.LavaMonster;
+	const spatialKind = spatialEditorItemKind(kind);
+	if (
+		!characterSpawn &&
+		(spatialKind === undefined || !canSitOnPlatform(spatialKind))
+	)
+		return resolvedPosition;
 
 	let resolvedElevation = groundElevation;
 	for (const [entity, obstacle] of world.obstacles) {
 		if (
 			entity === excludedEntity ||
-			!canSitOnSupport({ kind, supportKind: obstacle.kind })
+			(!characterSpawn &&
+				(spatialKind === undefined ||
+					!canSitOnSupport({ kind: spatialKind, supportKind: obstacle.kind })))
 		)
 			continue;
 		const platformPosition = world.positions.get(entity);

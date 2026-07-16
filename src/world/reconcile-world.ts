@@ -11,6 +11,7 @@ import { floorTileVersion } from "./floor";
 import { initialWorld } from "./initial-world";
 import { surfaceAt } from "./spatial/collision";
 import {
+	characterSpawnPosition,
 	groundElevation,
 	obstacleHeightTolerance,
 	playerBody,
@@ -33,10 +34,14 @@ export const reconcileWorld = (world: World): World => {
 	const obstacles = new Map(world.obstacles ?? initialWorld.obstacles);
 	const decorations = new Map(world.decorations ?? initialWorld.decorations);
 	const characters = new Map(world.characters ?? initialWorld.characters);
+	const characterSpawns = new Map(
+		world.characterSpawns ?? initialWorld.characterSpawns,
+	);
 	let foundPlayer = false;
 	for (const [entity, character] of characters) {
 		if (!positions.has(entity) || !bodies.has(entity)) {
 			characters.delete(entity);
+			characterSpawns.delete(entity);
 			continue;
 		}
 		if (character.kind === CharacterKinds.Player) {
@@ -54,6 +59,14 @@ export const reconcileWorld = (world: World): World => {
 					? PlayerFacings.Down
 					: PlayerFacings.Left,
 		});
+	}
+	for (const entity of characterSpawns.keys()) {
+		if (!characters.has(entity)) characterSpawns.delete(entity);
+	}
+	for (const entity of characters.keys()) {
+		const position = positions.get(entity);
+		if (!characterSpawns.has(entity) && position !== undefined)
+			characterSpawns.set(entity, position);
 	}
 	const openedChests = new Set(world.openedChests ?? initialWorld.openedChests);
 	const signContents = new Map(world.signContents ?? initialWorld.signContents);
@@ -89,6 +102,7 @@ export const reconcileWorld = (world: World): World => {
 		obstacles,
 		decorations,
 		characters,
+		characterSpawns,
 		lavaMonsterSteering: new Map(),
 		floorPlan,
 		floorOrigin: world.floorOrigin ?? initialWorld.floorOrigin,
@@ -101,6 +115,7 @@ export const reconcileWorld = (world: World): World => {
 			selected: null,
 			invalidPlacement: null,
 			editSession: null,
+			changedCharacterSpawns: new Set(),
 		},
 		pressed: new Set(),
 		openedChests,
@@ -125,10 +140,13 @@ export const reconcileWorld = (world: World): World => {
 		playerElevation.z,
 	);
 	if (!Number.isFinite(supportHeight)) {
+		const spawnPosition =
+			characterSpawnPosition({ world: reconciled, entity: playerEntity }) ??
+			playerSpawnPosition;
 		const resetPositions = new Map(reconciled.positions);
 		resetPositions.set(playerEntity, {
-			x: Math.min(playerSpawnPosition.x, floorPlan.width),
-			y: Math.min(playerSpawnPosition.y, floorPlan.depth),
+			x: Math.min(spawnPosition.x, floorPlan.width),
+			y: Math.min(spawnPosition.y, floorPlan.depth),
 		});
 		const resetElevations = new Map(reconciled.elevations);
 		resetElevations.set(playerEntity, {

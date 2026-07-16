@@ -15,6 +15,7 @@ import { outdoorFloorTiles } from "../../presentation/artwork/outdoor-floor";
 import { terrainFloorTemplate } from "../../presentation/artwork/terrain";
 import {
 	renderDepthForCharacter,
+	renderDepthForCharacterAt,
 	renderDepthForEntity,
 } from "../../presentation/geometry/depth";
 import {
@@ -122,6 +123,34 @@ const sceneObjects = (world: World): ReadonlyArray<RenderedObject> => {
 				grabbed: world.grabbed === entity,
 			}),
 		});
+	}
+	if (world.editor.open) {
+		for (const [entity, character] of world.characters) {
+			const position = world.characterSpawns.get(entity);
+			const body = world.bodies.get(entity);
+			if (position === undefined || body === undefined) continue;
+			const elevation = surfaceAt(world, position, body);
+			const center = project(position, elevation);
+			const player = character.kind === CharacterKinds.Player;
+			const radius = player ? 27 : 34;
+			const color = player ? "#55b9f3" : "#f06a3b";
+			objects.push({
+				depth: renderDepthForCharacterAt({
+					world,
+					body,
+					position,
+					elevation,
+				}),
+				entity,
+				template: svg`
+					<g data-character-spawn=${character.kind} aria-label=${player ? "Player spawn point" : "Lava Monster spawn point"}>
+						<ellipse cx=${center.x} cy=${center.y} rx=${radius} ry=${radius * 0.5} fill=${color} opacity="0.34" />
+						<ellipse cx=${center.x} cy=${center.y} rx=${radius - 5} ry=${(radius - 5) * 0.5} fill="none" stroke=${color} stroke-width="5" vector-effect="non-scaling-stroke" />
+						<circle cx=${center.x} cy=${center.y} r="5" fill=${color} />
+					</g>
+				`,
+			});
+		}
 	}
 	if (!world.editor.open) {
 		for (const [entity, character] of world.characters) {

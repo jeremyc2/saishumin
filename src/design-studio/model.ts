@@ -3,7 +3,10 @@ import {
 	Body,
 	defaultDecorationHeight,
 	isDecorationKind,
+	isObstacleKind,
 } from "../world/components";
+import type { SpatialEntityKind } from "../world/spatial/elevation";
+import { lavaMonsterBody, playerBody } from "../world/world";
 
 export const EditorItemKind = Schema.Literals([
 	"hopscotch",
@@ -17,6 +20,13 @@ export const EditorItemKind = Schema.Literals([
 ]);
 export type EditorItemKind = typeof EditorItemKind.Type;
 
+export const CharacterSpawnKind = Schema.Literals([
+	"player-spawn",
+	"lava-monster-spawn",
+]);
+export type CharacterSpawnKind = typeof CharacterSpawnKind.Type;
+export type DesignStudioItemKind = EditorItemKind | CharacterSpawnKind;
+
 export const EditorItemKinds = {
 	Hopscotch: EditorItemKind.make("hopscotch"),
 	Plant: EditorItemKind.make("plant"),
@@ -28,9 +38,21 @@ export const EditorItemKinds = {
 	Sign: EditorItemKind.make("sign"),
 } as const;
 
+export const CharacterSpawnKinds = {
+	Player: CharacterSpawnKind.make("player-spawn"),
+	LavaMonster: CharacterSpawnKind.make("lava-monster-spawn"),
+} as const;
+
 export const isEditorItemKind = Schema.is(EditorItemKind);
 
-export const defaultEditorItemBody = (kind: EditorItemKind): Body => {
+export const spatialEditorItemKind = (
+	kind: DesignStudioItemKind,
+): SpatialEntityKind | undefined =>
+	isDecorationKind(kind) || isObstacleKind(kind) ? kind : undefined;
+
+export const defaultEditorItemBody = (kind: DesignStudioItemKind): Body => {
+	if (kind === CharacterSpawnKinds.Player) return playerBody;
+	if (kind === CharacterSpawnKinds.LavaMonster) return lavaMonsterBody;
 	if (kind === EditorItemKinds.Hopscotch)
 		return Body.make({ width: 150, depth: 280 });
 	if (kind === EditorItemKinds.Plant)
@@ -46,7 +68,12 @@ export const defaultEditorItemBody = (kind: EditorItemKind): Body => {
 	return Body.make({ width: 70, depth: 70 });
 };
 
-export const defaultEditorItemHeight = (kind: EditorItemKind): number => {
+export const defaultEditorItemHeight = (kind: DesignStudioItemKind): number => {
+	if (
+		kind === CharacterSpawnKinds.Player ||
+		kind === CharacterSpawnKinds.LavaMonster
+	)
+		return 0;
 	if (isDecorationKind(kind)) return defaultDecorationHeight(kind);
 	if (kind === EditorItemKinds.Wall) return 80;
 	if (kind === EditorItemKinds.Platform) return 40;
@@ -55,8 +82,13 @@ export const defaultEditorItemHeight = (kind: EditorItemKind): number => {
 };
 
 export const editorItemHeightLimits = (
-	kind: EditorItemKind,
+	kind: DesignStudioItemKind,
 ): { readonly minimum: number; readonly maximum: number } => {
+	if (
+		kind === CharacterSpawnKinds.Player ||
+		kind === CharacterSpawnKinds.LavaMonster
+	)
+		return { minimum: 0, maximum: 0 };
 	if (kind === EditorItemKinds.Hopscotch) return { minimum: 0, maximum: 0 };
 	if (kind === EditorItemKinds.Platform) return { minimum: 16, maximum: 160 };
 	if (kind === EditorItemKinds.Crate || kind === EditorItemKinds.Chest)
@@ -65,7 +97,9 @@ export const editorItemHeightLimits = (
 	return { minimum: 40, maximum: 240 };
 };
 
-export const maximumEditorItemBody = (kind: EditorItemKind): Body => {
+export const maximumEditorItemBody = (kind: DesignStudioItemKind): Body => {
+	if (kind === CharacterSpawnKinds.Player) return playerBody;
+	if (kind === CharacterSpawnKinds.LavaMonster) return lavaMonsterBody;
 	if (kind === EditorItemKinds.Hopscotch)
 		return Body.make({ width: 800, depth: 1200 });
 	if (kind === EditorItemKinds.Plant || kind === EditorItemKinds.Lamp)

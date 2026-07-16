@@ -23,6 +23,7 @@ export type World = {
 	readonly obstacles: ReadonlyMap<EntityId, Obstacle>;
 	readonly decorations: ReadonlyMap<EntityId, Decoration>;
 	readonly characters: ReadonlyMap<EntityId, Character>;
+	readonly characterSpawns: ReadonlyMap<EntityId, Position>;
 	readonly lavaMonsterSteering: ReadonlyMap<EntityId, LavaMonsterSteering>;
 	readonly floorPlan: Body;
 	readonly floorOrigin: Position;
@@ -58,6 +59,15 @@ export const lavaMonsterEntitiesIn = (world: World): ReadonlyArray<EntityId> =>
 	[...world.characters]
 		.filter(([, character]) => character.kind === CharacterKinds.LavaMonster)
 		.map(([entity]) => entity);
+
+export const characterSpawnPosition = ({
+	world,
+	entity,
+}: {
+	readonly world: World;
+	readonly entity: EntityId;
+}): Position | undefined =>
+	world.characterSpawns.get(entity) ?? world.positions.get(entity);
 export const roomWidth = 1160;
 export const roomDepth = 640;
 export const minimumFloorWidth = 360;

@@ -13,7 +13,9 @@ export type EditorItemKind =
 	| "platform"
 	| "crate"
 	| "chest"
-	| "sign";
+	| "sign"
+	| "player-spawn"
+	| "lava-monster-spawn";
 
 export type EditorSelection = EntityId | "floor" | null;
 
@@ -97,4 +99,5 @@ export type EditorState = {
 	readonly selected: EditorSelection;
 	readonly invalidPlacement: InvalidPlacement | null;
 	readonly editSession: EditSession | null;
+	readonly changedCharacterSpawns: ReadonlySet<EntityId>;
 };

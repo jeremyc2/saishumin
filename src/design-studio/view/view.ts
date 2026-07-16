@@ -6,8 +6,9 @@ import {
 } from "../../presentation/geometry/projection";
 import type { ResizeDirection } from "../../presentation/geometry/resize";
 import type { Position } from "../../world/components";
+import { surfaceAt } from "../../world/spatial/collision";
 import { entityBaseElevation } from "../../world/spatial/elevation";
-import type { World } from "../../world/world";
+import { characterSpawnPosition, type World } from "../../world/world";
 import type { DesignStudioInteraction } from "../interaction/interaction";
 import { makeDesignStudioOverlays } from "./overlays";
 import { makeDesignStudioPanel } from "./panel";
@@ -188,14 +189,21 @@ export const makeDesignStudioView = (interaction: DesignStudioInteraction) => {
 				`;
 		}
 
-		const position = world.positions.get(selected);
+		const characterSelected = world.characters.has(selected);
+		const position = characterSelected
+			? characterSpawnPosition({ world, entity: selected })
+			: world.positions.get(selected);
 		const body = world.bodies.get(selected);
 		if (position === undefined || body === undefined) return svg``;
 		const outline = projectedRectangle(
 			position,
 			body,
-			entityBaseElevation(world, selected),
+			characterSelected
+				? surfaceAt(world, position, body)
+				: entityBaseElevation(world, selected),
 		);
+		if (characterSelected)
+			return svg`<polygon points=${points(outline)} fill="none" stroke=${accent} stroke-width="4" stroke-dasharray="10 7" vector-effect="non-scaling-stroke" pointer-events="none" />`;
 		const edges: ReadonlyArray<{
 			readonly start: Position;
 			readonly end: Position;

@@ -1,5 +1,5 @@
 import { Data } from "effect";
-import type { EditorItemKind } from "../design-studio/model";
+import type { DesignStudioItemKind } from "../design-studio/model";
 import type { Body, Position, SignContent } from "../world/components";
 import type {
 	EditorSelection,
@@ -24,7 +24,7 @@ export type Action = Data.TaggedEnum<{
 	EditorEditSessionCommitted: Record<never, never>;
 	EditorEditSessionCancelled: Record<never, never>;
 	EditorItemAdded: {
-		readonly kind: EditorItemKind;
+		readonly kind: DesignStudioItemKind;
 		readonly position: Position;
 	};
 	EditorEntityMoved: {

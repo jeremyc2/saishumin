@@ -1,4 +1,4 @@
-import { html, type TemplateResult } from "lit-html";
+import { html, svg, type TemplateResult } from "lit-html";
 import { Action, type Action as AppAction } from "../../app/action";
 import {
 	boxTemplate,
@@ -8,6 +8,7 @@ import {
 } from "../../presentation/artwork/entities";
 import {
 	points,
+	project,
 	projectedRectangle,
 	viewport,
 } from "../../presentation/geometry/projection";
@@ -21,16 +22,20 @@ import type {
 	EditSessionRejectionReason,
 	InvalidPlacement,
 } from "../../world/editor-state";
+import { surfaceAt } from "../../world/spatial/collision";
 import { placementElevationForKind } from "../../world/spatial/elevation";
 import { isSupportSurfaceOccupied } from "../../world/spatial/support-surface";
 import type { World } from "../../world/world";
+import { groundElevation } from "../../world/world";
 import { EditSessionStatus } from "../edit-session/edit-session";
 import type { DesignStudioInteraction } from "../interaction/interaction";
 import {
+	CharacterSpawnKinds,
+	type DesignStudioItemKind,
 	defaultEditorItemBody,
 	defaultEditorItemHeight,
-	type EditorItemKind,
 	EditorItemKinds,
+	spatialEditorItemKind,
 } from "../model";
 
 type Dispatch = (action: AppAction) => void;
@@ -53,7 +58,7 @@ export const invalidPreviewDescription = (input: {
 };
 
 const decorationKindForEditorItem = (
-	itemKind: EditorItemKind,
+	itemKind: DesignStudioItemKind,
 ): DecorationKind => {
 	switch (itemKind) {
 		case EditorItemKinds.Hopscotch:
@@ -140,15 +145,32 @@ export const makeDesignStudioOverlays = (
 		if (preview === null) return html``;
 		const body = defaultEditorItemBody(preview.itemKind);
 		const position = preview.position;
-		const baseElevation = placementElevationForKind(
-			world,
-			preview.itemKind,
-			position,
-			body,
-		);
+		const characterSpawn =
+			preview.itemKind === CharacterSpawnKinds.Player ||
+			preview.itemKind === CharacterSpawnKinds.LavaMonster;
+		const spatialKind = spatialEditorItemKind(preview.itemKind);
+		let baseElevation = groundElevation;
+		if (characterSpawn) baseElevation = surfaceAt(world, position, body);
+		else if (spatialKind !== undefined)
+			baseElevation = placementElevationForKind(
+				world,
+				spatialKind,
+				position,
+				body,
+			);
 		const height = defaultEditorItemHeight(preview.itemKind);
 		let visual: TemplateResult;
-		if (preview.itemKind === EditorItemKinds.Crate)
+		if (characterSpawn) {
+			const center = project(position, baseElevation);
+			const player = preview.itemKind === CharacterSpawnKinds.Player;
+			const radius = player ? 27 : 34;
+			const color = player ? "#55b9f3" : "#f06a3b";
+			visual = svg`
+				<ellipse cx=${center.x} cy=${center.y} rx=${radius} ry=${radius * 0.5} fill=${color} opacity="0.34" />
+				<ellipse cx=${center.x} cy=${center.y} rx=${radius - 5} ry=${(radius - 5) * 0.5} fill="none" stroke=${color} stroke-width="5" vector-effect="non-scaling-stroke" />
+				<circle cx=${center.x} cy=${center.y} r="5" fill=${color} />
+			`;
+		} else if (preview.itemKind === EditorItemKinds.Crate)
 			visual = crateTemplate({
 				position,
 				body,

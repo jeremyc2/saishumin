@@ -1,14 +1,28 @@
 import { describe, expect, test } from "bun:test";
 import { Effect } from "effect";
 import {
+	authoredRoomFromWorld,
 	copyAuthoredRoomToClipboard,
 	loadAuthoredRoomFromClipboard,
 	stringifyAuthoredRoom,
 } from "../authored-room";
+import { Position } from "../components";
 import { EntityId } from "../entity-id";
 import { initialWorld } from "../initial-world";
 
 describe("Authored Room serialization", () => {
+	test("serializes Character Spawn positions instead of transient live positions", () => {
+		const player = EntityId(1);
+		const livePosition = Position.make({ x: 500, y: 500 });
+		const room = authoredRoomFromWorld({
+			...initialWorld,
+			positions: new Map(initialWorld.positions).set(player, livePosition),
+		});
+
+		expect(
+			room.entities.find(({ entity }) => entity === player)?.position,
+		).toEqual(initialWorld.characterSpawns.get(player));
+	});
 	test("serializes authored data in deterministic Entity ID order", () => {
 		const serialized = stringifyAuthoredRoom({
 			...initialWorld,

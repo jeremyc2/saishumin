@@ -43,10 +43,15 @@ import {
 	editorItemKindForEntity,
 	isEntityPlacementValid,
 	isFloorPlanPlacementValid,
+	isNewEditorItemPlacementValid,
 	maximumEditorBody,
 	previewEditSession,
 } from "../edit-session/edit-session";
-import { EditorItemKinds, editorItemHeightLimits } from "../model";
+import {
+	defaultEditorItemBody,
+	EditorItemKinds,
+	editorItemHeightLimits,
+} from "../model";
 
 type DesignStudioAction = Exclude<
 	Action,
@@ -118,20 +123,35 @@ const addEditorItem = (
 	kind: Parameters<typeof Action.EditorItemAdded>[0]["kind"],
 	position: Position,
 ): World => {
+	const body = defaultEditorItemBody(kind);
+	if (!isNewEditorItemPlacementValid(world, kind, position, body))
+		return {
+			...world,
+			editor: { ...world.editor, invalidPlacement: { kind: "new" } },
+		};
 	const candidate = addEditorItemToWorld(world, kind, position);
 	const entity = candidate.editor.selected;
 	if (entity === null || entity === "floor") return world;
-	const body = candidate.bodies.get(entity);
+	const candidateBody = candidate.bodies.get(entity);
 	if (
-		body === undefined ||
-		!isEntityPlacementValid(candidate, entity, position, body)
+		candidateBody === undefined ||
+		!isEntityPlacementValid(candidate, entity, position, candidateBody)
 	)
 		return {
 			...world,
 			editor: { ...world.editor, invalidPlacement: { kind: "new" } },
 		};
 
-	return { ...candidate, editor: { ...world.editor, selected: entity } };
+	const changedCharacterSpawns = new Set(world.editor.changedCharacterSpawns);
+	if (candidate.characters.has(entity)) changedCharacterSpawns.add(entity);
+	return {
+		...candidate,
+		editor: {
+			...world.editor,
+			selected: entity,
+			changedCharacterSpawns,
+		},
+	};
 };
 
 const toggleDesignStudio = (world: World): World => {
@@ -152,38 +172,63 @@ const toggleDesignStudio = (world: World): World => {
 			selected: null,
 			invalidPlacement: null,
 			editSession: null,
+			changedCharacterSpawns: open
+				? new Set()
+				: withoutSession.editor.changedCharacterSpawns,
 		},
 	};
 	if (open) return toggled;
-	const playerEntity = playerEntityIn(withoutSession);
+	const positions = new Map(toggled.positions);
+	const elevations = new Map(toggled.elevations);
+	for (const entity of withoutSession.editor.changedCharacterSpawns) {
+		const spawn = withoutSession.characterSpawns.get(entity);
+		const body = withoutSession.bodies.get(entity);
+		if (spawn === undefined || body === undefined) continue;
+		positions.set(entity, spawn);
+		elevations.set(entity, {
+			z: surfaceAt(withoutSession, spawn, body),
+			velocity: stationaryVelocity,
+		});
+	}
+	toggled = {
+		...toggled,
+		positions,
+		elevations,
+		editor: { ...toggled.editor, changedCharacterSpawns: new Set() },
+	};
+	const playerEntity = playerEntityIn(toggled);
 	if (playerEntity === undefined) return toggled;
-	const playerPosition = withoutSession.positions.get(playerEntity);
-	const playerElevation = withoutSession.elevations.get(playerEntity);
+	const playerPosition = toggled.positions.get(playerEntity);
+	const playerElevation = toggled.elevations.get(playerEntity);
 	if (
 		playerPosition === undefined ||
 		playerElevation === undefined ||
-		isPlayerPlacementValid(withoutSession, playerPosition, playerElevation.z)
+		isPlayerPlacementValid(toggled, playerPosition, playerElevation.z)
 	)
 		return toggled;
 	const safePosition = nearestValidPlayerPosition(
-		withoutSession,
+		toggled,
 		playerPosition,
 		groundElevation,
 	);
 	if (safePosition === undefined) return toggled;
-	const positions = new Map(withoutSession.positions);
-	positions.set(playerEntity, safePosition);
-	const elevations = new Map(withoutSession.elevations);
-	elevations.set(playerEntity, {
+	const safePositions = new Map(toggled.positions);
+	safePositions.set(playerEntity, safePosition);
+	const safeElevations = new Map(toggled.elevations);
+	safeElevations.set(playerEntity, {
 		z: groundElevation,
 		velocity: stationaryVelocity,
 	});
-	toggled = { ...toggled, positions, elevations };
+	toggled = {
+		...toggled,
+		positions: safePositions,
+		elevations: safeElevations,
+	};
 	return {
 		...toggled,
 		gameCamera: cameraFollowingPlayer({
 			world: toggled,
-			camera: withoutSession.gameCamera,
+			camera: toggled.gameCamera,
 		}),
 	};
 };
@@ -330,12 +375,7 @@ const dismissInvalidPlacement = (world: World): World => {
 
 const deleteSelected = (world: World): World => {
 	const selected = world.editor.selected;
-	if (
-		!world.editor.open ||
-		selected === null ||
-		selected === "floor" ||
-		isPlayerEntity(world, selected)
-	)
+	if (!world.editor.open || selected === null || selected === "floor")
 		return world;
 	const position = world.positions.get(selected);
 	const body = world.bodies.get(selected);
@@ -349,6 +389,9 @@ const deleteSelected = (world: World): World => {
 	const elevations = new Map(world.elevations);
 	const openedChests = new Set(world.openedChests);
 	const signContents = new Map(world.signContents);
+	const characters = new Map(world.characters);
+	const characterSpawns = new Map(world.characterSpawns);
+	const lavaMonsterSteering = new Map(world.lavaMonsterSteering);
 	positions.delete(selected);
 	bodies.delete(selected);
 	obstacles.delete(selected);
@@ -356,6 +399,9 @@ const deleteSelected = (world: World): World => {
 	elevations.delete(selected);
 	openedChests.delete(selected);
 	signContents.delete(selected);
+	characters.delete(selected);
+	characterSpawns.delete(selected);
+	lavaMonsterSteering.delete(selected);
 	return {
 		...world,
 		positions,
@@ -365,6 +411,9 @@ const deleteSelected = (world: World): World => {
 		elevations,
 		openedChests,
 		signContents,
+		characters,
+		characterSpawns,
+		lavaMonsterSteering,
 		editor: { ...world.editor, selected: null },
 	};
 };

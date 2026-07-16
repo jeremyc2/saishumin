@@ -53,7 +53,10 @@ export const authoredRoomFromWorld = (world: World): AuthoredRoom => {
 		const signContent = world.signContents.get(entity);
 		entities.push({
 			entity,
-			position,
+			position:
+				character === undefined
+					? position
+					: (world.characterSpawns.get(entity) ?? position),
 			body,
 			...(elevation === undefined ? {} : { elevation }),
 			...(obstacle === undefined ? {} : { obstacle }),

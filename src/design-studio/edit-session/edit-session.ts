@@ -1,12 +1,15 @@
 import { Data } from "effect";
 import { dual } from "effect/Function";
 import {
+	Character,
+	CharacterKinds,
 	Decoration,
 	DecorationKinds,
 	defaultSignContent,
 	Elevation,
 	Obstacle,
 	ObstacleKinds,
+	PlayerFacings,
 	type Position,
 } from "../../world/components";
 import type {
@@ -24,17 +27,23 @@ import {
 import { isSupportSurfaceTransformValid } from "../../world/spatial/support-surface";
 import {
 	crateHeight,
+	groundElevation,
+	lavaMonsterBody,
+	playerBody,
 	stationaryVelocity,
 	type World,
 	wallHeight,
 } from "../../world/world";
 import {
+	CharacterSpawnKinds,
+	type DesignStudioItemKind,
 	defaultEditorItemBody,
 	defaultEditorItemHeight,
-	type EditorItemKind,
 	EditorItemKinds,
+	spatialEditorItemKind,
 } from "../model";
 import {
+	isCharacterSpawnPlacementValid,
 	isEntityPlacementValid,
 	isFloorPlanPlacementValid,
 	isInsideFloorPlan,
@@ -65,70 +74,137 @@ export const editSessionStatus = (world: World): EditSessionStatus => {
 
 const nextEntityId = (world: World): EntityIdType => {
 	let greatestId = 0;
-	for (const entity of world.positions.keys())
-		greatestId = Math.max(greatestId, entity);
+	const componentMaps: ReadonlyArray<ReadonlyMap<EntityIdType, unknown>> = [
+		world.positions,
+		world.bodies,
+		world.elevations,
+		world.obstacles,
+		world.decorations,
+		world.characters,
+		world.characterSpawns,
+		world.signContents,
+	];
+	for (const componentMap of componentMaps)
+		for (const entity of componentMap.keys())
+			greatestId = Math.max(greatestId, entity);
 	return EntityId(greatestId + 1);
 };
 
 export const addEditorItemToWorld = dual<
-	(itemKind: EditorItemKind, position: Position) => (self: World) => World,
-	(self: World, itemKind: EditorItemKind, position: Position) => World
->(3, (world: World, itemKind: EditorItemKind, position: Position): World => {
-	const entity = nextEntityId(world);
-	const body = defaultEditorItemBody(itemKind);
-	const height = defaultEditorItemHeight(itemKind);
-	const positions = new Map(world.positions).set(entity, position);
-	const bodies = new Map(world.bodies).set(entity, body);
-	const obstacles = new Map(world.obstacles);
-	const decorations = new Map(world.decorations);
-	const elevations = new Map(world.elevations).set(
-		entity,
-		Elevation.make({
-			z: placementElevationForKind(world, itemKind, position, body),
-			velocity: stationaryVelocity,
-		}),
-	);
-	const signContents = new Map(world.signContents);
+	(
+		itemKind: DesignStudioItemKind,
+		position: Position,
+	) => (self: World) => World,
+	(self: World, itemKind: DesignStudioItemKind, position: Position) => World
+>(
+	3,
+	(world: World, itemKind: DesignStudioItemKind, position: Position): World => {
+		const entity = nextEntityId(world);
+		const body = defaultEditorItemBody(itemKind);
+		if (
+			itemKind === CharacterSpawnKinds.Player ||
+			itemKind === CharacterSpawnKinds.LavaMonster
+		) {
+			const characters = new Map(world.characters).set(
+				entity,
+				Character.make({
+					kind:
+						itemKind === CharacterSpawnKinds.Player
+							? CharacterKinds.Player
+							: CharacterKinds.LavaMonster,
+					facing:
+						itemKind === CharacterSpawnKinds.Player
+							? PlayerFacings.Down
+							: PlayerFacings.Left,
+				}),
+			);
+			const positions = new Map(world.positions).set(entity, position);
+			const bodies = new Map(world.bodies).set(
+				entity,
+				itemKind === CharacterSpawnKinds.Player ? playerBody : lavaMonsterBody,
+			);
+			const characterSpawns = new Map(world.characterSpawns).set(
+				entity,
+				position,
+			);
+			const elevations = new Map(world.elevations).set(
+				entity,
+				Elevation.make({
+					z: placementElevationForEntity(world, entity, position, body),
+					velocity: stationaryVelocity,
+				}),
+			);
+			return {
+				...world,
+				positions,
+				bodies,
+				characters,
+				characterSpawns,
+				elevations,
+				editor: { ...world.editor, selected: entity },
+			};
+		}
+		const height = defaultEditorItemHeight(itemKind);
+		const positions = new Map(world.positions).set(entity, position);
+		const bodies = new Map(world.bodies).set(entity, body);
+		const obstacles = new Map(world.obstacles);
+		const decorations = new Map(world.decorations);
+		const spatialKind = spatialEditorItemKind(itemKind);
+		const elevations = new Map(world.elevations).set(
+			entity,
+			Elevation.make({
+				z:
+					spatialKind === undefined
+						? groundElevation
+						: placementElevationForKind(world, spatialKind, position, body),
+				velocity: stationaryVelocity,
+			}),
+		);
+		const signContents = new Map(world.signContents);
 
-	if (itemKind === EditorItemKinds.Wall)
-		obstacles.set(
-			entity,
-			Obstacle.make({ height: wallHeight, kind: ObstacleKinds.Wall }),
-		);
-	else if (itemKind === EditorItemKinds.Platform)
-		obstacles.set(
-			entity,
-			Obstacle.make({ height: 40, kind: ObstacleKinds.Platform }),
-		);
-	else if (itemKind === EditorItemKinds.Crate)
-		obstacles.set(
-			entity,
-			Obstacle.make({ height: crateHeight, kind: ObstacleKinds.Crate }),
-		);
-	else if (itemKind === EditorItemKinds.Chest)
-		obstacles.set(entity, Obstacle.make({ height, kind: ObstacleKinds.Chest }));
-	else {
-		let kind = DecorationKinds.Lamp;
-		if (itemKind === EditorItemKinds.Hopscotch)
-			kind = DecorationKinds.Hopscotch;
-		else if (itemKind === EditorItemKinds.Plant) kind = DecorationKinds.Plant;
-		else if (itemKind === EditorItemKinds.Sign) kind = DecorationKinds.Sign;
-		decorations.set(entity, Decoration.make({ kind, height }));
-		if (itemKind === EditorItemKinds.Sign)
-			signContents.set(entity, defaultSignContent);
-	}
+		if (itemKind === EditorItemKinds.Wall)
+			obstacles.set(
+				entity,
+				Obstacle.make({ height: wallHeight, kind: ObstacleKinds.Wall }),
+			);
+		else if (itemKind === EditorItemKinds.Platform)
+			obstacles.set(
+				entity,
+				Obstacle.make({ height: 40, kind: ObstacleKinds.Platform }),
+			);
+		else if (itemKind === EditorItemKinds.Crate)
+			obstacles.set(
+				entity,
+				Obstacle.make({ height: crateHeight, kind: ObstacleKinds.Crate }),
+			);
+		else if (itemKind === EditorItemKinds.Chest)
+			obstacles.set(
+				entity,
+				Obstacle.make({ height, kind: ObstacleKinds.Chest }),
+			);
+		else {
+			let kind = DecorationKinds.Lamp;
+			if (itemKind === EditorItemKinds.Hopscotch)
+				kind = DecorationKinds.Hopscotch;
+			else if (itemKind === EditorItemKinds.Plant) kind = DecorationKinds.Plant;
+			else if (itemKind === EditorItemKinds.Sign) kind = DecorationKinds.Sign;
+			decorations.set(entity, Decoration.make({ kind, height }));
+			if (itemKind === EditorItemKinds.Sign)
+				signContents.set(entity, defaultSignContent);
+		}
 
-	return {
-		...world,
-		positions,
-		bodies,
-		obstacles,
-		decorations,
-		elevations,
-		signContents,
-		editor: { ...world.editor, selected: entity },
-	};
-});
+		return {
+			...world,
+			positions,
+			bodies,
+			obstacles,
+			decorations,
+			elevations,
+			signContents,
+			editor: { ...world.editor, selected: entity },
+		};
+	},
+);
 
 const applyOperation = (
 	world: World,
@@ -146,6 +222,15 @@ const applyOperation = (
 				world.floorTileOrigin,
 				operation.floorPlan,
 				operation.floorOrigin,
+			),
+		};
+	}
+	if (world.characters.has(operation.entity)) {
+		return {
+			...world,
+			characterSpawns: new Map(world.characterSpawns).set(
+				operation.entity,
+				operation.position,
 			),
 		};
 	}
@@ -194,6 +279,22 @@ const validityFor = (
 	}
 	const body =
 		operation.kind === "resize" ? operation.body : operation.originalBody;
+	const character = world.characters.get(operation.entity);
+	if (character !== undefined) {
+		const kind =
+			character.kind === CharacterKinds.Player
+				? CharacterSpawnKinds.Player
+				: CharacterSpawnKinds.LavaMonster;
+		return isCharacterSpawnPlacementValid({
+			world,
+			kind,
+			position: operation.position,
+			body,
+			entity: operation.entity,
+		})
+			? { kind: "valid" }
+			: { kind: "invalid", reason: "overlaps-editor-item" };
+	}
 	if (!isInsideFloorPlan(world, operation.position, body))
 		return { kind: "invalid", reason: "outside-floor" };
 	if (
@@ -280,7 +381,26 @@ export const commitEditSession = (world: World): World => {
 			},
 		};
 	const committed = applyOperation(world, session.operation);
-	return { ...committed, editor: { ...committed.editor, editSession: null } };
+	const selected = committed.editor.selected;
+	let changedEntity: EntityIdType | undefined;
+	if (session.operation.kind === "create") {
+		if (selected !== null && selected !== "floor") changedEntity = selected;
+	} else if (session.operation.kind !== "resize-floor") {
+		changedEntity = session.operation.entity;
+	}
+	const changedCharacterSpawns = new Set(
+		committed.editor.changedCharacterSpawns,
+	);
+	if (changedEntity !== undefined && committed.characters.has(changedEntity))
+		changedCharacterSpawns.add(changedEntity);
+	return {
+		...committed,
+		editor: {
+			...committed.editor,
+			editSession: null,
+			changedCharacterSpawns,
+		},
+	};
 };
 
 export const cancelEditSession = (world: World): World => {

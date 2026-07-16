@@ -1,9 +1,20 @@
 import { describe, expect, test } from "bun:test";
-import { Body, Position } from "../../../world/components";
+import {
+	Body,
+	Obstacle,
+	ObstacleKinds,
+	Position,
+} from "../../../world/components";
 import { EntityId } from "../../../world/entity-id";
 import { initialWorld } from "../../../world/initial-world";
-import { defaultEditorItemBody, EditorItemKinds } from "../../model";
+import { lavaMonsterBody, playerBody } from "../../../world/world";
 import {
+	CharacterSpawnKinds,
+	defaultEditorItemBody,
+	EditorItemKinds,
+} from "../../model";
+import {
+	isCharacterSpawnPlacementValid,
 	isEntityPlacementValid,
 	isFloorPlanPlacementValid,
 	isInsideFloorPlan,
@@ -16,6 +27,53 @@ const crateEntities = [EntityId(8)] as const;
 const smallBody = Body.make({ width: 40, depth: 40 });
 
 describe("editor placement", () => {
+	test("accepts both Character Spawns on every standable obstacle surface", () => {
+		const surfaceEntity = EntityId(999);
+		const surfacePosition = Position.make({ x: 520, y: 300 });
+		const surfaceBody = Body.make({ width: 260, depth: 180 });
+		const surfaces = [
+			{ kind: ObstacleKinds.Platform, height: 48 },
+			{ kind: ObstacleKinds.Crate, height: 62 },
+			{ kind: ObstacleKinds.Wall, height: 80 },
+		] as const;
+		const characterSpawns = [
+			{
+				kind: CharacterSpawnKinds.Player,
+				body: playerBody,
+				entity: EntityId(1),
+			},
+			{
+				kind: CharacterSpawnKinds.LavaMonster,
+				body: lavaMonsterBody,
+				entity: EntityId(2),
+			},
+		] as const;
+
+		for (const surface of surfaces) {
+			const surfaceWorld = {
+				...initialWorld,
+				positions: new Map(initialWorld.positions).set(
+					surfaceEntity,
+					surfacePosition,
+				),
+				bodies: new Map(initialWorld.bodies).set(surfaceEntity, surfaceBody),
+				obstacles: new Map(initialWorld.obstacles).set(
+					surfaceEntity,
+					Obstacle.make(surface),
+				),
+			};
+			for (const characterSpawn of characterSpawns) {
+				expect(
+					isCharacterSpawnPlacementValid({
+						world: surfaceWorld,
+						...characterSpawn,
+						position: surfacePosition,
+					}),
+				).toBe(true);
+			}
+		}
+	});
+
 	test("requires the entire body to stay inside the floor", () => {
 		expect(
 			isInsideFloorPlan(
