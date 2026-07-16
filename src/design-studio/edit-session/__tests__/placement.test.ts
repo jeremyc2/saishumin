@@ -11,8 +11,8 @@ import {
 } from "../placement";
 
 const playerEntity = EntityId(1);
-const wallEntity = EntityId(100);
-const crateEntities = [EntityId(200)] as const;
+const wallEntity = EntityId(3);
+const crateEntities = [EntityId(8)] as const;
 const smallBody = Body.make({ width: 40, depth: 40 });
 
 describe("editor placement", () => {

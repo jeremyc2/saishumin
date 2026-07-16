@@ -41,8 +41,8 @@ import { MovementSystemService } from "../../movement/movement-system";
 import { UpdateSystemService } from "../update-system";
 
 const playerEntity = EntityId(1);
-const crateEntities = [EntityId(200), EntityId(201)] as const;
-const platformEntities = [EntityId(300), EntityId(301)] as const;
+const crateEntities = [EntityId(8), EntityId(9)] as const;
+const platformEntities = [EntityId(12), EntityId(13)] as const;
 
 const runtime = ManagedRuntime.make(
 	UpdateSystemService.layer.pipe(Layer.provide(MovementSystemService.layer)),

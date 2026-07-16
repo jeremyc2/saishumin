@@ -6,7 +6,7 @@ import { playerSpawnPosition, roomDepth, roomWidth } from "../world";
 const playerEntity = EntityId(1);
 
 describe("initial World", () => {
-	test("starts the current single Authored Room exactly as before", () => {
+	test("starts the current Authored Room with one World-wide Entity ID sequence", () => {
 		expect(initialWorld.floorPlan).toEqual({
 			width: roomWidth,
 			depth: roomDepth,
@@ -19,23 +19,8 @@ describe("initial World", () => {
 		expect(initialWorld.positions.get(playerEntity)).toEqual(
 			playerSpawnPosition,
 		);
-		expect([...initialWorld.positions.keys()]).toEqual([
-			playerEntity,
-			EntityId(2),
-			EntityId(3),
-			EntityId(100),
-			EntityId(101),
-			EntityId(102),
-			EntityId(103),
-			EntityId(104),
-			EntityId(200),
-			EntityId(201),
-			EntityId(202),
-			EntityId(203),
-			EntityId(300),
-			EntityId(301),
-			EntityId(401),
-			EntityId(400),
-		]);
+		const entityIds = [...initialWorld.positions.keys()];
+		expect(entityIds).toHaveLength(15);
+		expect(entityIds).toEqual(entityIds.map((_, index) => EntityId(index + 1)));
 	});
 });

@@ -6,7 +6,7 @@ import { initialWorld } from "../../world/initial-world";
 import { updateDesignStudio } from "../design-studio";
 import { EditorItemKinds } from "../model";
 
-const crateEntities = [EntityId(200)] as const;
+const crateEntities = [EntityId(8)] as const;
 
 describe("Design Studio actions", () => {
 	test("opens an Edit Session and updates its camera through the Design Studio interface", () => {
