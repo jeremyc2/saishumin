@@ -13,7 +13,7 @@ import {
 	groundElevation,
 	obstacleHeightTolerance,
 	playerBody,
-	playerEntity,
+	playerEntityIn,
 	type World,
 } from "../../world/world";
 import { visualDepth } from "./projection";
@@ -135,5 +135,9 @@ export const renderDepthForCharacter = dual<
 	return depth;
 });
 
-export const renderDepthForPlayer = (world: World): number =>
-	renderDepthForCharacter(world, playerEntity, playerBody);
+export const renderDepthForPlayer = (world: World): number => {
+	const playerEntity = playerEntityIn(world);
+	return playerEntity === undefined
+		? Number.NEGATIVE_INFINITY
+		: renderDepthForCharacter(world, playerEntity, playerBody);
+};

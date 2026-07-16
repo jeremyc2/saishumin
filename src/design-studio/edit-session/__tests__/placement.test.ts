@@ -1,11 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { Body, Position } from "../../../world/components";
+import { EntityId } from "../../../world/entity-id";
 import { initialWorld } from "../../../world/initial-world";
-import {
-	crateEntities,
-	playerEntity,
-	wallEntities,
-} from "../../../world/world";
 import { defaultEditorItemBody, EditorItemKinds } from "../../model";
 import {
 	isEntityPlacementValid,
@@ -14,7 +10,9 @@ import {
 	isNewEditorItemPlacementValid,
 } from "../placement";
 
-const wallEntity = wallEntities[0];
+const playerEntity = EntityId(1);
+const wallEntity = EntityId(100);
+const crateEntities = [EntityId(200)] as const;
 const smallBody = Body.make({ width: 40, depth: 40 });
 
 describe("editor placement", () => {

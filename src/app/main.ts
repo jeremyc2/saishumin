@@ -124,8 +124,7 @@ const program = Effect.gen(function* () {
 							next.floorTileOrigin !== current.floorTileOrigin ||
 							next.gameCamera !== current.gameCamera ||
 							next.editor !== current.editor ||
-							next.playerFacing !== current.playerFacing ||
-							next.lavaMonsterFacing !== current.lavaMonsterFacing ||
+							next.characters !== current.characters ||
 							next.openedChests !== current.openedChests ||
 							next.signContents !== current.signContents ||
 							next.readingSign !== current.readingSign ||

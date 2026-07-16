@@ -3,11 +3,14 @@ import { ManagedRuntime } from "effect";
 import { Controls, type Direction } from "../../../app/control";
 import {
 	Body,
+	Character,
+	CharacterKinds,
 	Decoration,
 	DecorationKinds,
 	Elevation,
 	Obstacle,
 	ObstacleKinds,
+	PlayerFacings,
 	Position,
 } from "../../../world/components";
 import { EntityId } from "../../../world/entity-id";
@@ -18,13 +21,14 @@ import {
 	crateHeight,
 	groundElevation,
 	lavaMonsterBody,
-	lavaMonsterEntity,
 	playerBody,
-	playerEntity,
 	stationaryVelocity,
 	type World,
 } from "../../../world/world";
 import { MovementSystemService } from "../movement-system";
+
+const playerEntity = EntityId(1);
+const lavaMonsterEntity = EntityId(2);
 
 const runtime = ManagedRuntime.make(MovementSystemService.layer);
 const movementSystem = runtime.runSync(MovementSystemService);
@@ -63,6 +67,15 @@ const makeWorld = ({
 	bodies,
 	obstacles,
 	decorations,
+	characters: positions.has(lavaMonsterEntity)
+		? new Map(initialWorld.characters).set(
+				lavaMonsterEntity,
+				Character.make({
+					kind: CharacterKinds.LavaMonster,
+					facing: PlayerFacings.Left,
+				}),
+			)
+		: initialWorld.characters,
 	pressed,
 	grabbed,
 	lastFrame: 0,

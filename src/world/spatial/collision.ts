@@ -1,12 +1,7 @@
 import { dual } from "effect/Function";
 import { type Body, DecorationKinds, type Position } from "../components";
 import type { EntityId } from "../entity-id";
-import {
-	groundElevation,
-	lavaMonsterEntity,
-	obstacleHeightTolerance,
-	type World,
-} from "../world";
+import { groundElevation, obstacleHeightTolerance, type World } from "../world";
 import { bodyBoundsOverlap, entityTopElevation } from "./elevation";
 
 export const isSolidEntity = dual<
@@ -15,7 +10,7 @@ export const isSolidEntity = dual<
 >(
 	2,
 	(world: World, entity: EntityId): boolean =>
-		entity === lavaMonsterEntity ||
+		world.characters.has(entity) ||
 		world.obstacles.has(entity) ||
 		(world.decorations.has(entity) &&
 			world.decorations.get(entity)?.kind !== DecorationKinds.Hopscotch),

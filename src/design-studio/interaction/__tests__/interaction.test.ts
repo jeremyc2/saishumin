@@ -9,8 +9,10 @@ import {
 } from "../../../world/components";
 import { EntityId } from "../../../world/entity-id";
 import { initialWorld } from "../../../world/initial-world";
-import { playerEntity } from "../../../world/world";
 import { EditorItemKinds } from "../../model";
+
+const playerEntity = EntityId(1);
+
 import {
 	autoPanCamera,
 	contentEnvelope,

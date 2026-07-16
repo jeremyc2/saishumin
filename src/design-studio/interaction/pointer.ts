@@ -5,7 +5,7 @@ import {
 	entityBaseElevation,
 	entityHeight,
 } from "../../world/spatial/elevation";
-import { playerEntity, type World } from "../../world/world";
+import { isPlayerEntity, type World } from "../../world/world";
 import type { EditorItemKind } from "../model";
 
 export type ScreenBounds = {
@@ -277,7 +277,7 @@ export const contentEnvelope = (world: World): ScreenBounds => {
 		),
 	);
 	for (const [entity, position] of world.positions) {
-		if (entity === playerEntity) continue;
+		if (isPlayerEntity(world, entity)) continue;
 		const body = world.bodies.get(entity);
 		if (body === undefined) continue;
 		const base = entityBaseElevation(world, entity);

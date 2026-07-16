@@ -40,6 +40,20 @@ export const PlayerFacings = {
 	UpLeft: PlayerFacing.make("up-left"),
 } as const;
 
+export const CharacterKind = Schema.Literals(["player", "lava-monster"]);
+export type CharacterKind = typeof CharacterKind.Type;
+export const CharacterKinds = {
+	Player: CharacterKind.make("player"),
+	LavaMonster: CharacterKind.make("lava-monster"),
+} as const;
+
+export const Character = Schema.Struct({
+	kind: CharacterKind,
+	facing: PlayerFacing,
+});
+export type Character = typeof Character.Type;
+export const isCharacter = Schema.is(Character);
+
 export const ObstacleKind = Schema.Literals([
 	"wall",
 	"crate",

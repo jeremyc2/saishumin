@@ -26,11 +26,12 @@ import {
 import { isSupportSurfaceOccupied } from "../../world/spatial/support-surface";
 import {
 	groundElevation,
+	isPlayerEntity,
 	minimumEntityExtent,
 	minimumFloorDepth,
 	minimumFloorWidth,
 	obstacleHeightTolerance,
-	playerEntity,
+	playerEntityIn,
 	stationaryVelocity,
 	type World,
 } from "../../world/world";
@@ -153,6 +154,8 @@ const toggleDesignStudio = (world: World): World => {
 		},
 	};
 	if (open) return toggled;
+	const playerEntity = playerEntityIn(withoutSession);
+	if (playerEntity === undefined) return toggled;
 	const playerPosition = withoutSession.positions.get(playerEntity);
 	const playerElevation = withoutSession.elevations.get(playerEntity);
 	if (
@@ -192,7 +195,7 @@ const resizeEntity = (
 ): World => {
 	if (
 		!world.editor.open ||
-		entity === playerEntity ||
+		isPlayerEntity(world, entity) ||
 		!world.bodies.has(entity)
 	)
 		return world;
@@ -267,10 +270,9 @@ const changeEntityHeight = (
 		const body = updated.bodies.get(otherEntity);
 		if (position === undefined || body === undefined) continue;
 		elevations.set(otherEntity, {
-			z:
-				otherEntity === playerEntity
-					? surfaceAt(updated, position, body)
-					: placementElevationForEntity(updated, otherEntity, position, body),
+			z: isPlayerEntity(world, otherEntity)
+				? surfaceAt(updated, position, body)
+				: placementElevationForEntity(updated, otherEntity, position, body),
 			velocity: stationaryVelocity,
 		});
 	}
@@ -331,7 +333,7 @@ const deleteSelected = (world: World): World => {
 		!world.editor.open ||
 		selected === null ||
 		selected === "floor" ||
-		selected === playerEntity
+		isPlayerEntity(world, selected)
 	)
 		return world;
 	const position = world.positions.get(selected);
@@ -391,7 +393,7 @@ const dispatchDesignStudioAction = (world: World, action: Action): World =>
 		EditorEntityMoved: ({ entity, position }) => {
 			if (
 				!world.editor.open ||
-				entity === playerEntity ||
+				isPlayerEntity(world, entity) ||
 				!world.positions.has(entity)
 			)
 				return world;

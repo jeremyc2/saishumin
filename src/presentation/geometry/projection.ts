@@ -1,6 +1,6 @@
 import { dual } from "effect/Function";
 import type { Body, Position } from "../../world/components";
-import { groundElevation, playerEntity, type World } from "../../world/world";
+import { groundElevation, playerEntityIn, type World } from "../../world/world";
 
 const horizontalProjectionScale = 1;
 const depthProjectionScale = Math.SQRT1_2;
@@ -148,6 +148,8 @@ export const cameraFollowingPlayer = ({
 	readonly world: World;
 	readonly camera: Position;
 }): Position => {
+	const playerEntity = playerEntityIn(world);
+	if (playerEntity === undefined) return camera;
 	const position = world.positions.get(playerEntity);
 	const elevation = world.elevations.get(playerEntity);
 	return position === undefined

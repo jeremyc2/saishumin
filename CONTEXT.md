@@ -8,6 +8,18 @@ Saishumin is a room-exploration game with an integrated Design Studio for author
 The complete runtime snapshot of the game, including every Authored Room and all transient gameplay and Design Studio state. A World may contain one or more Authored Rooms.
 _Avoid_: Room, level
 
+**Entity**:
+The stable identity of one thing in a World. An Entity has no behavior or data by itself; its Components determine how systems treat it.
+_Avoid_: Object, component
+
+**Component**:
+One kind of data attached to an Entity, such as position, body, elevation, obstacle, decoration, or character data. Components are stored per Entity and may be absent.
+_Avoid_: Entity, object
+
+**Character Component**:
+The Component that identifies an Entity as a player or lava monster and records that Entity's facing. A World may have zero or one player Character Component and any number of lava monster Character Components.
+_Avoid_: Player facing, lava monster facing
+
 **Authored Room**:
 The committed room state within a World, including its floor and Editor Items. It excludes transient gameplay state and any uncommitted Edit Session preview.
 _Avoid_: World, level

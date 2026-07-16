@@ -1,4 +1,5 @@
 import {
+	CharacterKinds,
 	DecorationKinds,
 	defaultDecorationHeight,
 	defaultSignContent,
@@ -11,12 +12,9 @@ import { initialWorld } from "./initial-world";
 import { surfaceAt } from "./spatial/collision";
 import {
 	groundElevation,
-	lavaMonsterBody,
-	lavaMonsterEntity,
-	lavaMonsterSpawnPosition,
 	obstacleHeightTolerance,
 	playerBody,
-	playerEntity,
+	playerEntityIn,
 	playerSpawnPosition,
 	stationaryVelocity,
 	type World,
@@ -34,6 +32,29 @@ export const reconcileWorld = (world: World): World => {
 	const elevations = new Map(world.elevations ?? initialWorld.elevations);
 	const obstacles = new Map(world.obstacles ?? initialWorld.obstacles);
 	const decorations = new Map(world.decorations ?? initialWorld.decorations);
+	const characters = new Map(world.characters ?? initialWorld.characters);
+	let foundPlayer = false;
+	for (const [entity, character] of characters) {
+		if (!positions.has(entity) || !bodies.has(entity)) {
+			characters.delete(entity);
+			continue;
+		}
+		if (character.kind === CharacterKinds.Player) {
+			if (foundPlayer) {
+				characters.delete(entity);
+				continue;
+			}
+			foundPlayer = true;
+		}
+		if (isPlayerFacing(character.facing)) continue;
+		characters.set(entity, {
+			...character,
+			facing:
+				character.kind === CharacterKinds.Player
+					? PlayerFacings.Down
+					: PlayerFacings.Left,
+		});
+	}
 	const openedChests = new Set(world.openedChests ?? initialWorld.openedChests);
 	const signContents = new Map(world.signContents ?? initialWorld.signContents);
 	for (const entity of openedChests) {
@@ -60,37 +81,6 @@ export const reconcileWorld = (world: World): World => {
 		true
 			? world.floorTiles
 			: initialWorld.floorTiles;
-	bodies.set(playerEntity, playerBody);
-	bodies.set(lavaMonsterEntity, lavaMonsterBody);
-	if (!positions.has(lavaMonsterEntity)) {
-		positions.set(lavaMonsterEntity, lavaMonsterSpawnPosition);
-	}
-
-	if (!positions.has(playerEntity)) {
-		positions.set(playerEntity, {
-			x: Math.min(
-				Math.max(playerSpawnPosition.x, world.floorOrigin?.x ?? 0),
-				(world.floorOrigin?.x ?? 0) + floorPlan.width,
-			),
-			y: Math.min(
-				Math.max(playerSpawnPosition.y, world.floorOrigin?.y ?? 0),
-				(world.floorOrigin?.y ?? 0) + floorPlan.depth,
-			),
-		});
-	}
-	if (!elevations.has(playerEntity)) {
-		elevations.set(playerEntity, {
-			z: groundElevation,
-			velocity: stationaryVelocity,
-		});
-	}
-	if (!elevations.has(lavaMonsterEntity)) {
-		elevations.set(lavaMonsterEntity, {
-			z: groundElevation,
-			velocity: stationaryVelocity,
-		});
-	}
-
 	let reconciled: World = {
 		...world,
 		positions,
@@ -98,6 +88,7 @@ export const reconcileWorld = (world: World): World => {
 		elevations,
 		obstacles,
 		decorations,
+		characters,
 		floorPlan,
 		floorOrigin: world.floorOrigin ?? initialWorld.floorOrigin,
 		floorTiles,
@@ -111,12 +102,6 @@ export const reconcileWorld = (world: World): World => {
 			editSession: null,
 		},
 		pressed: new Set(),
-		playerFacing: isPlayerFacing(world.playerFacing)
-			? world.playerFacing
-			: PlayerFacings.Down,
-		lavaMonsterFacing: isPlayerFacing(world.lavaMonsterFacing)
-			? world.lavaMonsterFacing
-			: PlayerFacings.Left,
 		openedChests,
 		signContents,
 		readingSign: null,
@@ -124,10 +109,12 @@ export const reconcileWorld = (world: World): World => {
 		pushing: null,
 		lastFrame: 0,
 	};
+	const playerEntity = playerEntityIn(reconciled);
+	if (playerEntity === undefined) return reconciled;
 	const playerPosition = reconciled.positions.get(playerEntity);
 	const playerElevation = reconciled.elevations.get(playerEntity);
 	if (playerPosition === undefined || playerElevation === undefined) {
-		return initialWorld;
+		return reconciled;
 	}
 
 	const supportHeight = surfaceAt(

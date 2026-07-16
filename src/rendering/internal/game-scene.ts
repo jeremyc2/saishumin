@@ -16,7 +16,6 @@ import { terrainFloorTemplate } from "../../presentation/artwork/terrain";
 import {
 	renderDepthForCharacter,
 	renderDepthForEntity,
-	renderDepthForPlayer,
 } from "../../presentation/geometry/depth";
 import {
 	points,
@@ -24,20 +23,18 @@ import {
 	projectedRectangle,
 	viewport,
 } from "../../presentation/geometry/projection";
-import { DecorationKinds, ObstacleKinds } from "../../world/components";
+import {
+	CharacterKinds,
+	DecorationKinds,
+	ObstacleKinds,
+} from "../../world/components";
 import type { EntityId } from "../../world/entity-id";
 import { surfaceAt } from "../../world/spatial/collision";
 import {
 	entityBaseElevation,
 	shadowSectionsForEntity,
 } from "../../world/spatial/elevation";
-import {
-	lavaMonsterBody,
-	lavaMonsterEntity,
-	playerBody,
-	playerEntity,
-	type World,
-} from "../../world/world";
+import { lavaMonsterBody, playerBody, type World } from "../../world/world";
 
 type Dispatch = (action: AppAction) => void;
 
@@ -127,45 +124,33 @@ const sceneObjects = (world: World): ReadonlyArray<RenderedObject> => {
 		});
 	}
 	if (!world.editor.open) {
-		const playerPosition = world.positions.get(playerEntity);
-		const playerElevation = world.elevations.get(playerEntity);
-		const lavaMonsterPosition = world.positions.get(lavaMonsterEntity);
-		const lavaMonsterElevation = world.elevations.get(lavaMonsterEntity);
-		if (lavaMonsterPosition !== undefined && lavaMonsterElevation !== undefined)
+		for (const [entity, character] of world.characters) {
+			const position = world.positions.get(entity);
+			const elevation = world.elevations.get(entity);
+			if (position === undefined || elevation === undefined) continue;
+			const body =
+				character.kind === CharacterKinds.Player ? playerBody : lavaMonsterBody;
+			const shadowHeight = surfaceAt(world, position, body, elevation.z);
 			objects.push({
-				depth: renderDepthForCharacter(
-					world,
-					lavaMonsterEntity,
-					lavaMonsterBody,
-				),
-				template: lavaMonsterTemplate({
-					position: lavaMonsterPosition,
-					elevation: lavaMonsterElevation,
-					shadowHeight: surfaceAt(
-						world,
-						lavaMonsterPosition,
-						lavaMonsterBody,
-						lavaMonsterElevation.z,
-					),
-					facing: world.lavaMonsterFacing,
-				}),
+				depth: renderDepthForCharacter(world, entity, body),
+				template:
+					character.kind === CharacterKinds.Player
+						? playerTemplate({
+								position,
+								elevation,
+								shadowHeight,
+								facing: character.facing,
+								handlingObject:
+									world.grabbed !== null || world.pushing !== null,
+							})
+						: lavaMonsterTemplate({
+								position,
+								elevation,
+								shadowHeight,
+								facing: character.facing,
+							}),
 			});
-		if (playerPosition !== undefined && playerElevation !== undefined)
-			objects.push({
-				depth: renderDepthForPlayer(world),
-				template: playerTemplate({
-					position: playerPosition,
-					elevation: playerElevation,
-					shadowHeight: surfaceAt(
-						world,
-						playerPosition,
-						playerBody,
-						playerElevation.z,
-					),
-					facing: world.playerFacing,
-					handlingObject: world.grabbed !== null || world.pushing !== null,
-				}),
-			});
+		}
 	}
 	return objects.sort((left, right) => left.depth - right.depth);
 };

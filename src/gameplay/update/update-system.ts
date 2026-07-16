@@ -18,7 +18,7 @@ import {
 	millisecondsPerSecond,
 	obstacleHeightTolerance,
 	playerBody,
-	playerEntity,
+	playerEntityIn,
 	stationaryVelocity,
 	type World,
 } from "../../world/world";
@@ -41,13 +41,16 @@ export class UpdateSystemService extends Context.Service<
 				world: World,
 				isInteractable: (entity: EntityIdType) => boolean,
 			): EntityIdType | null => {
+				const playerEntity = playerEntityIn(world);
+				if (playerEntity === undefined) return null;
 				const playerPosition = world.positions.get(playerEntity);
 				const playerElevation = world.elevations.get(playerEntity);
+				const playerCharacter = world.characters.get(playerEntity);
 				if (
 					playerPosition === undefined ||
 					playerElevation === undefined ||
 					playerElevation.velocity !== stationaryVelocity ||
-					world.playerFacing !== PlayerFacings.Up
+					playerCharacter?.facing !== PlayerFacings.Up
 				)
 					return null;
 				for (const [entity, objectPosition] of world.positions) {
@@ -76,6 +79,8 @@ export class UpdateSystemService extends Context.Service<
 				return null;
 			};
 			const nearestGrabbableObject = (world: World): EntityIdType | null => {
+				const playerEntity = playerEntityIn(world);
+				if (playerEntity === undefined) return null;
 				const playerPosition = world.positions.get(playerEntity);
 				const elevation = world.elevations.get(playerEntity);
 				if (
@@ -157,6 +162,8 @@ export class UpdateSystemService extends Context.Service<
 									pushing: null,
 								};
 							if (key === Controls.Jump) {
+								const playerEntity = playerEntityIn(world);
+								if (playerEntity === undefined) return world;
 								const elevation = world.elevations.get(playerEntity);
 								const position = world.positions.get(playerEntity);
 								if (
@@ -184,16 +191,25 @@ export class UpdateSystemService extends Context.Service<
 								return { ...world, elevations, grabbed: null, pushing: null };
 							}
 							if (!isDirection(key)) return world;
+							const playerEntity = playerEntityIn(world);
+							if (playerEntity === undefined) return world;
 							const nextPressed = new Set(world.pressed);
 							if (pressed) nextPressed.add(key);
 							else nextPressed.delete(key);
+							const playerCharacter = world.characters.get(playerEntity);
+							if (playerCharacter === undefined) return world;
+							const characters = new Map(world.characters);
+							characters.set(playerEntity, {
+								...playerCharacter,
+								facing: playerFacingForDirections({
+									directions: nextPressed,
+									previous: playerCharacter.facing,
+								}),
+							});
 							return {
 								...world,
 								pressed: nextPressed,
-								playerFacing: playerFacingForDirections({
-									directions: nextPressed,
-									previous: world.playerFacing,
-								}),
+								characters,
 								pushing: null,
 							};
 						},

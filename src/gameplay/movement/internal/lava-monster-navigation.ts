@@ -1,14 +1,14 @@
 import type { Position } from "../../../world/components";
+import type { EntityId } from "../../../world/entity-id";
 import { isSolidEntity, overlaps } from "../../../world/spatial/collision";
 import { entityTopElevation } from "../../../world/spatial/elevation";
 import {
 	gravity,
+	isPlayerEntity,
 	jumpSpeed,
 	lavaMonsterBody,
-	lavaMonsterEntity,
 	lavaMonsterFollowDistance,
 	obstacleHeightTolerance,
-	playerEntity,
 	type World,
 } from "../../../world/world";
 import { canPlaceLavaMonster } from "./lava-monster-placement";
@@ -17,6 +17,7 @@ import { findGridPath } from "./navigation";
 const navigationGridSize = 28;
 type LavaMonsterNavigationInput = {
 	readonly world: World;
+	readonly entity: EntityId;
 	readonly position: Position;
 	readonly target: Position;
 	readonly elevation: number;
@@ -24,6 +25,7 @@ type LavaMonsterNavigationInput = {
 
 export const lavaMonsterDirection = ({
 	world,
+	entity: lavaMonster,
 	position,
 	target,
 	elevation,
@@ -35,6 +37,7 @@ export const lavaMonsterDirection = ({
 	if (
 		canPlaceLavaMonster({
 			world,
+			entity: lavaMonster,
 			position: {
 				x:
 					position.x +
@@ -62,6 +65,7 @@ export const lavaMonsterDirection = ({
 			if (
 				!canPlaceLavaMonster({
 					world,
+					entity: lavaMonster,
 					position: {
 						x: position.x + (segment.x * step) / steps,
 						y: position.y + (segment.y * step) / steps,
@@ -80,7 +84,12 @@ export const lavaMonsterDirection = ({
 		maximumColumns: Math.ceil(world.floorPlan.width / navigationGridSize) + 1,
 		maximumRows: Math.ceil(world.floorPlan.depth / navigationGridSize) + 1,
 		canOccupy: (candidate) =>
-			canPlaceLavaMonster({ world, position: candidate, elevation }),
+			canPlaceLavaMonster({
+				world,
+				entity: lavaMonster,
+				position: candidate,
+				elevation,
+			}),
 	});
 	let waypoint = path[0];
 	for (const pathPosition of path) {
@@ -96,6 +105,7 @@ export const lavaMonsterDirection = ({
 			if (
 				canPlaceLavaMonster({
 					world,
+					entity: lavaMonster,
 					position: {
 						x: position.x + wander.x * navigationGridSize,
 						y: position.y + wander.y * navigationGridSize,
@@ -115,6 +125,7 @@ export const lavaMonsterDirection = ({
 };
 export const lavaMonsterNeedsJump = ({
 	world,
+	entity: lavaMonster,
 	position,
 	elevation,
 	target,
@@ -133,8 +144,8 @@ export const lavaMonsterNeedsJump = ({
 	const maximumJumpRise = (jumpSpeed * jumpSpeed) / (2 * gravity);
 	for (const entity of world.positions.keys()) {
 		if (
-			entity === playerEntity ||
-			entity === lavaMonsterEntity ||
+			isPlayerEntity(world, entity) ||
+			entity === lavaMonster ||
 			!isSolidEntity(world, entity)
 		)
 			continue;

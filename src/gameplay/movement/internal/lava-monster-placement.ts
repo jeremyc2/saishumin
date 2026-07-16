@@ -1,4 +1,5 @@
 import type { Position } from "../../../world/components";
+import type { EntityId } from "../../../world/entity-id";
 import { isSolidEntity, overlaps } from "../../../world/spatial/collision";
 import {
 	entityTopElevation,
@@ -6,23 +7,24 @@ import {
 } from "../../../world/spatial/elevation";
 import {
 	groundElevation,
+	isPlayerEntity,
 	lavaMonsterBody,
 	lavaMonsterCollisionHeight,
-	lavaMonsterEntity,
 	obstacleHeightTolerance,
 	playerCollisionHeight,
-	playerEntity,
 	type World,
 } from "../../../world/world";
 
 type LavaMonsterPlacementInput = {
 	readonly world: World;
+	readonly entity: EntityId;
 	readonly position: Position;
 	readonly elevation: number;
 };
 
 export const canPlaceLavaMonster = ({
 	world,
+	entity: lavaMonster,
 	position,
 	elevation,
 }: LavaMonsterPlacementInput): boolean => {
@@ -35,20 +37,18 @@ export const canPlaceLavaMonster = ({
 	)
 		return false;
 	for (const entity of world.positions.keys()) {
-		if (entity === lavaMonsterEntity) continue;
+		if (entity === lavaMonster) continue;
 		const obstaclePosition = world.positions.get(entity);
 		const obstacleBody = world.bodies.get(entity);
-		const blocksAtElevation =
-			entity === playerEntity
-				? verticalRangesOverlap({
-						base: elevation,
-						height: lavaMonsterCollisionHeight,
-						otherBase: world.elevations.get(playerEntity)?.z ?? groundElevation,
-						otherHeight: playerCollisionHeight,
-					})
-				: isSolidEntity(world, entity) &&
-					elevation <
-						entityTopElevation(world, entity) - obstacleHeightTolerance;
+		const blocksAtElevation = isPlayerEntity(world, entity)
+			? verticalRangesOverlap({
+					base: elevation,
+					height: lavaMonsterCollisionHeight,
+					otherBase: world.elevations.get(entity)?.z ?? groundElevation,
+					otherHeight: playerCollisionHeight,
+				})
+			: isSolidEntity(world, entity) &&
+				elevation < entityTopElevation(world, entity) - obstacleHeightTolerance;
 		if (
 			blocksAtElevation &&
 			obstaclePosition !== undefined &&
@@ -66,10 +66,12 @@ export const canPlaceLavaMonster = ({
 };
 export const nearestValidLavaMonsterPosition = ({
 	world,
+	entity: lavaMonster,
 	origin,
 	elevation,
 }: {
 	readonly world: World;
+	readonly entity: EntityId;
 	readonly origin: Position;
 	readonly elevation: number;
 }): Position | undefined => {
@@ -84,7 +86,7 @@ export const nearestValidLavaMonsterPosition = ({
 	const xs = new Set([clamp(origin.x, minimumX, maximumX), minimumX, maximumX]),
 		ys = new Set([clamp(origin.y, minimumY, maximumY), minimumY, maximumY]);
 	for (const [entity, position] of world.positions) {
-		if (entity === lavaMonsterEntity) continue;
+		if (entity === lavaMonster) continue;
 		const body = world.bodies.get(entity);
 		if (body === undefined) continue;
 		const horizontal = (body.width + lavaMonsterBody.width) / 2,
@@ -99,7 +101,14 @@ export const nearestValidLavaMonsterPosition = ({
 	for (const x of xs)
 		for (const y of ys) {
 			const candidate = { x, y };
-			if (!canPlaceLavaMonster({ world, position: candidate, elevation }))
+			if (
+				!canPlaceLavaMonster({
+					world,
+					entity: lavaMonster,
+					position: candidate,
+					elevation,
+				})
+			)
 				continue;
 			const distance = Math.hypot(x - origin.x, y - origin.y);
 			if (distance < nearestDistance) {

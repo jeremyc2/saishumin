@@ -10,7 +10,7 @@ import {
 	type DesignStudioView,
 	makeDesignStudioView,
 } from "../design-studio/view/view";
-import { playerEntity, type World } from "../world/world";
+import type { World } from "../world/world";
 import { gameSceneTemplate } from "./internal/game-scene";
 
 type Dispatch = (action: Action) => void;
@@ -51,11 +51,6 @@ export class RenderSystem extends Context.Service<
 				currentEditSessionStatus = editSessionStatus;
 				currentDispatch = dispatch;
 				activeInteraction.update(world, dispatch);
-				if (
-					previewWorld.positions.get(playerEntity) === undefined ||
-					previewWorld.elevations.get(playerEntity) === undefined
-				)
-					return;
 				render(
 					gameSceneTemplate({
 						world: previewWorld,

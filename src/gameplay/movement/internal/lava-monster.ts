@@ -1,18 +1,19 @@
 import { dual } from "effect/Function";
 import type { PlayerFacing, Position } from "../../../world/components";
 import { PlayerFacings } from "../../../world/components";
+import type { EntityId } from "../../../world/entity-id";
 import { surfaceAt } from "../../../world/spatial/collision";
 import {
 	gravity,
 	groundElevation,
 	jumpSpeed,
 	lavaMonsterBody,
-	lavaMonsterEntity,
+	lavaMonsterEntitiesIn,
 	lavaMonsterFollowDistance,
 	lavaMonsterSpawnPosition,
 	lavaMonsterSpeed,
 	obstacleHeightTolerance,
-	playerEntity,
+	playerEntityIn,
 	stationaryVelocity,
 	type World,
 } from "../../../world/world";
@@ -42,40 +43,47 @@ const facingFor = (delta: Position, previous: PlayerFacing): PlayerFacing => {
 	return horizontal > 0 ? PlayerFacings.Right : previous;
 };
 
-export const updateLavaMonster = dual<
-	(elapsed: number) => (self: World) => World,
-	(self: World, elapsed: number) => World
->(2, (world: World, elapsed: number): World => {
-	const position = world.positions.get(lavaMonsterEntity),
+const updateOneLavaMonster = (
+	world: World,
+	elapsed: number,
+	entity: EntityId,
+): World => {
+	const playerEntity = playerEntityIn(world);
+	if (playerEntity === undefined) return world;
+	const position = world.positions.get(entity),
 		playerPosition = world.positions.get(playerEntity),
-		elevation = world.elevations.get(lavaMonsterEntity);
+		elevation = world.elevations.get(entity),
+		character = world.characters.get(entity);
 	if (
 		position === undefined ||
 		playerPosition === undefined ||
-		elevation === undefined
+		elevation === undefined ||
+		character === undefined
 	)
 		return world;
-	if (!canPlaceLavaMonster({ world, position, elevation: elevation.z })) {
+	if (
+		!canPlaceLavaMonster({ world, entity, position, elevation: elevation.z })
+	) {
 		const safePosition = nearestValidLavaMonsterPosition({
 			world,
+			entity,
 			origin: position,
 			elevation: elevation.z,
 		});
 		if (safePosition !== undefined)
-			return updateLavaMonster(
+			return updateOneLavaMonster(
 				{
 					...world,
-					positions: new Map(world.positions).set(
-						lavaMonsterEntity,
-						safePosition,
-					),
+					positions: new Map(world.positions).set(entity, safePosition),
 				},
 				elapsed,
+				entity,
 			);
 		if (
 			elevation.velocity !== stationaryVelocity ||
 			!canPlaceLavaMonster({
 				world,
+				entity,
 				position: lavaMonsterSpawnPosition,
 				elevation: groundElevation,
 			})
@@ -83,11 +91,8 @@ export const updateLavaMonster = dual<
 			return world;
 		return {
 			...world,
-			positions: new Map(world.positions).set(
-				lavaMonsterEntity,
-				lavaMonsterSpawnPosition,
-			),
-			elevations: new Map(world.elevations).set(lavaMonsterEntity, {
+			positions: new Map(world.positions).set(entity, lavaMonsterSpawnPosition),
+			elevations: new Map(world.elevations).set(entity, {
 				z: groundElevation,
 				velocity: stationaryVelocity,
 			}),
@@ -106,12 +111,14 @@ export const updateLavaMonster = dual<
 		grounded &&
 		lavaMonsterNeedsJump({
 			world,
+			entity,
 			position,
 			elevation: elevation.z,
 			target: playerPosition,
 		});
 	const direction = lavaMonsterDirection({
 		world,
+		entity,
 		position,
 		target: playerPosition,
 		elevation: elevation.z,
@@ -128,6 +135,7 @@ export const updateLavaMonster = dual<
 	const horizontalCandidate = { x: position.x + delta.x, y: position.y };
 	const afterHorizontal = canPlaceLavaMonster({
 		world,
+		entity,
 		position: horizontalCandidate,
 		elevation: elevation.z,
 	})
@@ -139,6 +147,7 @@ export const updateLavaMonster = dual<
 	};
 	const moved = canPlaceLavaMonster({
 		world,
+		entity,
 		position: verticalCandidate,
 		elevation: elevation.z,
 	})
@@ -166,14 +175,27 @@ export const updateLavaMonster = dual<
 	}
 	return {
 		...world,
-		positions: new Map(world.positions).set(lavaMonsterEntity, moved),
-		elevations: new Map(world.elevations).set(lavaMonsterEntity, {
+		positions: new Map(world.positions).set(entity, moved),
+		elevations: new Map(world.elevations).set(entity, {
 			z,
 			velocity,
 		}),
-		lavaMonsterFacing: facingFor(
-			{ x: moved.x - position.x, y: moved.y - position.y },
-			world.lavaMonsterFacing,
-		),
+		characters: new Map(world.characters).set(entity, {
+			...character,
+			facing: facingFor(
+				{ x: moved.x - position.x, y: moved.y - position.y },
+				character.facing,
+			),
+		}),
 	};
+};
+
+export const updateLavaMonster = dual<
+	(elapsed: number) => (self: World) => World,
+	(self: World, elapsed: number) => World
+>(2, (world: World, elapsed: number): World => {
+	let updated = world;
+	for (const entity of lavaMonsterEntitiesIn(world))
+		updated = updateOneLavaMonster(updated, elapsed, entity);
+	return updated;
 });

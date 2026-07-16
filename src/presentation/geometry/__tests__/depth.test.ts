@@ -14,9 +14,7 @@ import {
 	crateBody,
 	crateHeight,
 	lavaMonsterBody,
-	lavaMonsterEntity,
 	playerBody,
-	playerEntity,
 } from "../../../world/world";
 import {
 	renderDepthForCharacter,
@@ -25,6 +23,8 @@ import {
 } from "../depth";
 
 const platform = EntityId(920);
+const playerEntity = EntityId(1);
+const lavaMonsterEntity = EntityId(2);
 const backPlant = EntityId(921);
 const frontPlant = EntityId(922);
 const platformPosition = Position.make({ x: 500, y: 300 });

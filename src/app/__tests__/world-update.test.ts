@@ -1,9 +1,11 @@
 import { describe, expect, test } from "bun:test";
 import { Position } from "../../world/components";
+import { EntityId } from "../../world/entity-id";
 import { initialWorld } from "../../world/initial-world";
-import { playerEntity } from "../../world/world";
 import { Action } from "../action";
 import { completeWorldUpdate } from "../world-update";
+
+const playerEntity = EntityId(1);
 
 describe("application World update", () => {
 	test("updates the presentation camera after gameplay reaches a view edge", () => {

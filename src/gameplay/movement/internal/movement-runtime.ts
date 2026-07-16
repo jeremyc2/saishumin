@@ -32,10 +32,11 @@ import {
 	fallResetElevation,
 	gravity,
 	groundElevation,
+	isPlayerEntity,
 	obstacleHeightTolerance,
 	playerBody,
 	playerCollisionHeight,
-	playerEntity,
+	playerEntityIn,
 	playerSpawnPosition,
 	playerSpeed,
 	stationaryVelocity,
@@ -98,7 +99,7 @@ export class MovementSystemService extends Context.Service<
 					: Math.min(0, Math.max(allowed, roomContact));
 
 				for (const otherEntity of world.positions.keys()) {
-					const otherIsPlayer = otherEntity === playerEntity;
+					const otherIsPlayer = isPlayerEntity(world, otherEntity);
 					if (
 						crateEntities.has(otherEntity) ||
 						(!otherIsPlayer && !isSolidEntity(world, otherEntity))
@@ -108,7 +109,7 @@ export class MovementSystemService extends Context.Service<
 					const otherBody = world.bodies.get(otherEntity);
 					if (otherPosition === undefined || otherBody === undefined) continue;
 					if (otherIsPlayer) {
-						const playerElevation = world.elevations.get(playerEntity)?.z;
+						const playerElevation = world.elevations.get(otherEntity)?.z;
 						if (
 							playerElevation === undefined ||
 							playerElevation >=
@@ -477,6 +478,8 @@ export class MovementSystemService extends Context.Service<
 		};
 
 		const updateMovement = (world: World, elapsed: number): World => {
+			const playerEntity = playerEntityIn(world);
+			if (playerEntity === undefined) return world;
 			const position = world.positions.get(playerEntity);
 			const elevation = world.elevations.get(playerEntity);
 			if (position === undefined || elevation === undefined) return world;

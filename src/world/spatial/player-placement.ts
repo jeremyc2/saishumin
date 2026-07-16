@@ -2,9 +2,9 @@ import { dual } from "effect/Function";
 import type { Position } from "../components";
 import type { EntityId } from "../entity-id";
 import {
+	isPlayerEntity,
 	obstacleHeightTolerance,
 	playerBody,
-	playerEntity,
 	type World,
 } from "../world";
 import { isSolidEntity, overlaps } from "./collision";
@@ -40,7 +40,7 @@ export const isPlayerPlacementValid = dual<
 
 	for (const [entity, otherPosition] of world.positions) {
 		if (
-			entity === playerEntity ||
+			isPlayerEntity(world, entity) ||
 			!blocksPlayerAtElevation(world, entity, elevation)
 		)
 			continue;
@@ -83,7 +83,7 @@ export const nearestValidPlayerPosition = dual<
 		]);
 		for (const [entity, position] of world.positions) {
 			if (
-				entity === playerEntity ||
+				isPlayerEntity(world, entity) ||
 				!blocksPlayerAtElevation(world, entity, elevation)
 			)
 				continue;

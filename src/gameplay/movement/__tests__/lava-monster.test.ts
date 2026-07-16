@@ -2,6 +2,8 @@ import { afterAll, describe, expect, test } from "bun:test";
 import { ManagedRuntime } from "effect";
 import {
 	Body,
+	Character,
+	CharacterKinds,
 	Decoration,
 	DecorationKinds,
 	Elevation,
@@ -16,17 +18,18 @@ import { overlaps } from "../../../world/spatial/collision";
 import {
 	groundElevation,
 	lavaMonsterBody,
-	lavaMonsterEntity,
 	lavaMonsterFollowDistance,
 	lavaMonsterSpawnPosition,
 	lavaMonsterSpeed,
 	playerBody,
-	playerEntity,
 	roomDepth,
 	stationaryVelocity,
 	type World,
 } from "../../../world/world";
 import { MovementSystemService } from "../movement-system";
+
+const playerEntity = EntityId(1);
+const lavaMonsterEntity = EntityId(2);
 
 const runtime = ManagedRuntime.make(MovementSystemService.layer);
 const movement = runtime.runSync(MovementSystemService);
@@ -46,6 +49,13 @@ const worldWith = (
 		...bodies,
 	]),
 	obstacles,
+	characters: new Map(initialWorld.characters).set(
+		lavaMonsterEntity,
+		Character.make({
+			kind: CharacterKinds.LavaMonster,
+			facing: PlayerFacings.Left,
+		}),
+	),
 	elevations: new Map([
 		[
 			playerEntity,
@@ -62,6 +72,41 @@ const worldWith = (
 });
 
 describe("lava-monster movement through MovementSystemService", () => {
+	test("updates multiple lava-monster entities independently", () => {
+		const secondMonster = EntityId(3);
+		const base = worldWith([
+			[playerEntity, Position.make({ x: 200, y: 300 })],
+			[lavaMonsterEntity, Position.make({ x: 500, y: 250 })],
+			[secondMonster, Position.make({ x: 500, y: 400 })],
+		]);
+		const world: World = {
+			...base,
+			bodies: new Map(base.bodies).set(secondMonster, lavaMonsterBody),
+			elevations: new Map(base.elevations).set(
+				secondMonster,
+				Elevation.make({
+					z: groundElevation,
+					velocity: stationaryVelocity,
+				}),
+			),
+			characters: new Map(base.characters).set(
+				secondMonster,
+				Character.make({
+					kind: CharacterKinds.LavaMonster,
+					facing: PlayerFacings.Right,
+				}),
+			),
+		};
+
+		const moved = movement.update({ world, elapsed: 0.05 });
+
+		expect(moved.positions.get(lavaMonsterEntity)?.x).toBeLessThan(500);
+		expect(moved.positions.get(secondMonster)?.x).toBeLessThan(500);
+		expect(moved.characters.get(secondMonster)?.facing).toBe(
+			PlayerFacings.UpLeft,
+		);
+	});
+
 	test("pursues through clear space, stops at follow distance, and faces its movement", () => {
 		const player = Position.make({ x: 300, y: 300 });
 		const monster = Position.make({ x: 500, y: 300 });
@@ -76,7 +121,9 @@ describe("lava-monster movement through MovementSystemService", () => {
 			x: monster.x - lavaMonsterSpeed * 0.05,
 			y: monster.y,
 		});
-		expect(moved.lavaMonsterFacing).toBe(PlayerFacings.Left);
+		expect(moved.characters.get(lavaMonsterEntity)?.facing).toBe(
+			PlayerFacings.Left,
+		);
 		const near = movement.update({
 			world: worldWith([
 				[playerEntity, player],

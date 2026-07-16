@@ -1,6 +1,7 @@
 import { dual } from "effect/Function";
 import {
 	type Body,
+	CharacterKinds,
 	type DecorationKind,
 	DecorationKinds,
 	isDecorationKind,
@@ -13,7 +14,6 @@ import type { EntityId } from "../entity-id";
 import {
 	groundElevation,
 	lavaMonsterCollisionHeight,
-	lavaMonsterEntity,
 	obstacleHeightTolerance,
 	type World,
 } from "../world";
@@ -31,7 +31,7 @@ export const entityHeight = dual<
 	(entity: EntityId) => (self: World) => number,
 	(self: World, entity: EntityId) => number
 >(2, (world: World, entity: EntityId): number =>
-	entity === lavaMonsterEntity
+	world.characters.get(entity)?.kind === CharacterKinds.LavaMonster
 		? lavaMonsterCollisionHeight
 		: (world.obstacles.get(entity)?.height ??
 			world.decorations.get(entity)?.height ??

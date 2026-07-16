@@ -10,7 +10,7 @@ import {
 	verticalRangesOverlap,
 } from "../../world/spatial/elevation";
 import { isSupportSurfaceTransformValid } from "../../world/spatial/support-surface";
-import { playerEntity, type World } from "../../world/world";
+import { isPlayerEntity, type World } from "../../world/world";
 import {
 	defaultEditorItemHeight,
 	type EditorItemKind,
@@ -23,7 +23,7 @@ export type OriginalPlacement = {
 };
 
 const isBlockingEntity = (world: World, entity: EntityId): boolean =>
-	entity !== playerEntity && isSolidEntity(world, entity);
+	!isPlayerEntity(world, entity) && isSolidEntity(world, entity);
 
 const placementBoundaryTolerance = 0.000_001;
 
@@ -54,7 +54,7 @@ export const isFloorPlanPlacementValid = dual<
 	(self: World, floorPlan: Body) => boolean
 >(2, (world: World, floorPlan: Body): boolean => {
 	for (const [entity, position] of world.positions) {
-		if (entity === playerEntity) continue;
+		if (isPlayerEntity(world, entity)) continue;
 		const body = world.bodies.get(entity);
 		if (
 			body !== undefined &&

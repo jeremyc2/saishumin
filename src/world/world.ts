@@ -1,6 +1,8 @@
-import type { PlayerFacing } from "./components";
+import { dual } from "effect/Function";
 import {
 	Body,
+	type Character,
+	CharacterKinds,
 	type Decoration,
 	type Elevation,
 	type Obstacle,
@@ -8,7 +10,7 @@ import {
 	type SignContent,
 } from "./components";
 import type { EditorState } from "./editor-state";
-import { EntityId } from "./entity-id";
+import type { EntityId } from "./entity-id";
 import type { FloorTile } from "./floor";
 
 export type Direction = "ArrowUp" | "ArrowDown" | "ArrowLeft" | "ArrowRight";
@@ -19,6 +21,7 @@ export type World = {
 	readonly bodies: ReadonlyMap<EntityId, Body>;
 	readonly obstacles: ReadonlyMap<EntityId, Obstacle>;
 	readonly decorations: ReadonlyMap<EntityId, Decoration>;
+	readonly characters: ReadonlyMap<EntityId, Character>;
 	readonly floorPlan: Body;
 	readonly floorOrigin: Position;
 	readonly floorTiles: ReadonlyArray<FloorTile>;
@@ -26,8 +29,6 @@ export type World = {
 	readonly gameCamera: Position;
 	readonly editor: EditorState;
 	readonly pressed: ReadonlySet<Direction>;
-	readonly playerFacing: PlayerFacing;
-	readonly lavaMonsterFacing: PlayerFacing;
 	readonly openedChests: ReadonlySet<EntityId>;
 	readonly signContents: ReadonlyMap<EntityId, SignContent>;
 	readonly readingSign: EntityId | null;
@@ -36,8 +37,25 @@ export type World = {
 	readonly lastFrame: number;
 };
 
-export const playerEntity = EntityId(1);
-export const lavaMonsterEntity = EntityId(2);
+export const playerEntityIn = (world: World): EntityId | undefined => {
+	for (const [entity, character] of world.characters)
+		if (character.kind === CharacterKinds.Player) return entity;
+	return undefined;
+};
+
+export const isPlayerEntity = dual<
+	(entity: EntityId) => (self: World) => boolean,
+	(self: World, entity: EntityId) => boolean
+>(
+	2,
+	(world: World, entity: EntityId): boolean =>
+		world.characters.get(entity)?.kind === CharacterKinds.Player,
+);
+
+export const lavaMonsterEntitiesIn = (world: World): ReadonlyArray<EntityId> =>
+	[...world.characters]
+		.filter(([, character]) => character.kind === CharacterKinds.LavaMonster)
+		.map(([entity]) => entity);
 export const roomWidth = 1160;
 export const roomDepth = 640;
 export const minimumFloorWidth = 360;
@@ -67,27 +85,3 @@ export const millisecondsPerSecond = 1000;
 export const crateGrabDistance = 72;
 export const wallHeight = 80;
 export const crateHeight = 62;
-
-export const wallEntities = [
-	EntityId(100),
-	EntityId(101),
-	EntityId(102),
-	EntityId(103),
-	EntityId(104),
-] as const;
-export const backgroundWallEntities = [wallEntities[0]] as const;
-export const foregroundWallEntities = [
-	wallEntities[1],
-	wallEntities[2],
-	wallEntities[3],
-	wallEntities[4],
-] as const;
-export const crateEntities = [
-	EntityId(200),
-	EntityId(201),
-	EntityId(202),
-	EntityId(203),
-] as const;
-export const platformEntities = [EntityId(300), EntityId(301)] as const;
-export const decorationEntities = [EntityId(400)] as const;
-export const signEntities = [EntityId(401)] as const;

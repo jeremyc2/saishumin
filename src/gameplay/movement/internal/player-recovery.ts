@@ -2,10 +2,12 @@ import {
 	isPlayerPlacementValid,
 	nearestValidPlayerPosition,
 } from "../../../world/spatial/player-placement";
-import { playerEntity, type World } from "../../../world/world";
+import { playerEntityIn, type World } from "../../../world/world";
 
 /** Restores a player displaced into an invalid position by a world transition. */
 export const recoverInvalidPlayerPlacement = (world: World): World => {
+	const playerEntity = playerEntityIn(world);
+	if (playerEntity === undefined) return world;
 	const position = world.positions.get(playerEntity);
 	const elevation = world.elevations.get(playerEntity);
 	if (

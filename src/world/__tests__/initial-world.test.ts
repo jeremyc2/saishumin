@@ -1,17 +1,9 @@
 import { describe, expect, test } from "bun:test";
+import { EntityId } from "../entity-id";
 import { initialWorld } from "../initial-world";
-import {
-	crateEntities,
-	decorationEntities,
-	lavaMonsterEntity,
-	platformEntities,
-	playerEntity,
-	playerSpawnPosition,
-	roomDepth,
-	roomWidth,
-	signEntities,
-	wallEntities,
-} from "../world";
+import { playerSpawnPosition, roomDepth, roomWidth } from "../world";
+
+const playerEntity = EntityId(1);
 
 describe("initial World", () => {
 	test("starts the current single Authored Room exactly as before", () => {
@@ -29,12 +21,21 @@ describe("initial World", () => {
 		);
 		expect([...initialWorld.positions.keys()]).toEqual([
 			playerEntity,
-			lavaMonsterEntity,
-			...wallEntities,
-			...crateEntities,
-			...platformEntities,
-			...signEntities,
-			...decorationEntities,
+			EntityId(2),
+			EntityId(3),
+			EntityId(100),
+			EntityId(101),
+			EntityId(102),
+			EntityId(103),
+			EntityId(104),
+			EntityId(200),
+			EntityId(201),
+			EntityId(202),
+			EntityId(203),
+			EntityId(300),
+			EntityId(301),
+			EntityId(401),
+			EntityId(400),
 		]);
 	});
 });

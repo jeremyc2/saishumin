@@ -14,17 +14,18 @@ import { EntityId } from "../../../world/entity-id";
 import { initialWorld } from "../../../world/initial-world";
 import {
 	crateBody,
-	crateEntities,
 	crateHeight,
 	groundElevation,
-	lavaMonsterEntity,
 	playerBody,
-	playerEntity,
 	roomDepth,
 	stationaryVelocity,
 	type World,
 } from "../../../world/world";
 import { MovementSystemService } from "../movement-system";
+
+const playerEntity = EntityId(1);
+const lavaMonsterEntity = EntityId(2);
+const crateEntities = [EntityId(200)] as const;
 
 const runtime = ManagedRuntime.make(MovementSystemService.layer);
 const movementSystem = runtime.runSync(MovementSystemService);

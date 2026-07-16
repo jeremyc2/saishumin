@@ -11,11 +11,13 @@ import {
 } from "../../../design-studio/model";
 import {
 	Body,
+	CharacterKinds,
 	Decoration,
 	DecorationKinds,
 	Elevation,
 	Obstacle,
 	ObstacleKinds,
+	type PlayerFacing,
 	PlayerFacings,
 	Position,
 } from "../../../world/components";
@@ -24,7 +26,6 @@ import { initialWorld } from "../../../world/initial-world";
 import { isPlayerPlacementValid } from "../../../world/spatial/player-placement";
 import {
 	crateBody,
-	crateEntities,
 	crateHeight,
 	groundElevation,
 	interactionDistance,
@@ -32,14 +33,16 @@ import {
 	minimumEntityExtent,
 	minimumFloorDepth,
 	minimumFloorWidth,
-	platformEntities,
 	playerBody,
-	playerEntity,
 	stationaryVelocity,
 	type World,
 } from "../../../world/world";
 import { MovementSystemService } from "../../movement/movement-system";
 import { UpdateSystemService } from "../update-system";
+
+const playerEntity = EntityId(1);
+const crateEntities = [EntityId(200), EntityId(201)] as const;
+const platformEntities = [EntityId(300), EntityId(301)] as const;
 
 const runtime = ManagedRuntime.make(
 	UpdateSystemService.layer.pipe(Layer.provide(MovementSystemService.layer)),
@@ -47,6 +50,17 @@ const runtime = ManagedRuntime.make(
 const updateSystem = runtime.runSync(UpdateSystemService);
 
 afterAll(() => runtime.dispose());
+
+const withPlayerFacing = (world: World, facing: PlayerFacing): World => ({
+	...world,
+	characters: new Map(world.characters).set(playerEntity, {
+		...(world.characters.get(playerEntity) ?? {
+			kind: CharacterKinds.Player,
+			facing,
+		}),
+		facing,
+	}),
+});
 
 const makeWorld = ({
 	positions,
@@ -211,9 +225,15 @@ describe("UpdateSystemService", () => {
 			action: Action.KeyChanged({ key: Controls.Left, pressed: false }),
 		});
 
-		expect(facingUp.playerFacing).toBe(PlayerFacings.Up);
-		expect(facingUpLeft.playerFacing).toBe(PlayerFacings.UpLeft);
-		expect(stopped.playerFacing).toBe(PlayerFacings.Left);
+		expect(facingUp.characters.get(playerEntity)?.facing).toBe(
+			PlayerFacings.Up,
+		);
+		expect(facingUpLeft.characters.get(playerEntity)?.facing).toBe(
+			PlayerFacings.UpLeft,
+		);
+		expect(stopped.characters.get(playerEntity)?.facing).toBe(
+			PlayerFacings.Left,
+		);
 	});
 
 	test("opens and closes a chest only from its front", () => {
@@ -253,7 +273,7 @@ describe("UpdateSystemService", () => {
 					}),
 				],
 			]),
-			playerFacing: PlayerFacings.Up,
+			characters: withPlayerFacing(initialWorld, PlayerFacings.Up).characters,
 		};
 
 		const opened = updateSystem.update({
@@ -269,7 +289,7 @@ describe("UpdateSystemService", () => {
 		expect(closed.openedChests.has(chest)).toBe(false);
 
 		const wrongFacing = updateSystem.update({
-			world: { ...world, playerFacing: PlayerFacings.Down },
+			world: withPlayerFacing(world, PlayerFacings.Down),
 			action: Action.KeyChanged({ key: Controls.Interact, pressed: true }),
 		});
 		expect(wrongFacing.openedChests.has(chest)).toBe(false);
@@ -327,7 +347,7 @@ describe("UpdateSystemService", () => {
 					}),
 				],
 			]),
-			playerFacing: PlayerFacings.Up,
+			characters: withPlayerFacing(initialWorld, PlayerFacings.Up).characters,
 		};
 
 		const reading = updateSystem.update({
@@ -347,7 +367,7 @@ describe("UpdateSystemService", () => {
 		).toBeNull();
 
 		const wrongFacing = updateSystem.update({
-			world: { ...world, playerFacing: PlayerFacings.Down },
+			world: withPlayerFacing(world, PlayerFacings.Down),
 			action: Action.KeyChanged({ key: Controls.Interact, pressed: true }),
 		});
 		expect(wrongFacing.readingSign).toBeNull();
