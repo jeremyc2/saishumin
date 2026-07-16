@@ -140,6 +140,7 @@ const toggleDesignStudio = (world: World): World => {
 	let toggled: World = {
 		...withoutSession,
 		pressed: new Set<Direction>(),
+		lavaMonsterSteering: new Map(),
 		readingSign: null,
 		grabbed: null,
 		pushing: null,
@@ -464,6 +465,17 @@ const dispatchDesignStudioAction = (world: World, action: Action): World =>
 				? { ...world, editor: { ...world.editor, camera } }
 				: world,
 		EditorInvalidPlacementDismissed: () => dismissInvalidPlacement(world),
+		EditorAuthoredRoomLoaded: ({ world: loaded }) =>
+			world.editor.open
+				? {
+						...loaded,
+						editor: {
+							...loaded.editor,
+							open: true,
+							camera: loaded.gameCamera,
+						},
+					}
+				: world,
 		SignDismissed: () => world,
 		EditorDeleteSelected: () => deleteSelected(world),
 	});

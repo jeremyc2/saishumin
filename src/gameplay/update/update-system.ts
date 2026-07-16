@@ -256,6 +256,8 @@ export class UpdateSystemService extends Context.Service<
 							updateDesignStudio(world, editorAction),
 						EditorInvalidPlacementDismissed: (editorAction) =>
 							updateDesignStudio(world, editorAction),
+						EditorAuthoredRoomLoaded: (editorAction) =>
+							updateDesignStudio(world, editorAction),
 						SignDismissed: () =>
 							world.readingSign === null
 								? world

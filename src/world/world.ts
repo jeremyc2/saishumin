@@ -5,6 +5,7 @@ import {
 	CharacterKinds,
 	type Decoration,
 	type Elevation,
+	type LavaMonsterSteering,
 	type Obstacle,
 	Position,
 	type SignContent,
@@ -22,6 +23,7 @@ export type World = {
 	readonly obstacles: ReadonlyMap<EntityId, Obstacle>;
 	readonly decorations: ReadonlyMap<EntityId, Decoration>;
 	readonly characters: ReadonlyMap<EntityId, Character>;
+	readonly lavaMonsterSteering: ReadonlyMap<EntityId, LavaMonsterSteering>;
 	readonly floorPlan: Body;
 	readonly floorOrigin: Position;
 	readonly floorTiles: ReadonlyArray<FloorTile>;

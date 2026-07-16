@@ -89,6 +89,7 @@ export const reconcileWorld = (world: World): World => {
 		obstacles,
 		decorations,
 		characters,
+		lavaMonsterSteering: new Map(),
 		floorPlan,
 		floorOrigin: world.floorOrigin ?? initialWorld.floorOrigin,
 		floorTiles,

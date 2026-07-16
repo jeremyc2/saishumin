@@ -1,16 +1,24 @@
+import { Schema } from "effect";
 import { dual } from "effect/Function";
 import type { Body, Position } from "./components";
 
-export type FloorTerrain = "grass" | "sand" | "dirt" | "cobblestone";
-
 export const floorTileVersion = 4;
 
-export type FloorTile = {
-	readonly version: typeof floorTileVersion;
-	readonly column: number;
-	readonly row: number;
-	readonly terrain: FloorTerrain;
-};
+export const FloorTerrain = Schema.Literals([
+	"grass",
+	"sand",
+	"dirt",
+	"cobblestone",
+]);
+export type FloorTerrain = typeof FloorTerrain.Type;
+
+export const FloorTile = Schema.Struct({
+	version: Schema.Literal(floorTileVersion),
+	column: Schema.Int,
+	row: Schema.Int,
+	terrain: FloorTerrain,
+});
+export type FloorTile = typeof FloorTile.Type;
 
 export const floorTileWorldSize = {
 	width: 80,

@@ -1,5 +1,10 @@
+import { Effect } from "effect";
 import { html, type TemplateResult } from "lit-html";
 import { Action, type Action as AppAction } from "../../app/action";
+import {
+	copyAuthoredRoomToClipboard,
+	loadAuthoredRoomFromClipboard,
+} from "../../world/authored-room";
 import {
 	DecorationKinds,
 	defaultSignContent,
@@ -19,6 +24,7 @@ import {
 } from "../edit-session/edit-session";
 import type { DesignStudioInteraction } from "../interaction/interaction";
 import { type EditorItemKind, EditorItemKinds } from "../model";
+import { loadClipboardWithStatus } from "./clipboard-status";
 
 type Dispatch = (action: AppAction) => void;
 
@@ -94,6 +100,49 @@ const entityLabel = (world: World, entity: EntityId): string => {
 };
 
 export const makeDesignStudioPanel = (interaction: DesignStudioInteraction) => {
+	const updateClipboardButton = (
+		button: HTMLButtonElement,
+		label: string,
+		disabled: boolean,
+	) =>
+		Effect.sync(() => {
+			button.disabled = disabled;
+			button.textContent = label;
+		});
+
+	const copyAuthoredRoom = (event: Event, world: World): void => {
+		const button = event.currentTarget;
+		if (!(button instanceof HTMLButtonElement)) return;
+		Effect.runFork(
+			updateClipboardButton(button, "COPY", true).pipe(
+				Effect.andThen(copyAuthoredRoomToClipboard({ world })),
+				Effect.matchEffect({
+					onFailure: () =>
+						updateClipboardButton(button, "COPY FAILED — TRY AGAIN", false),
+					onSuccess: () =>
+						updateClipboardButton(button, "COPIED", true).pipe(
+							Effect.andThen(Effect.sleep("3 seconds")),
+							Effect.andThen(updateClipboardButton(button, "COPY", false)),
+						),
+				}),
+			),
+		);
+	};
+
+	const loadAuthoredRoom = (event: Event, dispatch: Dispatch): void => {
+		const button = event.currentTarget;
+		if (!(button instanceof HTMLButtonElement)) return;
+		Effect.runFork(
+			loadClipboardWithStatus({
+				load: loadAuthoredRoomFromClipboard(),
+				onLoaded: (world) =>
+					dispatch(Action.EditorAuthoredRoomLoaded({ world })),
+				setStatus: ({ label, disabled }) =>
+					updateClipboardButton(button, label, disabled),
+			}),
+		);
+	};
+
 	const numberInput = (
 		label: string,
 		value: number,
@@ -342,6 +391,12 @@ export const makeDesignStudioPanel = (interaction: DesignStudioInteraction) => {
 													: html`<div class="mt-3 rounded-xl border border-dashed border-[#30464c] px-4 py-5 text-center text-[11px] leading-relaxed text-[#819993]">Select an object to move or resize it.<br />Select the floor to change the plan.</div>`
 										)()
 							}
+						</section>
+
+						<section class="mt-6 border-t border-[#30434a] pt-5">
+							<h2 class="m-0 text-[12px] font-heading font-bold tracking-[0.16em] text-[#aebfba] uppercase">World data</h2>
+							<button data-copy-authored-room type="button" class="mt-3 w-full rounded-lg border border-[#8e6b3d] bg-[#5d4528] px-4 py-2.5 text-[11px] font-bold tracking-[0.12em] text-[#fff1d6] transition hover:bg-[#6d5331] disabled:cursor-default disabled:opacity-70" @click=${(event: Event) => copyAuthoredRoom(event, world)}>COPY</button>
+							<button data-load-authored-room type="button" class="mt-2 w-full rounded-lg border border-[#46656b] bg-[#1b333a] px-4 py-2.5 text-[11px] font-bold tracking-[0.12em] text-[#dcecea] transition hover:bg-[#25454d] disabled:cursor-wait disabled:opacity-70" @click=${(event: Event) => loadAuthoredRoom(event, dispatch)}>LOAD FROM CLIPBOARD</button>
 						</section>
 					</div>
 

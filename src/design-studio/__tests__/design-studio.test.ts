@@ -91,4 +91,19 @@ describe("Design Studio actions", () => {
 		expect(floor.floorPlan.width).toBe(1_240);
 		expect(deleted.positions.has(entity)).toBe(false);
 	});
+
+	test("loads a validated Authored Room while keeping the Design Studio open", () => {
+		const editing = updateDesignStudio(initialWorld, Action.EditorToggled());
+		const loadedFloorPlan = Body.make({ width: 1_400, depth: 700 });
+		const loaded = updateDesignStudio(
+			editing,
+			Action.EditorAuthoredRoomLoaded({
+				world: { ...initialWorld, floorPlan: loadedFloorPlan },
+			}),
+		);
+
+		expect(loaded.floorPlan).toEqual(loadedFloorPlan);
+		expect(loaded.editor.open).toBe(true);
+		expect(loaded.editor.selected).toBeNull();
+	});
 });

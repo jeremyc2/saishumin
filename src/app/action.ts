@@ -7,6 +7,7 @@ import type {
 	EditSessionPreview,
 } from "../world/editor-state";
 import type { EntityId } from "../world/entity-id";
+import type { World } from "../world/world";
 import type { Control } from "./control";
 
 export type Action = Data.TaggedEnum<{
@@ -48,6 +49,7 @@ export type Action = Data.TaggedEnum<{
 	};
 	EditorCameraChanged: { readonly camera: Position };
 	EditorInvalidPlacementDismissed: Record<never, never>;
+	EditorAuthoredRoomLoaded: { readonly world: World };
 	SignDismissed: Record<never, never>;
 	EditorDeleteSelected: Record<never, never>;
 }>;

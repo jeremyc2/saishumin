@@ -4,6 +4,7 @@ export const Position = Schema.Struct({ x: Schema.Finite, y: Schema.Finite });
 export type Position = typeof Position.Type;
 
 const PositiveFinite = Schema.Finite.check(Schema.isGreaterThan(0));
+const NonNegativeFinite = Schema.Finite.check(Schema.isGreaterThanOrEqualTo(0));
 export const Body = Schema.Struct({
 	width: PositiveFinite,
 	depth: PositiveFinite,
@@ -54,6 +55,12 @@ export const Character = Schema.Struct({
 export type Character = typeof Character.Type;
 export const isCharacter = Schema.is(Character);
 
+export const LavaMonsterSteering = Schema.Struct({
+	candidateFacing: PlayerFacing,
+	duration: NonNegativeFinite,
+});
+export type LavaMonsterSteering = typeof LavaMonsterSteering.Type;
+
 export const ObstacleKind = Schema.Literals([
 	"wall",
 	"crate",
@@ -68,7 +75,6 @@ export const ObstacleKinds = {
 	Chest: ObstacleKind.make("chest"),
 } as const;
 
-const NonNegativeFinite = Schema.Finite.check(Schema.isGreaterThanOrEqualTo(0));
 export const Obstacle = Schema.Struct({
 	height: NonNegativeFinite,
 	kind: ObstacleKind,

@@ -1,6 +1,6 @@
 import { dual } from "effect/Function";
 import type { PlayerFacing, Position } from "../../../world/components";
-import { PlayerFacings } from "../../../world/components";
+import { LavaMonsterSteering, PlayerFacings } from "../../../world/components";
 import type { EntityId } from "../../../world/entity-id";
 import { surfaceAt } from "../../../world/spatial/collision";
 import {
@@ -43,6 +43,19 @@ const facingFor = (delta: Position, previous: PlayerFacing): PlayerFacing => {
 	return horizontal > 0 ? PlayerFacings.Right : previous;
 };
 
+const diagonalDirection = Math.SQRT1_2;
+const minimumFacingCommitDuration = 0.12;
+const directionForFacing: Record<PlayerFacing, Position> = {
+	up: { x: 0, y: -1 },
+	"up-right": { x: diagonalDirection, y: -diagonalDirection },
+	right: { x: 1, y: 0 },
+	"down-right": { x: diagonalDirection, y: diagonalDirection },
+	down: { x: 0, y: 1 },
+	"down-left": { x: -diagonalDirection, y: diagonalDirection },
+	left: { x: -1, y: 0 },
+	"up-left": { x: -diagonalDirection, y: -diagonalDirection },
+};
+
 const updateOneLavaMonster = (
 	world: World,
 	elapsed: number,
@@ -61,6 +74,7 @@ const updateOneLavaMonster = (
 		character === undefined
 	)
 		return world;
+	const previousSteering = world.lavaMonsterSteering.get(entity);
 	if (
 		!canPlaceLavaMonster({ world, entity, position, elevation: elevation.z })
 	) {
@@ -122,6 +136,8 @@ const updateOneLavaMonster = (
 		position,
 		target: playerPosition,
 		elevation: elevation.z,
+		preferredDirection:
+			directionForFacing[previousSteering?.candidateFacing ?? character.facing],
 	});
 	const targetDistance = Math.hypot(
 		playerPosition.x - position.x,
@@ -153,6 +169,28 @@ const updateOneLavaMonster = (
 	})
 		? verticalCandidate
 		: afterHorizontal;
+	const movedDelta = { x: moved.x - position.x, y: moved.y - position.y };
+	const facingDirection =
+		movedDelta.x === 0 && movedDelta.y === 0 ? movedDelta : direction;
+	const desiredFacing = facingFor(facingDirection, character.facing);
+	const candidateDuration =
+		previousSteering?.candidateFacing === desiredFacing
+			? previousSteering.duration + elapsed
+			: elapsed;
+	const lavaMonsterSteering = new Map(world.lavaMonsterSteering);
+	let facing = character.facing;
+	if (desiredFacing === character.facing) lavaMonsterSteering.delete(entity);
+	else if (candidateDuration >= minimumFacingCommitDuration) {
+		facing = desiredFacing;
+		lavaMonsterSteering.delete(entity);
+	} else
+		lavaMonsterSteering.set(
+			entity,
+			LavaMonsterSteering.make({
+				candidateFacing: desiredFacing,
+				duration: candidateDuration,
+			}),
+		);
 	let velocity =
 		(shouldJump ? jumpSpeed : elevation.velocity) - gravity * elapsed;
 	let z = elevation.z + velocity * elapsed;
@@ -182,11 +220,9 @@ const updateOneLavaMonster = (
 		}),
 		characters: new Map(world.characters).set(entity, {
 			...character,
-			facing: facingFor(
-				{ x: moved.x - position.x, y: moved.y - position.y },
-				character.facing,
-			),
+			facing,
 		}),
+		lavaMonsterSteering,
 	};
 };
 

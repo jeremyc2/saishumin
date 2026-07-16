@@ -87,6 +87,7 @@ export const makeInitialWorld = Effect.fnUntraced(function* ({
 				character === undefined ? [] : [[entity, character] as const],
 			),
 		),
+		lavaMonsterSteering: new Map(),
 		floorPlan,
 		floorOrigin,
 		floorTiles: initialFloorTiles(floorPlan),

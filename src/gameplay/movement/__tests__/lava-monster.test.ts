@@ -98,8 +98,16 @@ describe("lava-monster movement through MovementSystemService", () => {
 			),
 		};
 
-		const moved = movement.update({ world, elapsed: 0.05 });
+		const firstFrame = movement.update({ world, elapsed: 0.05 });
+		const secondFrame = movement.update({ world: firstFrame, elapsed: 0.05 });
+		const moved = movement.update({ world: secondFrame, elapsed: 0.05 });
 
+		expect(firstFrame.characters.get(secondMonster)?.facing).toBe(
+			PlayerFacings.Right,
+		);
+		expect(secondFrame.characters.get(secondMonster)?.facing).toBe(
+			PlayerFacings.Right,
+		);
 		expect(moved.positions.get(lavaMonsterEntity)?.x).toBeLessThan(500);
 		expect(moved.positions.get(secondMonster)?.x).toBeLessThan(500);
 		expect(moved.characters.get(secondMonster)?.facing).toBe(
@@ -276,6 +284,129 @@ describe("lava-monster movement through MovementSystemService", () => {
 			z: groundElevation,
 			velocity: stationaryVelocity,
 		});
+	});
+
+	test("routes around a sign when a jump cannot clear it", () => {
+		const sign = EntityId(895);
+		const world: World = {
+			...worldWith(
+				[
+					[playerEntity, Position.make({ x: 280, y: 300 })],
+					[lavaMonsterEntity, Position.make({ x: 430, y: 300 })],
+					[sign, Position.make({ x: 400, y: 300 })],
+				],
+				new Map(),
+				new Map([[sign, Body.make({ width: 88, depth: 56 })]]),
+			),
+			decorations: new Map([
+				[sign, Decoration.make({ kind: DecorationKinds.Sign, height: 104 })],
+			]),
+		};
+
+		const moved = movement.update({ world, elapsed: 0.05 });
+
+		expect(moved.elevations.get(lavaMonsterEntity)).toEqual({
+			z: groundElevation,
+			velocity: stationaryVelocity,
+		});
+	});
+
+	test("routes around another lava monster instead of repeatedly jumping", () => {
+		const blockingMonster = EntityId(3);
+		const base = worldWith([
+			[playerEntity, Position.make({ x: 280, y: 300 })],
+			[lavaMonsterEntity, Position.make({ x: 430, y: 300 })],
+			[blockingMonster, Position.make({ x: 400, y: 300 })],
+		]);
+		const world: World = {
+			...base,
+			bodies: new Map(base.bodies).set(blockingMonster, lavaMonsterBody),
+			elevations: new Map(base.elevations).set(
+				blockingMonster,
+				Elevation.make({
+					z: groundElevation,
+					velocity: stationaryVelocity,
+				}),
+			),
+			characters: new Map(base.characters).set(
+				blockingMonster,
+				Character.make({
+					kind: CharacterKinds.LavaMonster,
+					facing: PlayerFacings.Left,
+				}),
+			),
+		};
+
+		const moved = movement.update({ world, elapsed: 0.05 });
+
+		expect(moved.elevations.get(lavaMonsterEntity)).toEqual({
+			z: groundElevation,
+			velocity: stationaryVelocity,
+		});
+	});
+
+	test("keeps making progress around a blocker without flickering between headings", () => {
+		const sign = EntityId(894);
+		const secondSign = EntityId(893);
+		let world: World = {
+			...worldWith(
+				[
+					[playerEntity, Position.make({ x: 280, y: 300 })],
+					[lavaMonsterEntity, Position.make({ x: 550, y: 300 })],
+					[sign, Position.make({ x: 400, y: 255 })],
+					[secondSign, Position.make({ x: 400, y: 345 })],
+				],
+				new Map(),
+				new Map([
+					[sign, Body.make({ width: 88, depth: 56 })],
+					[secondSign, Body.make({ width: 88, depth: 56 })],
+				]),
+			),
+			decorations: new Map([
+				[sign, Decoration.make({ kind: DecorationKinds.Sign, height: 104 })],
+				[
+					secondSign,
+					Decoration.make({ kind: DecorationKinds.Sign, height: 104 }),
+				],
+			]),
+		};
+		const headings: Array<string> = [];
+		for (let frame = 0; frame < 80; frame += 1) {
+			world = movement.update({ world, elapsed: 0.05 });
+			headings.push(
+				world.characters.get(lavaMonsterEntity)?.facing ?? "missing",
+			);
+		}
+		const oppositeHeadings = new Map([
+			["up", "down"],
+			["up-right", "down-left"],
+			["right", "left"],
+			["down-right", "up-left"],
+			["down", "up"],
+			["down-left", "up-right"],
+			["left", "right"],
+			["up-left", "down-right"],
+		]);
+		const reversals = headings.filter(
+			(heading, index) =>
+				index > 0 &&
+				oppositeHeadings.get(headings[index - 1] ?? "") === heading,
+		).length;
+		const singleFrameChanges = headings.filter(
+			(heading, index) =>
+				index > 0 &&
+				index < headings.length - 1 &&
+				heading !== headings[index - 1] &&
+				headings[index - 1] === headings[index + 1],
+		).length;
+		const headingChanges = headings.filter(
+			(heading, index) => index > 0 && heading !== headings[index - 1],
+		).length;
+
+		expect(world.positions.get(lavaMonsterEntity)?.x).toBeLessThan(380);
+		expect(reversals).toBe(0);
+		expect(singleFrameChanges).toBe(0);
+		expect(headingChanges).toBeLessThan(12);
 	});
 
 	test("jumps over a sign without respawning", () => {
