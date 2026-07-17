@@ -99,6 +99,7 @@
 					"returnEffectInGen": "error",
 					"runEffectInsideEffect": "error",
 					"schemaNumber": "error",
+					"schemaOpaqueInstanceMember": "error",
 					"schemaStructWithTag": "error",
 					"schemaSyncInEffect": "error",
 					"schemaUnionOfLiterals": "error",
@@ -106,6 +107,7 @@
 					"serviceNotAsClass": "error",
 					"strictBooleanExpressions": "error",
 					"strictEffectProvide": "error",
+					"syncToSucceed": "error",
 					"tryCatchInEffectGen": "error",
 					"unknownInEffectCatch": "error",
 					"unnecessaryArrowBlock": "error",
@@ -114,7 +116,7 @@
 					"unnecessaryPipe": "error",
 					"unnecessaryPipeChain": "error",
 					"unnecessaryTypeofType": "error",
-					"unsafeEffectTypeAssertion": "error"
+					"unsafeEffectTypeAssertion": "error",
 				}
 			}
 		]
