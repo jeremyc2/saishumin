@@ -70,7 +70,9 @@ const pointerDownHandlerAfter = (
 	template: NonNullable<ReturnType<typeof templateResult>>,
 	marker: string,
 ) => {
-	const markerIndex = template.strings.findIndex((part) => part.includes(marker));
+	const markerIndex = template.strings.findIndex((part) =>
+		part.includes(marker),
+	);
 	if (markerIndex < 0) throw new Error(`Missing ${marker}`);
 	for (let index = markerIndex; index < template.strings.length; index += 1) {
 		if (template.strings[index]?.includes("@pointerdown=") !== true) continue;
@@ -571,7 +573,10 @@ describe("game scene", () => {
 			onRootPointerDown: () => {},
 		});
 		const floorPointerDown = pointerDownHandlerAfter(scene, "data-floor-base");
-		const canvasPointerDown = pointerDownHandlerAfter(scene, 'id="world-canvas"');
+		const canvasPointerDown = pointerDownHandlerAfter(
+			scene,
+			'id="world-canvas"',
+		);
 		const currentTarget = {
 			getScreenCTM: () => ({ a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 }),
 		};
