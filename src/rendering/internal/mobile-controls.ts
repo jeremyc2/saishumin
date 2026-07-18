@@ -1,34 +1,48 @@
 import { html, type TemplateResult } from "lit-html";
 import { type Action, Action as AppAction } from "../../app/action";
 import { type Control, Controls } from "../../app/control";
+import type { DesignStudioInteraction } from "../../design-studio/interaction/interaction";
+import type { Position } from "../../world/components";
+import type { World } from "../../world/world";
 
 type Dispatch = (action: Action) => void;
+
+const touchButtonClass =
+	"inline-flex min-h-12 min-w-12 select-none items-center justify-center rounded-2xl border border-[#e8b875]/65 bg-[#0d181f]/88 font-heading text-[0.7rem] font-bold tracking-[0.06em] text-[#fff1d6] shadow-[0_0.5rem_1.5rem_rgb(0_0_0/28%)] active:translate-y-px active:scale-[0.97] active:border-[#fff0a8] active:bg-[#44574d]/96 max-[380px]:min-h-11 max-[380px]:min-w-[2.6rem] [-webkit-touch-callout:none]";
 
 const controlButton = ({
 	control,
 	label,
 	visibleLabel,
+	visibleLabelClass = "",
 	className = "",
 	dispatch,
 }: {
 	readonly control: Control;
 	readonly label: string;
 	readonly visibleLabel: string;
+	readonly visibleLabelClass?: string;
 	readonly className?: string;
 	readonly dispatch: Dispatch;
 }): TemplateResult => {
 	const changeControl = (event: PointerEvent, pressed: boolean): void => {
-		event.preventDefault();
+		const target = event.currentTarget;
+		if (!(target instanceof HTMLElement)) return;
 		if (pressed) {
-			const target = event.currentTarget;
-			if (target instanceof Element) target.setPointerCapture(event.pointerId);
+			if (target.dataset["controlPointer"] !== undefined) return;
+			target.dataset["controlPointer"] = String(event.pointerId);
+			target.setPointerCapture(event.pointerId);
+		} else {
+			if (target.dataset["controlPointer"] !== String(event.pointerId)) return;
+			delete target.dataset["controlPointer"];
 		}
+		event.preventDefault();
 		dispatch(AppAction.KeyChanged({ key: control, pressed }));
 	};
 	return html`
 		<button
 			type="button"
-			class=${`inline-flex min-h-12 min-w-12 select-none items-center justify-center rounded-2xl border border-[#e8b875]/65 bg-[#0d181f]/88 font-heading text-base font-bold tracking-[0.06em] text-[#fff1d6] shadow-[0_0.5rem_1.5rem_rgb(0_0_0/28%)] active:translate-y-px active:scale-[0.97] active:border-[#fff0a8] active:bg-[#44574d]/96 max-[380px]:min-h-11 max-[380px]:min-w-[2.6rem] max-[380px]:rounded-[0.85rem] [-webkit-touch-callout:none] ${className}`}
+			class=${`${touchButtonClass} ${className}`}
 			aria-label=${label}
 			@pointerdown=${(event: PointerEvent) => changeControl(event, true)}
 			@pointerup=${(event: PointerEvent) => changeControl(event, false)}
@@ -37,24 +51,156 @@ const controlButton = ({
 				changeControl(event, false)}
 			@contextmenu=${(event: Event) => event.preventDefault()}
 		>
-			${visibleLabel}
+			<span class=${visibleLabelClass}>${visibleLabel}</span>
 		</button>
 	`;
 };
 
-export const mobileControlsTemplate = (dispatch: Dispatch): TemplateResult =>
-	html`
-		<div class="pointer-events-none absolute inset-x-0 bottom-0 z-20 hidden items-end justify-between gap-5 px-[max(0.875rem,env(safe-area-inset-left))] pb-[max(0.875rem,env(safe-area-inset-bottom))] max-md:flex max-[380px]:gap-3 [@media(max-width:900px)_and_(max-height:500px)]:flex pointer-coarse:flex" aria-label="Touch controls">
-			<div class="pointer-events-auto grid w-40 shrink-0 touch-none grid-cols-3 grid-rows-2 gap-2 max-[380px]:w-34 max-[380px]:gap-1.5" aria-label="Movement controls">
-				${controlButton({ control: Controls.Up, label: "Move up", visibleLabel: "▲", className: "col-start-2", dispatch })}
-				${controlButton({ control: Controls.Left, label: "Move left", visibleLabel: "◀", className: "col-start-1 row-start-2", dispatch })}
-				${controlButton({ control: Controls.Down, label: "Move down", visibleLabel: "▼", className: "col-start-2 row-start-2", dispatch })}
-				${controlButton({ control: Controls.Right, label: "Move right", visibleLabel: "▶", className: "col-start-3 row-start-2", dispatch })}
-			</div>
-			<div class="pointer-events-auto grid shrink-0 touch-none grid-cols-2 items-end gap-2 max-[380px]:gap-1.5" aria-label="Action controls">
-				${controlButton({ control: Controls.Grab, label: "Hold to grab or drag", visibleLabel: "GRAB", className: "text-[0.65rem]", dispatch })}
-				${controlButton({ control: Controls.Interact, label: "Interact", visibleLabel: "ACT", className: "text-[0.65rem]", dispatch })}
-				${controlButton({ control: Controls.Jump, label: "Jump", visibleLabel: "JUMP", className: "col-span-2 min-h-[3.35rem] bg-[#5d4528]/92 text-[0.72rem]", dispatch })}
+const actionButton = ({
+	label,
+	onClick,
+	className = "",
+}: {
+	readonly label: string;
+	readonly onClick: () => void;
+	readonly className?: string;
+}): TemplateResult => html`
+	<button type="button" class=${`${touchButtonClass} px-4 ${className}`} @click=${onClick}>${label}</button>
+`;
+
+const joystickTemplate = (
+	onChange: (vector: Position) => void,
+): TemplateResult => {
+	const ownsPointer = (target: HTMLElement, pointerId: number): boolean =>
+		target.dataset["joystickPointer"] === String(pointerId);
+	const update = (event: PointerEvent): void => {
+		event.preventDefault();
+		const target = event.currentTarget;
+		if (!(target instanceof HTMLElement)) return;
+		const bounds = target.getBoundingClientRect();
+		const radius = Math.max(1, Math.min(bounds.width, bounds.height) / 2 - 28);
+		const x = event.clientX - (bounds.left + bounds.width / 2);
+		const y = event.clientY - (bounds.top + bounds.height / 2);
+		const distance = Math.hypot(x, y);
+		const scale = distance > radius ? radius / distance : 1;
+		const visualX = x * scale;
+		const visualY = y * scale;
+		target.style.setProperty("--joystick-x", `${visualX}px`);
+		target.style.setProperty("--joystick-y", `${visualY}px`);
+		onChange({ x: visualX / radius, y: visualY / radius });
+	};
+	const release = (event: PointerEvent): void => {
+		const target = event.currentTarget;
+		if (!(target instanceof HTMLElement)) return;
+		if (!ownsPointer(target, event.pointerId)) return;
+		delete target.dataset["joystickPointer"];
+		event.preventDefault();
+		target.style.setProperty("--joystick-x", "0px");
+		target.style.setProperty("--joystick-y", "0px");
+		onChange({ x: 0, y: 0 });
+	};
+	return html`
+		<div
+			role="application"
+			aria-label="Movement joystick"
+			class="pointer-events-auto relative size-32 shrink-0 touch-none select-none rounded-full border-2 border-[#e8b875]/55 bg-[#0d181f]/78 shadow-[0_0.75rem_2rem_rgb(0_0_0/32%)] max-[380px]:size-28 landscape:size-24"
+			style="--joystick-x: 0px; --joystick-y: 0px;"
+			@pointerdown=${(event: PointerEvent) => {
+				const target = event.currentTarget;
+				if (!(target instanceof HTMLElement)) return;
+				target.dataset["joystickPointer"] = String(event.pointerId);
+				target.setPointerCapture(event.pointerId);
+				update(event);
+			}}
+			@pointermove=${(event: PointerEvent) => {
+				const target = event.currentTarget;
+				if (
+					target instanceof HTMLElement &&
+					ownsPointer(target, event.pointerId) &&
+					target.hasPointerCapture(event.pointerId)
+				)
+					update(event);
+			}}
+			@pointerup=${release}
+			@pointercancel=${release}
+			@lostpointercapture=${release}
+			@contextmenu=${(event: Event) => event.preventDefault()}
+		>
+			<div class="pointer-events-none absolute top-1/2 left-1/2 size-15 rounded-full border border-[#fff0a8]/75 bg-[#5d4528] shadow-lg [transform:translate(calc(-50%+var(--joystick-x)),calc(-50%+var(--joystick-y)))]"></div>
+		</div>
+	`;
+};
+
+const changeGameplayJoystick = (vector: Position, dispatch: Dispatch): void => {
+	const threshold = 0.24;
+	dispatch(
+		AppAction.KeyChanged({
+			key: Controls.Left,
+			pressed: vector.x < -threshold,
+		}),
+	);
+	dispatch(
+		AppAction.KeyChanged({
+			key: Controls.Right,
+			pressed: vector.x > threshold,
+		}),
+	);
+	dispatch(
+		AppAction.KeyChanged({ key: Controls.Up, pressed: vector.y < -threshold }),
+	);
+	dispatch(
+		AppAction.KeyChanged({ key: Controls.Down, pressed: vector.y > threshold }),
+	);
+};
+
+export const mobileControlsTemplate = ({
+	world,
+	interaction,
+	dispatch,
+}: {
+	readonly world: World;
+	readonly interaction: DesignStudioInteraction;
+	readonly dispatch: Dispatch;
+}): TemplateResult => {
+	const editing = world.editor.open;
+	const touchEditActive = interaction.isTouchEditActive();
+	if (
+		editing &&
+		(interaction.isTouchPanelOpen() || interaction.isTouchDetailsOpen()) &&
+		!touchEditActive
+	)
+		return html``;
+	let actionControls = html``;
+	if (editing && touchEditActive) {
+		actionControls = html`
+			${actionButton({ label: "CANCEL", onClick: interaction.cancelTouchEdit, className: "border-[#9a625d] bg-[#6f3f3e]/94" })}
+			${actionButton({ label: "PLACE", onClick: interaction.commitTouchEdit, className: "border-[#e8b875] bg-[#5d4528]/94" })}
+		`;
+	}
+	if (editing && !touchEditActive && world.editor.selected !== null) {
+		actionControls = html`
+			${actionButton({ label: "CANCEL", onClick: () => dispatch(AppAction.EditorSelectionChanged({ selection: null })), className: "min-h-14 border-[#9a625d] bg-[#6f3f3e]/94" })}
+			${actionButton({ label: "DETAILS", onClick: interaction.openTouchDetails, className: "min-h-14 border-[#e8b875] bg-[#5d4528]/94" })}
+		`;
+	}
+	if (!editing) {
+		actionControls = html`
+			${controlButton({ control: Controls.ContextAction, label: "Grab or interact", visibleLabel: "B", visibleLabelClass: "text-2xl leading-none", className: "absolute bottom-0 left-0 aspect-square size-16 rounded-full p-0", dispatch })}
+			${controlButton({ control: Controls.Jump, label: "Jump", visibleLabel: "A", visibleLabelClass: "text-2xl leading-none", className: "absolute top-0 right-0 aspect-square size-16 rounded-full bg-[#5d4528]/92 p-0", dispatch })}
+		`;
+	}
+	const actionLayoutClass = editing
+		? "grid grid-cols-2 items-end gap-3 max-[380px]:gap-2"
+		: "relative h-30 w-38 landscape:h-27 landscape:w-35";
+	return html`
+		<div class="pointer-events-none absolute inset-x-0 bottom-0 z-20 hidden items-end justify-between gap-5 px-[max(0.875rem,env(safe-area-inset-left))] pb-[max(2.25rem,calc(env(safe-area-inset-bottom)+1.5rem))] any-pointer-coarse:flex landscape:px-[max(0.75rem,env(safe-area-inset-left))] landscape:pb-[max(0.75rem,env(safe-area-inset-bottom))]" aria-label="Touch controls">
+			${joystickTemplate((vector) => {
+				if (editing) interaction.setTouchJoystick(vector);
+				else changeGameplayJoystick(vector, dispatch);
+			})}
+			<div class=${`pointer-events-auto shrink-0 touch-none ${actionLayoutClass}`} aria-label="Action controls">
+				${actionControls}
 			</div>
 		</div>
 	`;
+};

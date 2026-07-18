@@ -197,6 +197,7 @@ export const makeDesignStudioPanel = (interaction: DesignStudioInteraction) => {
 	const editorPanelTemplate = (
 		world: World,
 		panelVisible: boolean,
+		touchPanelVisible: boolean,
 		dispatch: Dispatch,
 	): TemplateResult => {
 		const selected = world.editor.selected;
@@ -234,29 +235,132 @@ export const makeDesignStudioPanel = (interaction: DesignStudioInteraction) => {
 		const hasPlayer = [...world.characters.values()].some(
 			(character) => character.kind === CharacterKinds.Player,
 		);
+		let touchDetailsContent = html`<p class="text-sm text-[#819993]">Nothing is selected.</p>`;
+		if (selected === "floor") {
+			touchDetailsContent = html`
+				<div class="text-base font-bold">Floor plan</div>
+				<div class="mt-4 flex gap-3">
+					${numberInput("Width", world.floorPlan.width, minimumFloorWidth, undefined, (width) => dispatch(Action.EditorFloorResized({ floorPlan: { ...world.floorPlan, width } })))}
+					${numberInput("Depth", world.floorPlan.depth, minimumFloorDepth, undefined, (depth) => dispatch(Action.EditorFloorResized({ floorPlan: { ...world.floorPlan, depth } })))}
+				</div>
+			`;
+		} else if (
+			selectedEntity !== undefined &&
+			selectedBody !== undefined &&
+			selectedPosition !== undefined &&
+			selectedMaximumBody !== undefined
+		) {
+			let touchHeightInput: TemplateResult = html``;
+			if (
+				selectedHeight !== undefined &&
+				selectedHeightLimits !== undefined &&
+				selectedHeightLimits.maximum > 0
+			)
+				touchHeightInput = numberInput(
+					"Height",
+					selectedHeight,
+					selectedHeightLimits.minimum,
+					selectedHeightLimits.maximum,
+					(height) =>
+						dispatch(
+							Action.EditorEntityHeightChanged({
+								entity: selectedEntity,
+								height,
+							}),
+						),
+				);
+			let touchSizeInputs: TemplateResult = html``;
+			if (!characterSelected)
+				touchSizeInputs = html`
+					<div class="mt-5 flex gap-3">
+						${numberInput("Width", selectedBody.width, minimumEntityExtent, selectedMaximumBody.width, (width) => dispatch(Action.EditorEntityResized({ entity: selectedEntity, body: { ...selectedBody, width } })))}
+						${numberInput("Depth", selectedBody.depth, minimumEntityExtent, selectedMaximumBody.depth, (depth) => dispatch(Action.EditorEntityResized({ entity: selectedEntity, body: { ...selectedBody, depth } })))}
+						${touchHeightInput}
+					</div>
+				`;
+			let touchSignInputs: TemplateResult = html``;
+			if (selectedSignContent !== undefined)
+				touchSignInputs = html`
+					<div class="mt-5 border-t border-[#30434a] pt-5">
+						<label class="block text-xs font-bold text-[#819993] uppercase">Title
+							<input type="text" .value=${selectedSignContent.title} class="mt-2 block w-full rounded-lg border border-[#3a5157] bg-[#16252c] px-3 py-3 text-base text-[#fff1d6]" @change=${(
+								event: Event,
+							) => {
+								const input = event.currentTarget;
+								if (!(input instanceof HTMLInputElement)) return;
+								dispatch(
+									Action.EditorSignContentChanged({
+										entity: selectedEntity,
+										content: { ...selectedSignContent, title: input.value },
+									}),
+								);
+							}} />
+						</label>
+						<label class="mt-4 block text-xs font-bold text-[#819993] uppercase">Body
+							<textarea .value=${selectedSignContent.body} rows="5" class="mt-2 block w-full rounded-lg border border-[#3a5157] bg-[#16252c] px-3 py-3 text-base text-[#fff1d6]" @change=${(
+								event: Event,
+							) => {
+								const input = event.currentTarget;
+								if (!(input instanceof HTMLTextAreaElement)) return;
+								dispatch(
+									Action.EditorSignContentChanged({
+										entity: selectedEntity,
+										content: { ...selectedSignContent, body: input.value },
+									}),
+								);
+							}}></textarea>
+						</label>
+					</div>
+				`;
+			touchDetailsContent = html`
+				<div class="flex items-start justify-between gap-3">
+					<div>
+						<div class="text-base font-bold">${entityLabel(world, selectedEntity)}</div>
+						<div class="mt-1 text-xs text-[#819993]">X ${Math.round(selectedPosition.x)} · Y ${Math.round(selectedPosition.y)}</div>
+					</div>
+					<div class="flex gap-2">
+						<button type="button" class="min-h-11 rounded-lg border border-[#8e6b3d] bg-[#5d4528] px-4 text-xs font-bold" @click=${() => {
+							interaction.closeTouchDetails();
+							interaction.startTouchEntityMove(world, selectedEntity, dispatch);
+						}}>MOVE</button>
+						<button type="button" class="min-h-11 rounded-lg border border-[#704a45] px-4 text-xs font-bold text-[#ef9f8e]" @click=${() => dispatch(Action.EditorDeleteSelected())}>DELETE</button>
+					</div>
+				</div>
+				${touchSizeInputs}
+				${touchSignInputs}
+			`;
+		}
 		return html`
-				<aside data-editor-panel class=${`absolute top-0 right-0 z-30 flex h-full w-85 flex-col overscroll-contain border-l border-[#41565a] bg-[#0d181f]/98 text-[#fff1d6] shadow-[-18px_0_44px_rgba(3,9,12,0.38)] transition-transform duration-180 ease-out motion-reduce:transition-none max-md:inset-x-0 max-md:top-auto max-md:bottom-0 max-md:h-[min(72dvh,42rem)] max-md:w-full max-md:border-t max-md:border-l-0 max-md:pb-[env(safe-area-inset-bottom)] pointer-coarse:inset-x-0 pointer-coarse:top-auto pointer-coarse:bottom-0 pointer-coarse:h-[min(72dvh,42rem)] pointer-coarse:w-full pointer-coarse:border-t pointer-coarse:border-l-0 pointer-coarse:pb-[env(safe-area-inset-bottom)] ${panelVisible ? "translate-x-0 max-md:translate-y-0 pointer-coarse:translate-y-0" : "pointer-events-none translate-x-full max-md:translate-x-0 max-md:translate-y-full pointer-coarse:translate-x-0 pointer-coarse:translate-y-full"}`}>
-					<header class="border-b border-[#30434a] px-5 pt-6 pb-4">
-						<div class="text-lg font-heading font-bold tracking-[0.2em] text-[#e8b875] uppercase">Design studio</div>
-						<div class="text-[11px] leading-relaxed text-[#819993]">Scroll to pan · Command/Control-drag to pan</div>
+				<aside data-editor-panel class=${`absolute top-0 right-0 z-30 flex h-full w-85 flex-col overscroll-contain border-l border-[#41565a] bg-[#0d181f]/98 text-[#fff1d6] shadow-[-18px_0_44px_rgba(3,9,12,0.38)] transition-transform duration-180 ease-out motion-reduce:transition-none any-pointer-coarse:inset-0 any-pointer-coarse:z-50 any-pointer-coarse:h-dvh any-pointer-coarse:w-screen any-pointer-coarse:border-0 any-pointer-coarse:pb-[env(safe-area-inset-bottom)] ${panelVisible ? "translate-x-0" : "pointer-events-none translate-x-full"} ${touchPanelVisible ? "any-pointer-coarse:pointer-events-auto any-pointer-coarse:translate-x-0 any-pointer-coarse:translate-y-0" : "any-pointer-coarse:pointer-events-none any-pointer-coarse:translate-x-0 any-pointer-coarse:translate-y-full"}`}>
+					<header class="border-b border-[#30434a] px-5 pt-6 pb-4 any-pointer-coarse:flex any-pointer-coarse:items-center any-pointer-coarse:justify-between any-pointer-coarse:pt-[max(0.75rem,env(safe-area-inset-top))] any-pointer-coarse:pb-3">
+						<div class="text-lg font-heading font-bold tracking-[0.2em] text-[#e8b875] uppercase">Objects</div>
+						<button type="button" class="hidden min-h-11 rounded-xl border border-[#46656b] bg-[#1b333a] px-4 text-xs font-bold text-[#dcecea] any-pointer-coarse:block" @click=${interaction.toggleTouchPanel}>CLOSE</button>
+						<div class="text-[11px] leading-relaxed text-[#819993] any-pointer-coarse:hidden">Scroll to pan · Command/Control-drag to pan</div>
 					</header>
 
-					<div class="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-5">
+					<div class="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-5 any-pointer-coarse:px-3 any-pointer-coarse:py-3">
 						<section>
 							<div class="flex items-end justify-between">
 								<h2 class="m-0 text-[12px] font-heading font-bold tracking-[0.16em] text-[#aebfba] uppercase">Add objects</h2>
-								<span class="text-[10px] text-[#708780]">DRAG TO PLACE</span>
+								<span class="text-[10px] text-[#708780] any-pointer-coarse:hidden">DRAG TO PLACE</span>
+								<span class="hidden text-[10px] text-[#708780] any-pointer-coarse:inline">TAP TO PLACE</span>
 							</div>
-							<div class="mt-3 grid grid-cols-2 gap-2">
+							<div class="mt-3 grid grid-cols-2 gap-2 any-pointer-coarse:landscape:grid-cols-4">
 								${paletteItems.map(
 									(item) => html`
 										<button
 											data-palette-item
 											type="button"
 											?disabled=${item.kind === CharacterSpawnKinds.Player && hasPlayer}
-											class="group cursor-grab touch-none rounded-xl border border-[#30464c] bg-[#17272e] p-3 text-left transition hover:-translate-y-0.5 hover:border-[#d9a969] hover:bg-[#20343b] active:cursor-grabbing disabled:cursor-not-allowed disabled:opacity-40"
+											class="group cursor-grab touch-none rounded-xl border border-[#30464c] bg-[#17272e] p-3 text-left transition hover:-translate-y-0.5 hover:border-[#d9a969] hover:bg-[#20343b] active:cursor-grabbing disabled:cursor-not-allowed disabled:opacity-40 any-pointer-coarse:cursor-pointer any-pointer-coarse:touch-pan-y"
 											@pointerdown=${(event: PointerEvent) =>
 												interaction.startPaletteDrag(event, item.kind, world)}
+											@click=${() =>
+												interaction.startTouchPalettePlacement(
+													item.kind,
+													world,
+													dispatch,
+												)}
 										>
 											<span class="text-[22px] text-[#e8b875]">${item.icon}</span>
 											<span class="mt-1 block text-[13px] font-bold">${item.label}</span>
@@ -267,7 +371,7 @@ export const makeDesignStudioPanel = (interaction: DesignStudioInteraction) => {
 							</div>
 						</section>
 
-						<section class="mt-6 border-t border-[#30434a] pt-5">
+						<section class="mt-6 border-t border-[#30434a] pt-5 any-pointer-coarse:hidden">
 							<h2 class="m-0 text-[12px] font-heading font-bold tracking-[0.16em] text-[#aebfba] uppercase">Selection</h2>
 							${
 								selected === "floor"
@@ -435,9 +539,19 @@ export const makeDesignStudioPanel = (interaction: DesignStudioInteraction) => {
 						</section>
 					</div>
 
-					<footer class="border-t border-[#30434a] px-5 py-4 text-[10px] leading-relaxed text-[#718780]">
-						Drag objects to move · Scroll to pan<br />⌘/Ctrl-drag pans · Delete removes a selection
+					<footer class="border-t border-[#30434a] px-5 py-4 text-[10px] leading-relaxed text-[#718780] any-pointer-coarse:hidden">
+						<span class="any-pointer-coarse:hidden">Drag objects to move · Scroll to pan<br />⌘/Ctrl-drag pans · Delete removes a selection</span>
+						<span class="hidden any-pointer-coarse:inline">Close Objects to pan the room. Tap an object to reposition it.</span>
 					</footer>
+				</aside>
+				<aside data-touch-details class=${`absolute inset-0 z-50 hidden h-dvh w-screen flex-col bg-[#0d181f]/98 text-[#fff1d6] transition-transform duration-180 any-pointer-coarse:flex ${interaction.isTouchDetailsOpen() ? "any-pointer-coarse:translate-y-0" : "pointer-events-none any-pointer-coarse:translate-y-full"}`}>
+					<header class="flex items-center justify-between border-b border-[#30434a] px-4 pt-[max(0.75rem,env(safe-area-inset-top))] pb-3">
+						<div class="text-lg font-heading font-bold tracking-[0.2em] text-[#e8b875] uppercase">Details</div>
+						<button type="button" class="min-h-11 rounded-xl border border-[#46656b] bg-[#1b333a] px-4 text-xs font-bold" @click=${interaction.closeTouchDetails}>CLOSE</button>
+					</header>
+					<div class="min-h-0 flex-1 overflow-y-auto overscroll-contain p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))]">
+						${touchDetailsContent}
+					</div>
 				</aside>
 			`;
 	};

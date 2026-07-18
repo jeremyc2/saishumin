@@ -19,6 +19,7 @@ import {
 	renderDepthForEntity,
 } from "../../presentation/geometry/depth";
 import {
+	canvasViewportForScreen,
 	points,
 	project,
 	projectedRectangle,
@@ -201,6 +202,21 @@ export const gameSceneTemplate = ({
 	readonly onRootPointerDown: (event: PointerEvent) => void;
 }): TemplateResult => {
 	const camera = world.editor.open ? world.editor.camera : world.gameCamera;
+	const canvasViewport = world.editor.open
+		? canvasViewportForScreen({
+				screen:
+					typeof window === "undefined"
+						? viewport
+						: { width: window.innerWidth, height: window.innerHeight },
+				zoom: interaction.zoom(),
+			})
+		: {
+				...viewport,
+				left: 0,
+				top: 0,
+				right: viewport.width,
+				bottom: viewport.height,
+			};
 	const invalidPreview =
 		EditSessionStatus.$is("InvalidPreview")(editSessionStatus) ||
 		EditSessionStatus.$is("InvalidReleased")(editSessionStatus);
@@ -218,10 +234,10 @@ export const gameSceneTemplate = ({
 		world.floorTiles,
 		project(world.floorTileOrigin),
 		{
-			left: -camera.x,
-			top: -camera.y,
-			width: viewport.width,
-			height: viewport.height,
+			left: canvasViewport.left - camera.x,
+			top: canvasViewport.top - camera.y,
+			width: canvasViewport.width,
+			height: canvasViewport.height,
 		},
 	);
 	const gridLines = interiorGridCoordinates(
@@ -245,10 +261,19 @@ export const gameSceneTemplate = ({
 		else if (event.button === 0)
 			dispatch(Action.EditorSelectionChanged({ selection: "floor" }));
 	};
+	const floorClick = (event: PointerEvent): void => {
+		if (!world.editor.open || !interaction.usesTouchControls()) return;
+		event.stopPropagation();
+		dispatch(Action.EditorSelectionChanged({ selection: "floor" }));
+	};
 	const canvasPointerDown = (event: PointerEvent): void => {
 		if (!world.editor.open) return;
 		if (interaction.isPanGesture(event)) interaction.startPan(event, world);
 		else if (event.button === 0)
+			dispatch(Action.EditorSelectionChanged({ selection: null }));
+	};
+	const canvasClick = (): void => {
+		if (world.editor.open && interaction.usesTouchControls())
 			dispatch(Action.EditorSelectionChanged({ selection: null }));
 	};
 	const palettePopover = interaction.palettePopover();
@@ -260,31 +285,38 @@ export const gameSceneTemplate = ({
 	const renderedObjects = sceneObjects(world).map(({ entity, template }) => {
 		if (entity === undefined) return template;
 		const entityClass = world.editor.open ? "cursor-move" : "";
-		return svg`<g class=${entityClass} @pointerdown=${(event: PointerEvent) => interaction.startEntityMove(event, world, entity, dispatch)}>${template}</g>`;
+		return svg`<g class=${entityClass} @pointerdown=${(event: PointerEvent) => interaction.startEntityMove(event, world, entity, dispatch)} @click=${(
+			event: PointerEvent,
+		) => {
+			event.stopPropagation();
+			interaction.selectTouchEntity(world, entity, dispatch);
+		}}>${template}</g>`;
 	});
 	return html`
 		<main class=${`relative h-dvh w-screen overflow-hidden bg-[#14212a] ${interaction.isGestureActive() ? "editor-active-gesture" : ""} ${invalidPreview ? "editor-invalid-preview-root" : ""}`} @pointerdown=${onRootPointerDown}>
-			<svg id="world-canvas" class=${`block h-full w-full ${canvasClass}`} viewBox=${`0 0 ${viewport.width} ${viewport.height}`} preserveAspectRatio=${world.editor.open ? "xMidYMid meet" : "xMidYMid slice"} role="img" aria-label=${world.editor.open ? "Infinite canvas design studio" : "Room exploration game"} @pointerdown=${canvasPointerDown}>
+			<svg id="world-canvas" class=${`block h-full w-full ${canvasClass}`} viewBox=${`${canvasViewport.left} ${canvasViewport.top} ${canvasViewport.width} ${canvasViewport.height}`} preserveAspectRatio=${world.editor.open ? "xMidYMid meet" : "xMidYMid slice"} role="img" aria-label=${world.editor.open ? "Objects editor canvas" : "Room exploration game"} @pointerdown=${canvasPointerDown} @click=${canvasClick} @dblclick=${interaction.zoomAt}>
 				<defs>
 					<pattern id="editor-dots" width="32" height="32" patternUnits="userSpaceOnUse" patternTransform=${`translate(${camera.x % 32} ${camera.y % 32})`}><circle cx="2" cy="2" r="1.6" fill="#3b5157" /></pattern>
 					<clipPath id="outdoor-floor-clip" clipPathUnits="userSpaceOnUse"><polygon points=${points(floor)} /></clipPath>
 				</defs>
 				${world.editor.open ? svg`<rect width="100%" height="100%" fill="url(#editor-dots)" opacity="0.68" />` : svg``}
 				<g transform=${`translate(${camera.x} ${camera.y})`}>
-					<polygon data-floor-base points=${points(floor)} fill="#c9b385" @pointerdown=${floorPointerDown} />
+					<polygon data-floor-base points=${points(floor)} fill="#c9b385" @pointerdown=${floorPointerDown} @click=${floorClick} />
 					<g pointer-events="none" stroke="#8f8065" stroke-width=${floorGridStrokeWidth} opacity=${floorGridOpacity}>${gridLines}${depthLines}</g>
 					<g data-outdoor-floor-tiles clip-path="url(#outdoor-floor-clip)" pointer-events="none">${terrainFloorTemplate(floorTiles)}</g>
 					${renderedObjects}
 					${world.editor.open ? designStudioView.selectionTemplate(world, invalidPreview, dispatch) : svg``}
 				</g>
 			</svg>
-			<h1 class="pointer-events-none absolute top-7 left-7 m-0 select-none text-[27px] font-heading font-bold tracking-[0.16em] text-[#fff1d6] max-md:top-[max(0.75rem,env(safe-area-inset-top))] max-md:left-[max(0.875rem,env(safe-area-inset-left))] max-md:text-base pointer-coarse:top-[max(0.75rem,env(safe-area-inset-top))] pointer-coarse:left-[max(0.875rem,env(safe-area-inset-left))] pointer-coarse:text-base">SAISHUMIN</h1>
-			<div class=${`absolute top-6 z-40 flex flex-col items-end gap-2 max-md:top-[max(0.625rem,env(safe-area-inset-top))] max-md:right-[max(0.75rem,env(safe-area-inset-right))] pointer-coarse:top-[max(0.625rem,env(safe-area-inset-top))] pointer-coarse:right-[max(0.75rem,env(safe-area-inset-right))] ${world.editor.open && !sessionActive ? "right-[360px]" : "right-6"}`}>
-				<button type="button" class="inline-flex items-center gap-2 rounded-xl border border-[#e8b875]/70 bg-[#0d181f]/92 px-4 py-3 text-[12px] font-bold tracking-[0.12em] text-[#fff1d6] shadow-lg transition-colors hover:bg-[#1b2d34] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#fff1d6] max-md:min-h-11 max-md:px-[0.8rem] max-md:py-[0.65rem] max-md:text-[0.625rem] pointer-coarse:min-h-11 pointer-coarse:px-[0.8rem] pointer-coarse:py-[0.65rem] pointer-coarse:text-[0.625rem]" @click=${() => dispatch(Action.EditorToggled())}>
-					${world.editor.open ? svg`<svg class="size-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 5a2 2 0 0 1 3.008-1.728l11.997 6.998a2 2 0 0 1 .003 3.458l-12 7A2 2 0 0 1 5 19z" /></svg>PLAY` : svg`<svg class="size-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 12-9.373 9.373a1 1 0 0 1-3.001-3L12 9" /><path d="m18 15 4-4" /><path d="m21.5 11.5-1.914-1.914A2 2 0 0 1 19 8.172v-.344a2 2 0 0 0-.586-1.414l-1.657-1.657A6 6 0 0 0 12.516 3H9l1.243 1.243A6 6 0 0 1 12 8.485V10l2 2h1.172a2 2 0 0 1 1.414.586L18.5 14.5" /></svg>DESIGN STUDIO`}
+			<h1 class="pointer-events-none absolute top-7 left-7 m-0 select-none text-[27px] font-heading font-bold tracking-[0.16em] text-[#fff1d6] any-pointer-coarse:top-[max(0.75rem,env(safe-area-inset-top))] any-pointer-coarse:left-[max(0.875rem,env(safe-area-inset-left))] any-pointer-coarse:text-base">SAISHUMIN</h1>
+			<div class=${`absolute top-6 z-40 flex flex-row items-center gap-2 any-pointer-coarse:top-[max(0.625rem,env(safe-area-inset-top))] any-pointer-coarse:right-[max(0.75rem,env(safe-area-inset-right))] ${world.editor.open && !sessionActive ? "right-[360px]" : "right-6"} ${world.editor.open && (interaction.isTouchPanelOpen() || interaction.isTouchDetailsOpen()) ? "any-pointer-coarse:hidden" : ""}`}>
+				<button type="button" class="inline-flex items-center gap-2 rounded-xl border border-[#e8b875]/70 bg-[#0d181f]/92 px-4 py-3 text-[12px] font-bold tracking-[0.12em] text-[#fff1d6] shadow-lg transition-colors hover:bg-[#1b2d34] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#fff1d6] any-pointer-coarse:min-h-11 any-pointer-coarse:px-[0.8rem] any-pointer-coarse:py-[0.65rem] any-pointer-coarse:text-[0.625rem]" @click=${() => dispatch(Action.EditorToggled())}>
+					${world.editor.open ? "PLAY" : "OBJECTS"}
 				</button>
+				${world.editor.open && !sessionActive && !interaction.isTouchPanelOpen() ? html`<button type="button" class="hidden min-h-11 items-center rounded-xl border border-[#46656b] bg-[#1b333a]/94 px-3 py-[0.65rem] text-[0.625rem] font-bold tracking-[0.1em] text-[#dcecea] shadow-lg any-pointer-coarse:inline-flex" @click=${interaction.toggleTouchPanel}>OBJECTS</button>` : html``}
 			</div>
-			${world.editor.open ? html`<div class="pointer-events-none absolute bottom-6 left-7 rounded-xl bg-[#0d181f]/88 px-4 py-2 text-[11px] font-bold tracking-[0.12em] text-[#e8b875] max-md:hidden pointer-coarse:hidden">CONTROLS PAUSED · INFINITE PAN · FIXED SCALE</div>${designStudioView.editorPanelTemplate(world, !sessionActive, dispatch)}` : html`<div class="pointer-events-none absolute bottom-7 left-7 flex max-w-[calc(100vw-3.5rem)] flex-wrap gap-x-12 gap-y-3 rounded-[18px] bg-[#0d181f]/90 px-6 py-4 select-none max-md:hidden [@media(max-width:900px)_and_(max-height:500px)]:hidden pointer-coarse:hidden"><div><div class="text-[15px] font-heading font-bold text-[#fff1d6]">ARROW KEYS</div><div class="mt-1 text-[13px] text-[#aebfba]">MOVE · PUSH CRATES</div></div><div><div class="text-[15px] font-heading font-bold text-[#fff1d6]">SPACE</div><div class="mt-1 text-[13px] text-[#aebfba]">JUMP · CLIMB · FALL</div></div><div><div class="text-[15px] font-heading font-bold text-[#fff1d6]">HOLD SHIFT</div><div class="mt-1 text-[13px] text-[#aebfba]">GRAB · DRAG OBJECTS</div></div><div><div class="text-[15px] font-heading font-bold text-[#fff1d6]">X</div><div class="mt-1 text-[13px] text-[#aebfba]">OPEN CHESTS · READ SIGNS</div></div></div>${mobileControlsTemplate(dispatch)}`}
+			${world.editor.open ? html`<div class="pointer-events-none absolute bottom-6 left-7 rounded-xl bg-[#0d181f]/88 px-4 py-2 text-[11px] font-bold tracking-[0.12em] text-[#e8b875] any-pointer-coarse:hidden">CONTROLS PAUSED · INFINITE PAN · FIXED SCALE</div>${designStudioView.editorPanelTemplate(world, !sessionActive, interaction.isTouchPanelOpen() && !sessionActive, dispatch)}` : html`<div class="pointer-events-none absolute bottom-7 left-7 flex max-w-[calc(100vw-3.5rem)] flex-wrap gap-x-12 gap-y-3 rounded-[18px] bg-[#0d181f]/90 px-6 py-4 select-none any-pointer-coarse:hidden"><div><div class="text-[15px] font-heading font-bold text-[#fff1d6]">ARROW KEYS</div><div class="mt-1 text-[13px] text-[#aebfba]">MOVE · PUSH CRATES</div></div><div><div class="text-[15px] font-heading font-bold text-[#fff1d6]">SPACE</div><div class="mt-1 text-[13px] text-[#aebfba]">JUMP · CLIMB · FALL</div></div><div><div class="text-[15px] font-heading font-bold text-[#fff1d6]">HOLD SHIFT</div><div class="mt-1 text-[13px] text-[#aebfba]">GRAB · DRAG OBJECTS</div></div><div><div class="text-[15px] font-heading font-bold text-[#fff1d6]">X</div><div class="mt-1 text-[13px] text-[#aebfba]">OPEN CHESTS · READ SIGNS</div></div></div>${mobileControlsTemplate({ world, interaction, dispatch })}`}
+			${world.editor.open ? mobileControlsTemplate({ world, interaction, dispatch }) : html``}
 			<div id="editor-create-preview-host" class="contents"></div>
 			${designStudioView.paletteGuidanceTemplate(palettePopover)}
 			${world.editor.invalidPlacement === null && !invalidReleased ? html`` : designStudioView.invalidPlacementTemplate(world, editSessionStatus, dispatch)}

@@ -281,6 +281,14 @@ describe("UpdateSystemService", () => {
 			action: Action.KeyChanged({ key: Controls.Interact, pressed: true }),
 		});
 		expect(opened.openedChests.has(chest)).toBe(true);
+		const openedWithContextAction = updateSystem.update({
+			world,
+			action: Action.KeyChanged({
+				key: Controls.ContextAction,
+				pressed: false,
+			}),
+		});
+		expect(openedWithContextAction.openedChests.has(chest)).toBe(true);
 
 		const closed = updateSystem.update({
 			world: opened,
@@ -373,6 +381,79 @@ describe("UpdateSystemService", () => {
 		expect(wrongFacing.readingSign).toBeNull();
 	});
 
+	test("waits for contextual B release before opening or dismissing a sign", () => {
+		const sign = EntityId(699);
+		const signPosition = Position.make({ x: 500, y: 400 });
+		const signBody = defaultEditorItemBody(EditorItemKinds.Sign);
+		const world: World = {
+			...initialWorld,
+			positions: new Map([
+				[
+					playerEntity,
+					Position.make({
+						x: signPosition.x,
+						y: signPosition.y + (signBody.depth + playerBody.depth) / 2,
+					}),
+				],
+				[sign, signPosition],
+			]),
+			bodies: new Map([
+				[playerEntity, playerBody],
+				[sign, signBody],
+			]),
+			obstacles: new Map(),
+			decorations: new Map([
+				[sign, Decoration.make({ height: 104, kind: DecorationKinds.Sign })],
+			]),
+			elevations: new Map([
+				[
+					playerEntity,
+					Elevation.make({
+						z: groundElevation,
+						velocity: stationaryVelocity,
+					}),
+				],
+			]),
+			characters: withPlayerFacing(initialWorld, PlayerFacings.Up).characters,
+		};
+
+		const pressed = updateSystem.update({
+			world,
+			action: Action.KeyChanged({
+				key: Controls.ContextAction,
+				pressed: true,
+			}),
+		});
+		expect(pressed.readingSign).toBeNull();
+
+		const released = updateSystem.update({
+			world: pressed,
+			action: Action.KeyChanged({
+				key: Controls.ContextAction,
+				pressed: false,
+			}),
+		});
+		expect(released.readingSign).toBe(sign);
+
+		const dismissPressed = updateSystem.update({
+			world: released,
+			action: Action.KeyChanged({
+				key: Controls.ContextAction,
+				pressed: true,
+			}),
+		});
+		expect(dismissPressed.readingSign).toBe(sign);
+		expect(
+			updateSystem.update({
+				world: dismissPressed,
+				action: Action.KeyChanged({
+					key: Controls.ContextAction,
+					pressed: false,
+				}),
+			}).readingSign,
+		).toBeNull();
+	});
+
 	test("grabs nearby plants and lamps on the player's surface", () => {
 		for (const [kind, height] of [
 			[DecorationKinds.Plant, 84],
@@ -408,6 +489,14 @@ describe("UpdateSystemService", () => {
 			});
 
 			expect(grabbed.grabbed).toBe(entity);
+			const grabbedWithContextAction = updateSystem.update({
+				world,
+				action: Action.KeyChanged({
+					key: Controls.ContextAction,
+					pressed: true,
+				}),
+			});
+			expect(grabbedWithContextAction.grabbed).toBe(entity);
 		}
 	});
 

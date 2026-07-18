@@ -1,6 +1,8 @@
 import { dual } from "effect/Function";
 import { projectedRectangle } from "../../presentation/geometry/projection";
 import type { Position } from "../../world/components";
+import type { EditorSelection } from "../../world/editor-state";
+import type { EntityId } from "../../world/entity-id";
 import {
 	entityBaseElevation,
 	entityHeight,
@@ -37,6 +39,33 @@ export const initialDesignStudioInteraction: DesignStudioInteraction = {
 	palettePress: null,
 	popover: null,
 };
+
+const touchPanGraceMilliseconds = 110;
+const touchPanThresholdPixels = 8;
+
+export const shouldPanTouchGesture = ({
+	elapsedMilliseconds,
+	distance,
+}: {
+	readonly elapsedMilliseconds: number;
+	readonly distance: number;
+}): boolean =>
+	elapsedMilliseconds >= touchPanGraceMilliseconds &&
+	distance >= touchPanThresholdPixels;
+
+export const shouldStartPinchGesture = ({
+	touchCount,
+}: {
+	readonly touchCount: number;
+}): boolean => touchCount >= 2;
+
+export const shouldMoveSelectedTouchEntity = ({
+	selection,
+	entity,
+}: {
+	readonly selection: EditorSelection;
+	readonly entity: EntityId;
+}): boolean => selection === entity;
 
 export const isDesignStudioPanelVisible = (world: World): boolean =>
 	world.editor.editSession === null;
@@ -171,6 +200,35 @@ const axisAutoPanSpeed = (pointer: number, extent: number): number => {
 
 const clamp = (value: number, minimum: number, maximum: number): number =>
 	Math.min(Math.max(value, minimum), maximum);
+
+export const clampCameraToEnvelope = ({
+	camera,
+	viewport,
+	envelope,
+	padding = autoPanEnvelopePadding,
+}: {
+	readonly camera: Position;
+	readonly viewport: ScreenBounds;
+	readonly envelope: ScreenBounds;
+	readonly padding?: number;
+}): Position => {
+	const minimumX = viewport.left + padding - envelope.right;
+	const maximumX = viewport.right - padding - envelope.left;
+	const minimumY = viewport.top + padding - envelope.bottom;
+	const maximumY = viewport.bottom - padding - envelope.top;
+	return {
+		x: clamp(
+			camera.x,
+			Math.min(minimumX, maximumX),
+			Math.max(minimumX, maximumX),
+		),
+		y: clamp(
+			camera.y,
+			Math.min(minimumY, maximumY),
+			Math.max(minimumY, maximumY),
+		),
+	};
+};
 
 const clampedAutoPanAxis = (
 	current: number,

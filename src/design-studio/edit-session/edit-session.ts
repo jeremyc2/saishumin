@@ -398,6 +398,8 @@ export const commitEditSession = (world: World): World => {
 		editor: {
 			...committed.editor,
 			editSession: null,
+			selected:
+				session.operation.kind === "create" ? null : committed.editor.selected,
 			changedCharacterSpawns,
 		},
 	};

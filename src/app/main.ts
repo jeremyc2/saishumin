@@ -76,6 +76,7 @@ const program = Effect.gen(function* () {
 			Controls.Left,
 			Controls.Right,
 			Controls.Grab,
+			Controls.ContextAction,
 		] as const) {
 			dispatch(Action.KeyChanged({ key, pressed: false }));
 		}

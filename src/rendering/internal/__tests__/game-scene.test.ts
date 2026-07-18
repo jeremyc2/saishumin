@@ -1,10 +1,15 @@
 import { describe, expect, test } from "bun:test";
 import { editSessionStatus } from "../../../design-studio/edit-session/edit-session";
-import { makeDesignStudioView } from "../../../design-studio/view/view";
+import {
+	editorEntitySelectionBody,
+	makeDesignStudioView,
+} from "../../../design-studio/view/view";
 import {
 	Body,
 	Character,
 	CharacterKinds,
+	Decoration,
+	DecorationKinds,
 	Obstacle,
 	ObstacleKinds,
 	PlayerFacings,
@@ -22,6 +27,21 @@ const interaction = {
 	startEntityResize: () => {},
 	startFloorResize: () => {},
 	startPaletteDrag: () => {},
+	startTouchPalettePlacement: () => {},
+	startTouchEntityMove: () => {},
+	selectTouchEntity: () => {},
+	setTouchJoystick: () => {},
+	commitTouchEdit: () => {},
+	cancelTouchEdit: () => {},
+	toggleTouchPanel: () => {},
+	isTouchPanelOpen: () => true,
+	isTouchEditActive: () => false,
+	openTouchDetails: () => {},
+	closeTouchDetails: () => {},
+	isTouchDetailsOpen: () => false,
+	usesTouchControls: () => false,
+	zoom: () => 1,
+	zoomAt: () => {},
 	update: () => {},
 	dismissPalettePopover: () => {},
 	isPanGesture: () => false,
@@ -51,6 +71,30 @@ const flattenedTemplate = (value: unknown): string => {
 };
 
 describe("game scene", () => {
+	test("keeps a plant selection outline around its visual ground footprint", () => {
+		const plant = EntityId(50);
+		const position = Position.make({ x: 500, y: 300 });
+		const body = Body.make({ width: 72, depth: 72 });
+		const artworkScale = (body.width + body.depth) / 140;
+		const visualFootprint = Body.make({
+			width: 52 * artworkScale,
+			depth: (18 * artworkScale) / Math.SQRT1_2,
+		});
+		const world = {
+			...initialWorld,
+			positions: new Map([[plant, position]]),
+			bodies: new Map([[plant, body]]),
+			decorations: new Map([
+				[plant, Decoration.make({ kind: DecorationKinds.Plant, height: 84 })],
+			]),
+			characters: new Map(),
+			editor: { ...initialWorld.editor, open: true, selected: plant },
+		};
+		expect(editorEntitySelectionBody({ world, entity: plant })).toEqual(
+			visualFootprint,
+		);
+	});
+
 	test("paints an elevated Character Spawn after its supporting platform", () => {
 		const player = EntityId(1);
 		const platform = EntityId(2);
@@ -128,13 +172,26 @@ describe("game scene", () => {
 			}),
 		);
 
-		const controls = mobileControlsTemplate(() => {}).strings.join("");
+		const controls = flattenedTemplate(
+			mobileControlsTemplate({
+				world: initialWorld,
+				interaction,
+				dispatch: () => {},
+			}),
+		);
 		expect(scene).toContain("preserveAspectRatio=xMidYMid slice");
-		expect(scene).toContain("▲");
-		expect(scene).toContain("JUMP");
-		expect(controls).toContain('aria-label="Touch controls"');
-		expect(controls).toContain('aria-label="Movement controls"');
-		expect(controls).toContain('aria-label="Action controls"');
+		expect(scene).toContain("Movement joystick");
+		expect(scene).toContain("Grab or interact");
+		expect(scene).toContain("Jump");
+		expect(controls).toContain("Touch controls");
+		expect(controls).toContain("Movement joystick");
+		expect(controls).toContain("Action controls");
+		expect(controls).toContain("bottom-0 left-0");
+		expect(controls).toContain("top-0 right-0");
+		expect(controls).toContain("size-16");
+		expect(controls).toContain("text-2xl");
+		expect(controls).not.toContain("max-[380px]:rounded-[0.85rem]");
+		expect(controls).not.toContain("activePointer === event.pointerId");
 	});
 
 	test("keeps the full canvas visible while editing", () => {
@@ -154,8 +211,77 @@ describe("game scene", () => {
 		);
 
 		expect(scene).toContain("preserveAspectRatio=xMidYMid meet");
-		expect(scene).toContain("max-md:translate-y-0");
+		expect(scene).toContain("any-pointer-coarse:translate-y-0");
+		expect(scene).toContain("TAP TO PLACE");
+		expect(scene).toContain("Objects");
+		expect(scene).toContain("any-pointer-coarse:landscape:grid-cols-4");
+		expect(scene).not.toContain(" gap-2 landscape:grid-cols-4");
 		expect(scene).not.toContain("data-panel-visible");
-		expect(scene).not.toContain("JUMP");
+		expect(scene).not.toContain("Grab or interact");
+	});
+
+	test("shows Place and Cancel while a touch edit is active", () => {
+		const world = {
+			...initialWorld,
+			editor: {
+				...initialWorld.editor,
+				open: true,
+				editSession: {
+					operation: {
+						kind: "create" as const,
+						itemKind: "crate" as const,
+						position: { x: 500, y: 300 },
+					},
+					validity: { kind: "valid" as const },
+					phase: "active" as const,
+				},
+			},
+		};
+		const touchInteraction = {
+			...interaction,
+			isTouchPanelOpen: () => false,
+			isTouchEditActive: () => true,
+		};
+		const scene = flattenedTemplate(
+			gameSceneTemplate({
+				world,
+				editSessionStatus: editSessionStatus(world),
+				dispatch: () => {},
+				interaction: touchInteraction,
+				designStudioView: makeDesignStudioView(touchInteraction),
+				onRootPointerDown: () => {},
+			}),
+		);
+
+		expect(scene).toContain("Movement joystick");
+		expect(scene).toContain("PLACE");
+		expect(scene).toContain("CANCEL");
+		expect(scene).not.toContain("Grab or interact");
+	});
+
+	test("offers Cancel and Details for a touch selection", () => {
+		const selected = EntityId(2);
+		const world = {
+			...initialWorld,
+			editor: { ...initialWorld.editor, open: true, selected },
+		};
+		const touchInteraction = {
+			...interaction,
+			isTouchPanelOpen: () => false,
+		};
+		const scene = flattenedTemplate(
+			gameSceneTemplate({
+				world,
+				editSessionStatus: editSessionStatus(world),
+				dispatch: () => {},
+				interaction: touchInteraction,
+				designStudioView: makeDesignStudioView(touchInteraction),
+				onRootPointerDown: () => {},
+			}),
+		);
+
+		expect(scene).toContain("CANCEL");
+		expect(scene).toContain("DETAILS");
+		expect(scene).toContain("data-touch-details");
 	});
 });

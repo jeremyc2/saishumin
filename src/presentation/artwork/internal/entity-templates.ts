@@ -14,6 +14,7 @@ import {
 	project,
 	projectedRectangle,
 } from "../../geometry/projection";
+import { decorationArtworkScale } from "../visual-footprint";
 
 const boxOutlineWidth = 3;
 
@@ -577,7 +578,7 @@ export const decorationTemplate = ({
 	}
 
 	const base = project(position, baseElevation);
-	const scale = Math.max(0.55, Math.min(2.6, (body.width + body.depth) / 140));
+	const scale = decorationArtworkScale(body);
 	if (decoration.kind === DecorationKinds.Sign)
 		return signpostTemplate({
 			position,
@@ -595,13 +596,15 @@ export const decorationTemplate = ({
 		const leafEdge = grabbed ? grabbedEdge : "#294c3c";
 		const potEdge = grabbed ? grabbedEdge : "#563f38";
 		return svg`
-			<g transform=${`translate(${base.x} ${base.y}) scale(${scale} ${heightScale})`}>
-				<ellipse cx="0" cy="3" rx="26" ry="9" fill="#14212a" opacity="0.2" />
+			<g transform=${`translate(${base.x} ${base.y})`}>
+				<ellipse transform=${`scale(${scale})`} cx="0" cy="3" rx="26" ry="9" fill="#14212a" opacity="0.2" />
+				<g transform=${`scale(${scale} ${heightScale})`}>
 				<path d="M -18 -29 Q -26 -58 -8 -66 Q -2 -44 0 -24" fill="#52785d" stroke=${leafEdge} stroke-width="3" />
 				<path d="M 4 -25 Q 7 -64 27 -59 Q 25 -37 10 -20" fill="#6d9568" stroke=${leafEdge} stroke-width="3" />
 				<path d="M -3 -23 Q -5 -74 12 -78 Q 20 -50 7 -19" fill="#88aa73" stroke=${leafEdge} stroke-width="3" />
 				<path d="M -20 -27 L 20 -27 L 15 1 Q 0 10 -15 1 Z" fill="#bb7148" stroke=${potEdge} stroke-width="4" />
 				<path d="M -23 -30 L 23 -30 L 20 -20 L -20 -20 Z" fill="#d58a55" stroke=${potEdge} stroke-width="4" />
+				</g>
 			</g>
 		`;
 	}

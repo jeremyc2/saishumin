@@ -42,6 +42,7 @@ describe("Edit Session", () => {
 
 		const committed = commitEditSession(preview);
 		expect(committed.editor.editSession).toBeNull();
+		expect(committed.editor.selected).toBeNull();
 		expect(committed.positions.size).toBe(editingWorld.positions.size + 1);
 	});
 

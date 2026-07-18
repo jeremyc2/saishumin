@@ -1,6 +1,9 @@
 import { Effect, type Scope } from "effect";
 import { Action, type Action as AppAction } from "../../../app/action";
-import { unproject } from "../../../presentation/geometry/projection";
+import {
+	canvasViewportForScreen,
+	unproject,
+} from "../../../presentation/geometry/projection";
 import {
 	type ResizeDirection,
 	resizeFromHandle,
@@ -25,6 +28,7 @@ import { type DesignStudioItemKind, defaultEditorItemBody } from "../../model";
 import { editorPlacementPositionAtPointer } from "../placement";
 import {
 	autoPanCamera,
+	clampCameraToEnvelope,
 	contentEnvelope,
 	contentEnvelopeIncludingPreview,
 	dismissPalettePopover,
@@ -33,6 +37,9 @@ import {
 	movePalettePress,
 	pressPaletteItem,
 	releasePalettePress,
+	shouldMoveSelectedTouchEntity,
+	shouldPanTouchGesture,
+	shouldStartPinchGesture,
 	visiblePalettePopover,
 } from "../pointer";
 
@@ -43,6 +50,8 @@ type ActiveInteraction =
 			readonly kind: "pan";
 			readonly pointer: Position;
 			readonly camera: Position;
+			readonly touchClientPointer?: Position;
+			readonly touchStartedAt?: number;
 	  }
 	| {
 			readonly kind: "move";
@@ -50,6 +59,7 @@ type ActiveInteraction =
 			readonly grabOffset: Position;
 			readonly position: Position;
 			readonly body: Body;
+			readonly touchControlled?: boolean;
 	  }
 	| {
 			readonly kind: "resize";
@@ -66,6 +76,7 @@ type ActiveInteraction =
 			readonly pointer: Position;
 			readonly position: Position;
 			readonly canDrop: boolean;
+			readonly touchControlled?: boolean;
 	  }
 	| {
 			readonly kind: "resize-floor";
@@ -89,6 +100,13 @@ const maximumFloorBody = {
 	depth: Number.POSITIVE_INFINITY,
 } as const;
 const wheelLinePixels = 16;
+const touchItemSpeed = 180;
+const touchCameraSpeed = 480;
+const maximumTouchFrameElapsedSeconds = 0.05;
+const minimumEditorZoom = 0.65;
+const maximumEditorZoom = 4;
+const usesTouchControls = (): boolean =>
+	window.matchMedia("(any-pointer: coarse)").matches;
 
 export type DesignStudioInteraction = {
 	readonly startPan: (event: PointerEvent, world: World) => void;
@@ -118,6 +136,33 @@ export type DesignStudioInteraction = {
 		itemKind: DesignStudioItemKind,
 		world: World,
 	) => void;
+	readonly startTouchPalettePlacement: (
+		itemKind: DesignStudioItemKind,
+		world: World,
+		dispatch: Dispatch,
+	) => void;
+	readonly startTouchEntityMove: (
+		world: World,
+		entity: EntityId,
+		dispatch: Dispatch,
+	) => void;
+	readonly selectTouchEntity: (
+		world: World,
+		entity: EntityId,
+		dispatch: Dispatch,
+	) => void;
+	readonly setTouchJoystick: (vector: Position) => void;
+	readonly commitTouchEdit: () => void;
+	readonly cancelTouchEdit: () => void;
+	readonly toggleTouchPanel: () => void;
+	readonly isTouchPanelOpen: () => boolean;
+	readonly isTouchEditActive: () => boolean;
+	readonly openTouchDetails: () => void;
+	readonly closeTouchDetails: () => void;
+	readonly isTouchDetailsOpen: () => boolean;
+	readonly usesTouchControls: () => boolean;
+	readonly zoom: () => number;
+	readonly zoomAt: (event: MouseEvent) => void;
 	readonly update: (world: World, dispatch: Dispatch) => void;
 	readonly dismissPalettePopover: () => void;
 	readonly isPanGesture: (event: PointerEvent) => boolean;
@@ -148,6 +193,72 @@ export const makeDesignStudioInteraction = (input: {
 		let latestPointer: Position | undefined;
 		let autoPanAnimationFrame: number | undefined;
 		let previousAutoPanTime: number | undefined;
+		let touchPanelOpen = true;
+		let touchDetailsOpen = false;
+		let touchJoystick: Position = { x: 0, y: 0 };
+		let previousTouchJoystickTime: number | undefined;
+		let editorZoom = 1;
+		const touchPointers = new Map<number, Position>();
+		let pinchGesture:
+			| {
+					readonly distance: number;
+					readonly zoom: number;
+					readonly midpoint: Position;
+					readonly camera: Position;
+			  }
+			| undefined;
+		const firstTwoTouchPointers = ():
+			| readonly [Position, Position]
+			| undefined => {
+			const pointers = touchPointers.values();
+			const first = pointers.next();
+			const second = pointers.next();
+			return first.done === true || second.done === true
+				? undefined
+				: [first.value, second.value];
+		};
+		const trackTouchPointerDown = (
+			event: PointerEvent,
+			world: World,
+			dispatch: Dispatch,
+		): boolean => {
+			if (event.pointerType !== "touch" || !world.editor.open) return false;
+			touchPointers.set(event.pointerId, {
+				x: event.clientX,
+				y: event.clientY,
+			});
+			if (!shouldStartPinchGesture({ touchCount: touchPointers.size }))
+				return false;
+			const pinchPointers = firstTwoTouchPointers();
+			if (pinchPointers === undefined) return false;
+			const [first, second] = pinchPointers;
+			const interaction = activeInteraction;
+			pinchGesture = {
+				distance: Math.max(
+					1,
+					Math.hypot(second.x - first.x, second.y - first.y),
+				),
+				zoom: editorZoom,
+				midpoint: {
+					x: (first.x + second.x) / 2,
+					y: (first.y + second.y) / 2,
+				},
+				camera:
+					interaction?.kind === "pan"
+						? interaction.camera
+						: world.editor.camera,
+			};
+			activeInteraction = undefined;
+			latestPointer = undefined;
+			previousAutoPanTime = undefined;
+			if (
+				world.editor.editSession !== null ||
+				(interaction !== undefined && interaction.kind !== "pan")
+			)
+				dispatch(Action.EditorEditSessionCancelled());
+			event.preventDefault();
+			return true;
+		};
 
 		const svgPosition = (
 			clientX: number,
@@ -162,6 +273,77 @@ export const makeDesignStudioInteraction = (input: {
 			point.y = clientY;
 			const transformed = point.matrixTransform(matrix.inverse());
 			return { x: transformed.x, y: transformed.y };
+		};
+
+		const canvasViewport = (zoom = editorZoom) => {
+			const canvas = document.querySelector("#world-canvas");
+			if (!(canvas instanceof SVGSVGElement)) return undefined;
+			const bounds = canvas.getBoundingClientRect();
+			return canvasViewportForScreen({
+				screen: { width: bounds.width, height: bounds.height },
+				zoom,
+			});
+		};
+
+		const clampedCamera = (world: World, camera: Position): Position => {
+			const visible = canvasViewport();
+			return visible === undefined
+				? camera
+				: clampCameraToEnvelope({
+						camera,
+						viewport: visible,
+						envelope: contentEnvelope(world),
+					});
+		};
+
+		const cameraForZoomAt = ({
+			world,
+			initialClient,
+			nextClient,
+			initialCamera,
+			initialZoom,
+			nextZoom,
+		}: {
+			readonly world: World;
+			readonly initialClient: Position;
+			readonly nextClient: Position;
+			readonly initialCamera: Position;
+			readonly initialZoom: number;
+			readonly nextZoom: number;
+		}): Position => {
+			const canvas = document.querySelector("#world-canvas");
+			if (!(canvas instanceof SVGSVGElement)) return initialCamera;
+			const bounds = canvas.getBoundingClientRect();
+			const screen = { width: bounds.width, height: bounds.height };
+			const initialViewport = canvasViewportForScreen({
+				screen,
+				zoom: initialZoom,
+			});
+			const nextViewport = canvasViewportForScreen({ screen, zoom: nextZoom });
+			const initialHorizontal =
+				(initialClient.x - bounds.left) / Math.max(1, bounds.width);
+			const initialVertical =
+				(initialClient.y - bounds.top) / Math.max(1, bounds.height);
+			const nextHorizontal =
+				(nextClient.x - bounds.left) / Math.max(1, bounds.width);
+			const nextVertical =
+				(nextClient.y - bounds.top) / Math.max(1, bounds.height);
+			const initialPoint = {
+				x: initialViewport.left + initialViewport.width * initialHorizontal,
+				y: initialViewport.top + initialViewport.height * initialVertical,
+			};
+			const nextPoint = {
+				x: nextViewport.left + nextViewport.width * nextHorizontal,
+				y: nextViewport.top + nextViewport.height * nextVertical,
+			};
+			return clampCameraToEnvelope({
+				camera: {
+					x: initialCamera.x + nextPoint.x - initialPoint.x,
+					y: initialCamera.y + nextPoint.y - initialPoint.y,
+				},
+				viewport: nextViewport,
+				envelope: contentEnvelope(world),
+			});
 		};
 
 		const projectedPointerPosition = (
@@ -184,6 +366,12 @@ export const makeDesignStudioInteraction = (input: {
 
 		const startPan = (event: PointerEvent, world: World): void => {
 			if (event.button !== 0 && event.button !== 1) return;
+			const dispatch = currentDispatch;
+			if (
+				dispatch !== undefined &&
+				trackTouchPointerDown(event, world, dispatch)
+			)
+				return;
 			const pointer = svgPosition(event.clientX, event.clientY);
 			if (pointer === undefined) return;
 			event.preventDefault();
@@ -191,6 +379,12 @@ export const makeDesignStudioInteraction = (input: {
 				kind: "pan",
 				pointer,
 				camera: world.editor.camera,
+				touchClientPointer:
+					event.pointerType === "touch"
+						? { x: event.clientX, y: event.clientY }
+						: undefined,
+				touchStartedAt:
+					event.pointerType === "touch" ? event.timeStamp : undefined,
 			};
 		};
 
@@ -204,10 +398,24 @@ export const makeDesignStudioInteraction = (input: {
 			dispatch: Dispatch,
 		): void => {
 			if (!world.editor.open) return;
+			if (trackTouchPointerDown(event, world, dispatch)) {
+				event.stopPropagation();
+				return;
+			}
+			if (
+				usesTouchControls() &&
+				!shouldMoveSelectedTouchEntity({
+					selection: world.editor.selected,
+					entity,
+				})
+			) {
+				event.stopPropagation();
+				return;
+			}
 			if (world.editor.editSession !== null || activeInteraction !== undefined)
 				return;
 			event.stopPropagation();
-			if (isPanGesture(event)) {
+			if (event.pointerType !== "touch" && isPanGesture(event)) {
 				startPan(event, world);
 				return;
 			}
@@ -266,10 +474,14 @@ export const makeDesignStudioInteraction = (input: {
 			depthDirection: ResizeDirection,
 			dispatch: Dispatch,
 		): void => {
+			if (trackTouchPointerDown(event, world, dispatch)) {
+				event.stopPropagation();
+				return;
+			}
 			if (world.editor.editSession !== null || activeInteraction !== undefined)
 				return;
 			event.stopPropagation();
-			if (isPanGesture(event)) {
+			if (event.pointerType !== "touch" && isPanGesture(event)) {
 				startPan(event, world);
 				return;
 			}
@@ -311,10 +523,14 @@ export const makeDesignStudioInteraction = (input: {
 			depthDirection: ResizeDirection,
 			dispatch: Dispatch,
 		): void => {
+			if (trackTouchPointerDown(event, world, dispatch)) {
+				event.stopPropagation();
+				return;
+			}
 			if (world.editor.editSession !== null || activeInteraction !== undefined)
 				return;
 			event.stopPropagation();
-			if (isPanGesture(event)) {
+			if (event.pointerType !== "touch" && isPanGesture(event)) {
 				startPan(event, world);
 				return;
 			}
@@ -347,6 +563,7 @@ export const makeDesignStudioInteraction = (input: {
 			itemKind: DesignStudioItemKind,
 			world: World,
 		): void => {
+			if (usesTouchControls()) return;
 			if (event.button !== 0) return;
 			if (world.editor.editSession !== null || activeInteraction !== undefined)
 				return;
@@ -368,7 +585,151 @@ export const makeDesignStudioInteraction = (input: {
 			input.refresh();
 		};
 
+		const startTouchPalettePlacement = (
+			itemKind: DesignStudioItemKind,
+			world: World,
+			dispatch: Dispatch,
+		): void => {
+			if (
+				!usesTouchControls() ||
+				!world.editor.open ||
+				world.editor.editSession !== null ||
+				activeInteraction !== undefined
+			)
+				return;
+			const canvas = document.querySelector("#world-canvas");
+			if (!(canvas instanceof SVGSVGElement)) return;
+			const bounds = canvas.getBoundingClientRect();
+			const pointer = svgPosition(
+				bounds.left + bounds.width / 2,
+				bounds.top + bounds.height / 2,
+			);
+			if (pointer === undefined) return;
+			const projectedPointer = {
+				x: pointer.x - world.editor.camera.x,
+				y: pointer.y - world.editor.camera.y,
+			};
+			const body = defaultEditorItemBody(itemKind);
+			const position = editorPlacementPositionAtPointer({
+				world,
+				kind: itemKind,
+				body,
+				projectedPointer,
+			});
+			activeInteraction = {
+				kind: "create",
+				itemKind,
+				pointer: position,
+				position,
+				canDrop: true,
+				touchControlled: true,
+			};
+			touchPanelOpen = false;
+			dispatch(
+				Action.EditorEditSessionBegan({
+					operation: { kind: "create", itemKind, position },
+				}),
+			);
+			input.refresh();
+		};
+
+		const startTouchEntityMove = (
+			world: World,
+			entity: EntityId,
+			dispatch: Dispatch,
+		): void => {
+			if (
+				!usesTouchControls() ||
+				!world.editor.open ||
+				world.editor.editSession !== null ||
+				activeInteraction !== undefined
+			)
+				return;
+			const position = world.characters.has(entity)
+				? characterSpawnPosition({ world, entity })
+				: world.positions.get(entity);
+			const body = world.bodies.get(entity);
+			if (position === undefined || body === undefined) return;
+			activeInteraction = {
+				kind: "move",
+				entity,
+				grabOffset: { x: 0, y: 0 },
+				position,
+				body,
+				touchControlled: true,
+			};
+			touchPanelOpen = false;
+			touchDetailsOpen = false;
+			dispatch(Action.EditorSelectionChanged({ selection: entity }));
+			dispatch(
+				Action.EditorEditSessionBegan({
+					operation: {
+						kind: "move",
+						entity,
+						originalPosition: position,
+						originalBody: body,
+						position,
+					},
+				}),
+			);
+			input.refresh();
+		};
+
+		const selectTouchEntity = (
+			world: World,
+			entity: EntityId,
+			dispatch: Dispatch,
+		): void => {
+			if (!usesTouchControls() || !world.editor.open) return;
+			touchPanelOpen = false;
+			touchDetailsOpen = false;
+			dispatch(Action.EditorSelectionChanged({ selection: entity }));
+			input.refresh();
+		};
+
 		const onPointerMove = (event: PointerEvent): void => {
+			if (touchPointers.has(event.pointerId))
+				touchPointers.set(event.pointerId, {
+					x: event.clientX,
+					y: event.clientY,
+				});
+			if (
+				pinchGesture !== undefined &&
+				touchPointers.size >= 2 &&
+				currentWorld?.editor.open === true &&
+				currentDispatch !== undefined
+			) {
+				const pinchPointers = firstTwoTouchPointers();
+				if (pinchPointers === undefined) return;
+				const [first, second] = pinchPointers;
+				const distance = Math.max(
+					1,
+					Math.hypot(second.x - first.x, second.y - first.y),
+				);
+				const nextZoom = Math.min(
+					maximumEditorZoom,
+					Math.max(
+						minimumEditorZoom,
+						pinchGesture.zoom * (distance / pinchGesture.distance),
+					),
+				);
+				const midpoint = {
+					x: (first.x + second.x) / 2,
+					y: (first.y + second.y) / 2,
+				};
+				const camera = cameraForZoomAt({
+					world: currentWorld,
+					initialClient: pinchGesture.midpoint,
+					nextClient: midpoint,
+					initialCamera: pinchGesture.camera,
+					initialZoom: pinchGesture.zoom,
+					nextZoom,
+				});
+				editorZoom = nextZoom;
+				currentDispatch(Action.EditorCameraChanged({ camera }));
+				input.refresh();
+				return;
+			}
 			latestPointer = { x: event.clientX, y: event.clientY };
 			const world = currentWorld;
 			const dispatch = currentDispatch;
@@ -425,16 +786,34 @@ export const makeDesignStudioInteraction = (input: {
 				dispatch === undefined
 			)
 				return;
+			if (
+				(interaction.kind === "create" || interaction.kind === "move") &&
+				interaction.touchControlled === true
+			)
+				return;
 
 			if (interaction.kind === "pan") {
+				if (
+					event.pointerType === "touch" &&
+					interaction.touchClientPointer !== undefined &&
+					interaction.touchStartedAt !== undefined &&
+					!shouldPanTouchGesture({
+						elapsedMilliseconds: event.timeStamp - interaction.touchStartedAt,
+						distance: Math.hypot(
+							event.clientX - interaction.touchClientPointer.x,
+							event.clientY - interaction.touchClientPointer.y,
+						),
+					})
+				)
+					return;
 				const pointer = svgPosition(event.clientX, event.clientY);
 				if (pointer === undefined) return;
 				dispatch(
 					Action.EditorCameraChanged({
-						camera: {
+						camera: clampedCamera(world, {
 							x: interaction.camera.x + pointer.x - interaction.pointer.x,
 							y: interaction.camera.y + pointer.y - interaction.pointer.y,
-						},
+						}),
 					}),
 				);
 				return;
@@ -557,8 +936,20 @@ export const makeDesignStudioInteraction = (input: {
 			}
 		};
 
-		const onPointerUp = (_event: PointerEvent): void => {
+		const onPointerUp = (event: PointerEvent): void => {
+			touchPointers.delete(event.pointerId);
+			if (pinchGesture !== undefined) {
+				if (touchPointers.size < 2) pinchGesture = undefined;
+				activeInteraction = undefined;
+				latestPointer = undefined;
+				return;
+			}
 			const interaction = activeInteraction;
+			if (
+				(interaction?.kind === "create" || interaction?.kind === "move") &&
+				interaction.touchControlled === true
+			)
+				return;
 			const world = currentWorld;
 			const dispatch = currentDispatch;
 			activeInteraction = undefined;
@@ -619,7 +1010,9 @@ export const makeDesignStudioInteraction = (input: {
 				dispatch(Action.EditorEditSessionCommitted());
 			}
 		};
-		const onPointerCancel = (): void => {
+		const onPointerCancel = (event: PointerEvent): void => {
+			touchPointers.delete(event.pointerId);
+			pinchGesture = undefined;
 			const interaction = activeInteraction;
 			const dispatch = currentDispatch;
 			activeInteraction = undefined;
@@ -651,12 +1044,23 @@ export const makeDesignStudioInteraction = (input: {
 			const scaleY = Math.max(Number.EPSILON, Math.abs(matrix.d));
 			dispatch(
 				Action.EditorCameraChanged({
-					camera: {
+					camera: clampedCamera(world, {
 						x: world.editor.camera.x - (event.deltaX * deltaFactor) / scaleX,
 						y: world.editor.camera.y - (event.deltaY * deltaFactor) / scaleY,
-					},
+					}),
 				}),
 			);
+		};
+		const onResize = (): void => {
+			const world = currentWorld;
+			const dispatch = currentDispatch;
+			if (world?.editor.open === true && dispatch !== undefined)
+				dispatch(
+					Action.EditorCameraChanged({
+						camera: clampedCamera(world, world.editor.camera),
+					}),
+				);
+			input.refresh();
 		};
 		const onKeyDown = (event: KeyboardEvent): void => {
 			const world = currentWorld;
@@ -699,7 +1103,105 @@ export const makeDesignStudioInteraction = (input: {
 			}
 		};
 
+		const finishTouchEdit = (commit: boolean): void => {
+			const interaction = activeInteraction;
+			if (
+				(interaction?.kind !== "create" && interaction?.kind !== "move") ||
+				interaction.touchControlled !== true
+			)
+				return;
+			activeInteraction = undefined;
+			touchJoystick = { x: 0, y: 0 };
+			previousTouchJoystickTime = undefined;
+			touchPanelOpen = true;
+			touchDetailsOpen = false;
+			currentDispatch?.(
+				commit
+					? Action.EditorEditSessionCommitted()
+					: Action.EditorEditSessionCancelled(),
+			);
+			input.refreshPreview();
+			input.refresh();
+		};
+
+		const applyTouchJoystick = (time: number): void => {
+			const world = currentWorld;
+			const dispatch = currentDispatch;
+			const moving =
+				Math.abs(touchJoystick.x) > Number.EPSILON ||
+				Math.abs(touchJoystick.y) > Number.EPSILON;
+			if (
+				!moving ||
+				world?.editor.open !== true ||
+				dispatch === undefined ||
+				touchPanelOpen
+			) {
+				previousTouchJoystickTime = undefined;
+				return;
+			}
+			if (previousTouchJoystickTime === undefined) {
+				previousTouchJoystickTime = time;
+				return;
+			}
+			const elapsedSeconds = Math.min(
+				(time - previousTouchJoystickTime) / 1_000,
+				maximumTouchFrameElapsedSeconds,
+			);
+			previousTouchJoystickTime = time;
+			const interaction = activeInteraction;
+			const selected = world.editor.selected;
+			if (
+				world.editor.editSession === null &&
+				selected !== null &&
+				selected !== "floor" &&
+				(interaction === undefined || interaction.kind === "pan")
+			) {
+				activeInteraction = undefined;
+				startTouchEntityMove(world, selected, dispatch);
+				previousTouchJoystickTime = time;
+				return;
+			}
+			if (
+				(interaction?.kind === "create" || interaction?.kind === "move") &&
+				interaction.touchControlled === true &&
+				world.editor.editSession !== null
+			) {
+				const operation = world.editor.editSession.operation;
+				if (operation.kind !== interaction.kind) return;
+				const currentPosition = operation.position;
+				const position = {
+					x:
+						currentPosition.x +
+						touchJoystick.x * touchItemSpeed * elapsedSeconds,
+					y:
+						currentPosition.y +
+						touchJoystick.y * touchItemSpeed * elapsedSeconds,
+				};
+				activeInteraction = { ...interaction, position };
+				dispatch(
+					Action.EditorEditSessionPreviewed({
+						preview: { kind: interaction.kind, position },
+					}),
+				);
+				return;
+			}
+			if (world.editor.editSession !== null) return;
+			dispatch(
+				Action.EditorCameraChanged({
+					camera: clampedCamera(world, {
+						x:
+							world.editor.camera.x -
+							touchJoystick.x * touchCameraSpeed * elapsedSeconds,
+						y:
+							world.editor.camera.y -
+							touchJoystick.y * touchCameraSpeed * elapsedSeconds,
+					}),
+				}),
+			);
+		};
+
 		const autoPanFrame = (time: number): void => {
+			applyTouchJoystick(time);
 			const interaction = activeInteraction;
 			const world = currentWorld;
 			const dispatch = currentDispatch;
@@ -707,6 +1209,10 @@ export const makeDesignStudioInteraction = (input: {
 			if (
 				interaction !== undefined &&
 				interaction.kind !== "pan" &&
+				!(
+					(interaction.kind === "create" || interaction.kind === "move") &&
+					interaction.touchControlled === true
+				) &&
 				world !== undefined &&
 				world.editor.editSession !== null &&
 				dispatch !== undefined &&
@@ -872,6 +1378,7 @@ export const makeDesignStudioInteraction = (input: {
 				window.addEventListener("pointercancel", onPointerCancel);
 				window.addEventListener("wheel", onWheel, { passive: false });
 				window.addEventListener("keydown", onKeyDown);
+				window.addEventListener("resize", onResize);
 				autoPanAnimationFrame = requestAnimationFrame(autoPanFrame);
 			}),
 			() =>
@@ -881,12 +1388,19 @@ export const makeDesignStudioInteraction = (input: {
 					window.removeEventListener("pointercancel", onPointerCancel);
 					window.removeEventListener("wheel", onWheel);
 					window.removeEventListener("keydown", onKeyDown);
+					window.removeEventListener("resize", onResize);
 					if (autoPanAnimationFrame !== undefined)
 						cancelAnimationFrame(autoPanAnimationFrame);
 					if (popoverAnimationFrame !== undefined)
 						cancelAnimationFrame(popoverAnimationFrame);
 					activeInteraction = undefined;
 					designStudioInteraction = initialDesignStudioInteraction;
+					touchJoystick = { x: 0, y: 0 };
+					previousTouchJoystickTime = undefined;
+					touchPanelOpen = false;
+					editorZoom = 1;
+					touchPointers.clear();
+					pinchGesture = undefined;
 					currentWorld = undefined;
 					currentDispatch = undefined;
 				}),
@@ -897,7 +1411,81 @@ export const makeDesignStudioInteraction = (input: {
 			startEntityResize,
 			startFloorResize,
 			startPaletteDrag,
+			startTouchPalettePlacement,
+			startTouchEntityMove,
+			selectTouchEntity,
+			setTouchJoystick: (vector) => {
+				touchJoystick = vector;
+				if (vector.x === 0 && vector.y === 0)
+					previousTouchJoystickTime = undefined;
+			},
+			commitTouchEdit: () => finishTouchEdit(true),
+			cancelTouchEdit: () => finishTouchEdit(false),
+			toggleTouchPanel: () => {
+				if (
+					currentWorld === undefined ||
+					currentWorld.editor.editSession !== null
+				)
+					return;
+				touchPanelOpen = !touchPanelOpen;
+				touchDetailsOpen = false;
+				touchJoystick = { x: 0, y: 0 };
+				previousTouchJoystickTime = undefined;
+				input.refresh();
+			},
+			isTouchPanelOpen: () => touchPanelOpen,
+			isTouchEditActive: () => {
+				const interaction = activeInteraction;
+				return (
+					(interaction?.kind === "create" || interaction?.kind === "move") &&
+					interaction.touchControlled === true
+				);
+			},
+			openTouchDetails: () => {
+				if (currentWorld?.editor.selected === null) return;
+				touchDetailsOpen = true;
+				input.refresh();
+			},
+			closeTouchDetails: () => {
+				touchDetailsOpen = false;
+				input.refresh();
+			},
+			isTouchDetailsOpen: () => touchDetailsOpen,
+			usesTouchControls,
+			zoom: () => editorZoom,
+			zoomAt: (event) => {
+				const world = currentWorld;
+				const dispatch = currentDispatch;
+				if (world?.editor.open !== true || dispatch === undefined) return;
+				event.preventDefault();
+				const nextZoom = Math.min(maximumEditorZoom, editorZoom * 1.5);
+				const client = { x: event.clientX, y: event.clientY };
+				const camera = cameraForZoomAt({
+					world,
+					initialClient: client,
+					nextClient: client,
+					initialCamera: world.editor.camera,
+					initialZoom: editorZoom,
+					nextZoom,
+				});
+				editorZoom = nextZoom;
+				dispatch(Action.EditorCameraChanged({ camera }));
+				input.refresh();
+			},
 			update: (world, dispatch) => {
+				if (world.editor.selected === null) touchDetailsOpen = false;
+				if (world.editor.open && currentWorld?.editor.open !== true)
+					touchPanelOpen = false;
+				else if (!world.editor.open) {
+					touchPanelOpen = false;
+					touchDetailsOpen = false;
+					touchJoystick = { x: 0, y: 0 };
+					previousTouchJoystickTime = undefined;
+					activeInteraction = undefined;
+					editorZoom = 1;
+					touchPointers.clear();
+					pinchGesture = undefined;
+				}
 				currentWorld = world;
 				currentDispatch = dispatch;
 			},
@@ -909,7 +1497,10 @@ export const makeDesignStudioInteraction = (input: {
 				input.refresh();
 			},
 			isPanGesture: (event) =>
-				event.button === 1 || event.metaKey || event.ctrlKey,
+				event.pointerType === "touch" ||
+				event.button === 1 ||
+				event.metaKey ||
+				event.ctrlKey,
 			isGestureActive: () =>
 				activeInteraction !== undefined && activeInteraction.kind !== "pan",
 			createPreview: () =>

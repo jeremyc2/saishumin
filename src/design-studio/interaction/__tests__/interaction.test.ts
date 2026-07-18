@@ -15,6 +15,7 @@ const playerEntity = EntityId(1);
 
 import {
 	autoPanCamera,
+	clampCameraToEnvelope,
 	contentEnvelope,
 	contentEnvelopeIncludingPreview,
 	floorResizePointerDelta,
@@ -23,10 +24,43 @@ import {
 	movePalettePress,
 	pressPaletteItem,
 	releasePalettePress,
+	shouldMoveSelectedTouchEntity,
+	shouldPanTouchGesture,
+	shouldStartPinchGesture,
 	visiblePalettePopover,
 } from "../pointer";
 
 describe("Design Studio interaction", () => {
+	test("reserves a short grace window for a second pinch pointer", () => {
+		expect(
+			shouldPanTouchGesture({ elapsedMilliseconds: 70, distance: 24 }),
+		).toBe(false);
+		expect(
+			shouldPanTouchGesture({ elapsedMilliseconds: 140, distance: 4 }),
+		).toBe(false);
+		expect(
+			shouldPanTouchGesture({ elapsedMilliseconds: 140, distance: 12 }),
+		).toBe(true);
+		expect(shouldStartPinchGesture({ touchCount: 1 })).toBe(false);
+		expect(shouldStartPinchGesture({ touchCount: 2 })).toBe(true);
+	});
+
+	test("moves a touch object only after that object has been selected", () => {
+		const selected = EntityId(8);
+		expect(
+			shouldMoveSelectedTouchEntity({ selection: selected, entity: selected }),
+		).toBe(true);
+		expect(
+			shouldMoveSelectedTouchEntity({ selection: null, entity: selected }),
+		).toBe(false);
+		expect(
+			shouldMoveSelectedTouchEntity({
+				selection: EntityId(9),
+				entity: selected,
+			}),
+		).toBe(false);
+	});
+
 	test("activates a palette drag only after leaving the item rectangle expanded by 12 pixels", () => {
 		const pressed = pressPaletteItem(initialDesignStudioInteraction, {
 			itemKind: EditorItemKinds.Hopscotch,
@@ -184,6 +218,21 @@ describe("Design Studio interaction", () => {
 			x: 1_000,
 			y: 0,
 		});
+	});
+
+	test("keeps authored terrain inside the viewport after an extreme manual pan", () => {
+		const envelope = contentEnvelope(initialWorld);
+		const viewport = { left: 0, top: 0, right: 1_600, bottom: 900 };
+		const camera = clampCameraToEnvelope({
+			camera: { x: 10_000, y: -10_000 },
+			viewport,
+			envelope,
+		});
+
+		expect(envelope.left + camera.x).toBeLessThan(viewport.right);
+		expect(envelope.right + camera.x).toBeGreaterThan(viewport.left);
+		expect(envelope.top + camera.y).toBeLessThan(viewport.bottom);
+		expect(envelope.bottom + camera.y).toBeGreaterThan(viewport.top);
 	});
 
 	test("keeps a floor resize stationary when the screen pointer has not moved", () => {

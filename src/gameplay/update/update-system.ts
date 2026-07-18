@@ -117,43 +117,58 @@ export class UpdateSystemService extends Context.Service<
 				}
 				return nearest;
 			};
+			const interact = (world: World): World => {
+				const chest = interactableInFrontOfPlayer(
+					world,
+					(entity) => world.obstacles.get(entity)?.kind === ObstacleKinds.Chest,
+				);
+				if (chest !== null) {
+					const openedChests = new Set(world.openedChests);
+					if (openedChests.has(chest)) openedChests.delete(chest);
+					else openedChests.add(chest);
+					return { ...world, openedChests };
+				}
+				const sign = interactableInFrontOfPlayer(
+					world,
+					(entity) =>
+						world.decorations.get(entity)?.kind === DecorationKinds.Sign,
+				);
+				return sign === null
+					? world
+					: {
+							...world,
+							pressed: new Set<Direction>(),
+							grabbed: null,
+							pushing: null,
+							readingSign: sign,
+						};
+			};
 			return {
 				update: ({ world, action }): World =>
 					Action.$match(action, {
 						KeyChanged: ({ key, pressed }) => {
-							if (world.readingSign !== null)
-								return key === Controls.Interact && pressed
-									? { ...world, readingSign: null }
-									: world;
+							if (world.readingSign !== null) {
+								if (key === Controls.Interact && pressed)
+									return { ...world, readingSign: null };
+								if (key === Controls.ContextAction && !pressed)
+									return { ...world, readingSign: null };
+								return world;
+							}
 							if (world.editor.open) return world;
 							if (key === Controls.Interact) {
 								if (!pressed) return world;
-								const chest = interactableInFrontOfPlayer(
-									world,
-									(entity) =>
-										world.obstacles.get(entity)?.kind === ObstacleKinds.Chest,
-								);
-								if (chest !== null) {
-									const openedChests = new Set(world.openedChests);
-									if (openedChests.has(chest)) openedChests.delete(chest);
-									else openedChests.add(chest);
-									return { ...world, openedChests };
+								return interact(world);
+							}
+							if (key === Controls.ContextAction) {
+								if (pressed) {
+									const grabbed = nearestGrabbableObject(world);
+									return grabbed === null
+										? world
+										: { ...world, grabbed, pushing: null };
 								}
-								const sign = interactableInFrontOfPlayer(
-									world,
-									(entity) =>
-										world.decorations.get(entity)?.kind ===
-										DecorationKinds.Sign,
-								);
-								return sign === null
-									? world
-									: {
-											...world,
-											pressed: new Set<Direction>(),
-											grabbed: null,
-											pushing: null,
-											readingSign: sign,
-										};
+								if (world.grabbed !== null)
+									return { ...world, grabbed: null, pushing: null };
+								return interact(world);
 							}
 							if (key === Controls.Grab)
 								return {

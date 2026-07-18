@@ -1,11 +1,13 @@
 import { svg, type TemplateResult } from "lit-html";
 import type { Action as AppAction } from "../../app/action";
+import { plantVisualFootprintBody } from "../../presentation/artwork/visual-footprint";
 import {
 	points,
 	projectedRectangle,
 } from "../../presentation/geometry/projection";
 import type { ResizeDirection } from "../../presentation/geometry/resize";
-import type { Position } from "../../world/components";
+import { DecorationKinds, type Position } from "../../world/components";
+import type { EntityId } from "../../world/entity-id";
 import { surfaceAt } from "../../world/spatial/collision";
 import { entityBaseElevation } from "../../world/spatial/elevation";
 import { characterSpawnPosition, type World } from "../../world/world";
@@ -22,6 +24,20 @@ const midpoint = (start: Position, end: Position): Position => ({
 	x: (start.x + end.x) / 2,
 	y: (start.y + end.y) / 2,
 });
+
+export const editorEntitySelectionBody = ({
+	world,
+	entity,
+}: {
+	readonly world: World;
+	readonly entity: EntityId;
+}) => {
+	const body = world.bodies.get(entity);
+	if (body === undefined) return undefined;
+	if (world.decorations.get(entity)?.kind === DecorationKinds.Plant)
+		return plantVisualFootprintBody(body);
+	return body;
+};
 
 export type DesignStudioView = ReturnType<typeof makeDesignStudioView>;
 
@@ -154,7 +170,7 @@ export const makeDesignStudioView = (interaction: DesignStudioInteraction) => {
 							stroke="transparent"
 							stroke-width="18"
 							pointer-events="stroke"
-							class=${edge.cursor}
+							class=${`${edge.cursor} any-pointer-coarse:[stroke-width:44]`}
 							@pointerdown=${(event: PointerEvent) =>
 								interaction.startFloorResize(
 									event,
@@ -166,7 +182,24 @@ export const makeDesignStudioView = (interaction: DesignStudioInteraction) => {
 						/>`,
 					)}
 					${handles.map(
-						(handle) => svg`<rect
+						(handle) => svg`<g>
+						<rect
+							x=${handle.point.x - 26}
+							y=${handle.point.y - 26}
+							width="52"
+							height="52"
+							fill="transparent"
+							class=${`hidden any-pointer-coarse:block ${handle.cursor}`}
+							@pointerdown=${(event: PointerEvent) =>
+								interaction.startFloorResize(
+									event,
+									world,
+									handle.widthDirection,
+									handle.depthDirection,
+									dispatch,
+								)}
+						/>
+						<rect
 							x=${handle.point.x - selectionHandleSize / 2}
 							y=${handle.point.y - selectionHandleSize / 2}
 							width=${selectionHandleSize}
@@ -184,7 +217,7 @@ export const makeDesignStudioView = (interaction: DesignStudioInteraction) => {
 									handle.depthDirection,
 									dispatch,
 								)}
-						/>`,
+						/></g>`,
 					)}
 				`;
 		}
@@ -193,7 +226,7 @@ export const makeDesignStudioView = (interaction: DesignStudioInteraction) => {
 		const position = characterSelected
 			? characterSpawnPosition({ world, entity: selected })
 			: world.positions.get(selected);
-		const body = world.bodies.get(selected);
+		const body = editorEntitySelectionBody({ world, entity: selected });
 		if (position === undefined || body === undefined) return svg``;
 		const outline = projectedRectangle(
 			position,
@@ -306,7 +339,7 @@ export const makeDesignStudioView = (interaction: DesignStudioInteraction) => {
 						stroke="transparent"
 						stroke-width="18"
 						pointer-events="stroke"
-						class=${edge.cursor}
+						class=${`${edge.cursor} any-pointer-coarse:[stroke-width:44]`}
 						@pointerdown=${(event: PointerEvent) =>
 							interaction.startEntityResize(
 								event,
@@ -319,7 +352,25 @@ export const makeDesignStudioView = (interaction: DesignStudioInteraction) => {
 					/>`,
 				)}
 				${handles.map(
-					(handle) => svg`<rect
+					(handle) => svg`<g>
+						<rect
+							x=${handle.point.x - 26}
+							y=${handle.point.y - 26}
+							width="52"
+							height="52"
+							fill="transparent"
+							class=${`hidden any-pointer-coarse:block ${handle.cursor}`}
+							@pointerdown=${(event: PointerEvent) =>
+								interaction.startEntityResize(
+									event,
+									world,
+									selected,
+									handle.widthDirection,
+									handle.depthDirection,
+									dispatch,
+								)}
+						/>
+						<rect
 							x=${handle.point.x - selectionHandleSize / 2}
 							y=${handle.point.y - selectionHandleSize / 2}
 							width=${selectionHandleSize}
@@ -338,7 +389,7 @@ export const makeDesignStudioView = (interaction: DesignStudioInteraction) => {
 									handle.depthDirection,
 									dispatch,
 								)}
-						/>`,
+						/></g>`,
 				)}
 			`;
 	};

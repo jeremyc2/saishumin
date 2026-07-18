@@ -7,6 +7,7 @@ import {
 	decorationTemplate,
 } from "../../presentation/artwork/entities";
 import {
+	canvasViewportForScreen,
 	points,
 	project,
 	projectedRectangle,
@@ -39,6 +40,14 @@ import {
 } from "../model";
 
 type Dispatch = (action: AppAction) => void;
+
+export const shouldDismissDialogClick = ({
+	pointerStarted,
+	clickDetail,
+}: {
+	readonly pointerStarted: boolean;
+	readonly clickDetail: number;
+}): boolean => pointerStarted || clickDetail === 0;
 
 export const invalidPreviewDescription = (input: {
 	readonly rejectionReason: EditSessionRejectionReason | null;
@@ -118,6 +127,7 @@ export const makeDesignStudioOverlays = (
 		world: World,
 		dispatch: Dispatch,
 	): TemplateResult => {
+		let dismissPointerStarted = false;
 		const content =
 			world.readingSign === null
 				? defaultSignContent
@@ -130,7 +140,23 @@ export const makeDesignStudioOverlays = (
 						<p id="sign-description" class="mt-2 mb-0 wrap-break-word whitespace-pre-wrap text-base leading-relaxed text-[#5d3b24]">${content.body}</p>
 					</div>
 					<div class="mt-5 flex justify-end">
-						<button type="button" autofocus class="rounded-lg border border-[#5d3b24] bg-[#70462b] px-5 py-2 text-[11px] font-bold tracking-[0.12em] text-[#fff3dc] transition hover:bg-[#845535]" @click=${() => dispatch(Action.SignDismissed())}>DISMISS</button>
+						<button type="button" autofocus class="rounded-lg border border-[#5d3b24] bg-[#70462b] px-5 py-2 text-[11px] font-bold tracking-[0.12em] text-[#fff3dc] transition hover:bg-[#845535]" @pointerdown=${() => {
+							dismissPointerStarted = true;
+						}} @pointercancel=${() => {
+							dismissPointerStarted = false;
+						}} @click=${(event: MouseEvent) => {
+							const shouldDismiss = shouldDismissDialogClick({
+								pointerStarted: dismissPointerStarted,
+								clickDetail: event.detail,
+							});
+							dismissPointerStarted = false;
+							if (!shouldDismiss) {
+								event.preventDefault();
+								event.stopPropagation();
+								return;
+							}
+							dispatch(Action.SignDismissed());
+						}}>DISMISS</button>
 					</div>
 				</div>
 			</div>
@@ -213,8 +239,15 @@ export const makeDesignStudioOverlays = (
 				baseElevation,
 			});
 		const accent = invalidPreview ? "#e59a91" : "#fff0a8";
+		const canvasViewport = canvasViewportForScreen({
+			screen:
+				typeof window === "undefined"
+					? viewport
+					: { width: window.innerWidth, height: window.innerHeight },
+			zoom: interaction.zoom(),
+		});
 		return html`
-				<svg data-editor-create-preview data-can-drop=${String(preview.canDrop)} aria-hidden="true" class="pointer-events-none absolute inset-0 z-40 h-full w-full" viewBox=${`0 0 ${viewport.width} ${viewport.height}`} preserveAspectRatio="xMidYMid meet">
+				<svg data-editor-create-preview data-can-drop=${String(preview.canDrop)} aria-hidden="true" class="pointer-events-none absolute inset-0 z-40 h-full w-full" viewBox=${`${canvasViewport.left} ${canvasViewport.top} ${canvasViewport.width} ${canvasViewport.height}`} preserveAspectRatio="xMidYMid meet">
 					<g transform=${`translate(${world.editor.camera.x} ${world.editor.camera.y})`}>
 						<g opacity="0.82">${visual}</g>
 						<polygon data-editor-create-outline points=${points(projectedRectangle(position, body, baseElevation))} fill="none" stroke=${accent} stroke-width="4" stroke-dasharray="10 7" vector-effect="non-scaling-stroke" />

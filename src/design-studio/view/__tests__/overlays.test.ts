@@ -1,5 +1,8 @@
 import { describe, expect, test } from "bun:test";
-import { invalidPreviewDescription } from "../overlays";
+import {
+	invalidPreviewDescription,
+	shouldDismissDialogClick,
+} from "../overlays";
 
 describe("Invalid Preview presentation", () => {
 	test("explains why a floor resize cannot be committed", () => {
@@ -22,5 +25,19 @@ describe("Invalid Preview presentation", () => {
 		).toBe(
 			"Move every object off this platform before moving or shrinking it.",
 		);
+	});
+});
+
+describe("touch dialog dismissal", () => {
+	test("ignores a synthesized click that did not begin on the dismiss button", () => {
+		expect(
+			shouldDismissDialogClick({ pointerStarted: false, clickDetail: 1 }),
+		).toBe(false);
+		expect(
+			shouldDismissDialogClick({ pointerStarted: true, clickDetail: 1 }),
+		).toBe(true);
+		expect(
+			shouldDismissDialogClick({ pointerStarted: false, clickDetail: 0 }),
+		).toBe(true);
 	});
 });
