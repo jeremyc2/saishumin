@@ -42,6 +42,7 @@ export const initialDesignStudioInteraction: DesignStudioInteraction = {
 
 const touchPanGraceMilliseconds = 110;
 const touchPanThresholdPixels = 8;
+const decisiveTouchPanThresholdPixels = 24;
 
 export const shouldPanTouchGesture = ({
 	elapsedMilliseconds,
@@ -50,8 +51,9 @@ export const shouldPanTouchGesture = ({
 	readonly elapsedMilliseconds: number;
 	readonly distance: number;
 }): boolean =>
-	elapsedMilliseconds >= touchPanGraceMilliseconds &&
-	distance >= touchPanThresholdPixels;
+	distance >= touchPanThresholdPixels &&
+	(elapsedMilliseconds >= touchPanGraceMilliseconds ||
+		distance >= decisiveTouchPanThresholdPixels);
 
 export const shouldStartPinchGesture = ({
 	touchCount,
@@ -59,13 +61,28 @@ export const shouldStartPinchGesture = ({
 	readonly touchCount: number;
 }): boolean => touchCount >= 2;
 
-export const shouldMoveSelectedTouchEntity = ({
+export type TouchEntityPointerIntent = "move-entity" | "pan-canvas";
+
+export const touchEntityPointerIntent = ({
 	selection,
 	entity,
 }: {
 	readonly selection: EditorSelection;
 	readonly entity: EntityId;
-}): boolean => selection === entity;
+}): TouchEntityPointerIntent =>
+	selection === entity ? "move-entity" : "pan-canvas";
+
+export type TouchEditorMode = "move" | "resize";
+
+export const nextTouchEditorMode = (mode: TouchEditorMode): TouchEditorMode =>
+	mode === "move" ? "resize" : "move";
+
+export type TouchJoystickTarget = "selected-entity" | "camera";
+
+export const touchJoystickTarget = (
+	selection: EditorSelection,
+): TouchJoystickTarget =>
+	selection !== null && selection !== "floor" ? "selected-entity" : "camera";
 
 export const isDesignStudioPanelVisible = (world: World): boolean =>
 	world.editor.editSession === null;

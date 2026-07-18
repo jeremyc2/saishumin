@@ -14,6 +14,7 @@ import {
 	project,
 	projectedRectangle,
 } from "../../geometry/projection";
+import { type LitTemplate, nothing } from "../../lit-template";
 import { decorationArtworkScale } from "../visual-footprint";
 
 const boxOutlineWidth = 3;
@@ -654,7 +655,7 @@ export const playerTemplate = ({
 	const isAirborne =
 		hasSurface && shadowDistance > playerShadowVisual.airborneThreshold;
 	const drawing = playerDrawingForFacing(facing);
-	let shadowTemplate = svg``;
+	let shadowTemplate: LitTemplate = nothing;
 	if (isAirborne)
 		shadowTemplate = svg`<ellipse cx=${shadow.x} cy=${shadow.y + playerShadowVisual.airborneOffset} rx=${playerShadowVisual.airborneRadius.x * shadowScale} ry=${playerShadowVisual.airborneRadius.y * shadowScale} fill="#14212a" opacity=${shadowOpacity} />`;
 	else if (hasSurface)
@@ -779,8 +780,8 @@ const lavaMonsterInteriorTemplate = (view: LavaMonsterView): TemplateResult => {
 	return svg`<path class="origin-bottom transform-fill animate-[lava-monster-flicker_0.48s_ease-in-out_infinite] motion-reduce:animate-none" d="M -19 39 C -24 24 -15 17 -14 6 C -4 14 -5 26 3 28 C 11 29 11 17 18 9 C 27 20 31 31 26 42 Z" fill="#e75b27" />`;
 };
 
-const lavaMonsterFaceTemplate = (view: LavaMonsterView): TemplateResult => {
-	if (view === "back") return svg``;
+const lavaMonsterFaceTemplate = (view: LavaMonsterView): LitTemplate => {
+	if (view === "back") return nothing;
 	if (view === "rear-quarter")
 		return svg`<path d="M 16 5 L 21 8 L 19 14" fill="none" stroke="#4b2728" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" opacity="0.55" />`;
 	if (view === "side")

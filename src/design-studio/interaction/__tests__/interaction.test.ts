@@ -22,18 +22,20 @@ import {
 	initialDesignStudioInteraction,
 	isDesignStudioPanelVisible,
 	movePalettePress,
+	nextTouchEditorMode,
 	pressPaletteItem,
 	releasePalettePress,
-	shouldMoveSelectedTouchEntity,
 	shouldPanTouchGesture,
 	shouldStartPinchGesture,
+	touchJoystickTarget,
+	touchEntityPointerIntent,
 	visiblePalettePopover,
 } from "../pointer";
 
 describe("Design Studio interaction", () => {
 	test("reserves a short grace window for a second pinch pointer", () => {
 		expect(
-			shouldPanTouchGesture({ elapsedMilliseconds: 70, distance: 24 }),
+			shouldPanTouchGesture({ elapsedMilliseconds: 70, distance: 12 }),
 		).toBe(false);
 		expect(
 			shouldPanTouchGesture({ elapsedMilliseconds: 140, distance: 4 }),
@@ -45,20 +47,37 @@ describe("Design Studio interaction", () => {
 		expect(shouldStartPinchGesture({ touchCount: 2 })).toBe(true);
 	});
 
-	test("moves a touch object only after that object has been selected", () => {
+	test("starts a decisive one-finger pan before the pinch grace window expires", () => {
+		expect(
+			shouldPanTouchGesture({ elapsedMilliseconds: 70, distance: 24 }),
+		).toBe(true);
+	});
+
+	test("toggles between explicit Move and Resize touch modes", () => {
+		expect(nextTouchEditorMode("move")).toBe("resize");
+		expect(nextTouchEditorMode("resize")).toBe("move");
+	});
+
+	test("routes the joystick to a selected entity and otherwise to the camera", () => {
+		expect(touchJoystickTarget(EntityId(8))).toBe("selected-entity");
+		expect(touchJoystickTarget(null)).toBe("camera");
+		expect(touchJoystickTarget("floor")).toBe("camera");
+	});
+
+	test("pans from an unselected touch object and moves only a selection", () => {
 		const selected = EntityId(8);
 		expect(
-			shouldMoveSelectedTouchEntity({ selection: selected, entity: selected }),
-		).toBe(true);
+			touchEntityPointerIntent({ selection: selected, entity: selected }),
+		).toBe("move-entity");
 		expect(
-			shouldMoveSelectedTouchEntity({ selection: null, entity: selected }),
-		).toBe(false);
+			touchEntityPointerIntent({ selection: null, entity: selected }),
+		).toBe("pan-canvas");
 		expect(
-			shouldMoveSelectedTouchEntity({
+			touchEntityPointerIntent({
 				selection: EntityId(9),
 				entity: selected,
 			}),
-		).toBe(false);
+		).toBe("pan-canvas");
 	});
 
 	test("activates a palette drag only after leaving the item rectangle expanded by 12 pixels", () => {

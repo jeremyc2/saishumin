@@ -25,6 +25,7 @@ import {
 	projectedRectangle,
 	viewport,
 } from "../../presentation/geometry/projection";
+import { nothing } from "../../presentation/lit-template";
 import {
 	CharacterKinds,
 	DecorationKinds,
@@ -299,13 +300,13 @@ export const gameSceneTemplate = ({
 					<pattern id="editor-dots" width="32" height="32" patternUnits="userSpaceOnUse" patternTransform=${`translate(${camera.x % 32} ${camera.y % 32})`}><circle cx="2" cy="2" r="1.6" fill="#3b5157" /></pattern>
 					<clipPath id="outdoor-floor-clip" clipPathUnits="userSpaceOnUse"><polygon points=${points(floor)} /></clipPath>
 				</defs>
-				${world.editor.open ? svg`<rect width="100%" height="100%" fill="url(#editor-dots)" opacity="0.68" />` : svg``}
+				${world.editor.open ? svg`<rect width="100%" height="100%" fill="url(#editor-dots)" opacity="0.68" />` : nothing}
 				<g transform=${`translate(${camera.x} ${camera.y})`}>
 					<polygon data-floor-base points=${points(floor)} fill="#c9b385" @pointerdown=${floorPointerDown} @click=${floorClick} />
 					<g pointer-events="none" stroke="#8f8065" stroke-width=${floorGridStrokeWidth} opacity=${floorGridOpacity}>${gridLines}${depthLines}</g>
 					<g data-outdoor-floor-tiles clip-path="url(#outdoor-floor-clip)" pointer-events="none">${terrainFloorTemplate(floorTiles)}</g>
 					${renderedObjects}
-					${world.editor.open ? designStudioView.selectionTemplate(world, invalidPreview, dispatch) : svg``}
+					${world.editor.open ? designStudioView.selectionTemplate(world, invalidPreview, dispatch) : nothing}
 				</g>
 			</svg>
 			<h1 class="pointer-events-none absolute top-7 left-7 m-0 select-none text-[27px] font-heading font-bold tracking-[0.16em] text-[#fff1d6] any-pointer-coarse:top-[max(0.75rem,env(safe-area-inset-top))] any-pointer-coarse:left-[max(0.875rem,env(safe-area-inset-left))] any-pointer-coarse:text-base">SAISHUMIN</h1>
@@ -313,14 +314,14 @@ export const gameSceneTemplate = ({
 				<button type="button" class="inline-flex items-center gap-2 rounded-xl border border-[#e8b875]/70 bg-[#0d181f]/92 px-4 py-3 text-[12px] font-bold tracking-[0.12em] text-[#fff1d6] shadow-lg transition-colors hover:bg-[#1b2d34] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#fff1d6] any-pointer-coarse:min-h-11 any-pointer-coarse:px-[0.8rem] any-pointer-coarse:py-[0.65rem] any-pointer-coarse:text-[0.625rem]" @click=${() => dispatch(Action.EditorToggled())}>
 					${world.editor.open ? "PLAY" : "EDIT"}
 				</button>
-				${world.editor.open && !sessionActive && !interaction.isTouchPanelOpen() ? html`<button type="button" class="hidden min-h-11 items-center rounded-xl border border-[#46656b] bg-[#1b333a]/94 px-3 py-[0.65rem] text-[0.625rem] font-bold tracking-[0.1em] text-[#dcecea] shadow-lg any-pointer-coarse:inline-flex" @click=${interaction.toggleTouchPanel}>OBJECTS</button>` : html``}
+				${world.editor.open && !sessionActive && !interaction.isTouchPanelOpen() ? html`<button type="button" class="hidden min-h-11 items-center rounded-xl border border-[#46656b] bg-[#1b333a]/94 px-3 py-[0.65rem] text-[0.625rem] font-bold tracking-[0.1em] text-[#dcecea] shadow-lg any-pointer-coarse:inline-flex" @click=${interaction.toggleTouchPanel}>OBJECTS</button>` : nothing}
 			</div>
 			${world.editor.open ? html`<div class="pointer-events-none absolute bottom-6 left-7 rounded-xl bg-[#0d181f]/88 px-4 py-2 text-[11px] font-bold tracking-[0.12em] text-[#e8b875] any-pointer-coarse:hidden">CONTROLS PAUSED · INFINITE PAN · FIXED SCALE</div>${designStudioView.editorPanelTemplate(world, !sessionActive, interaction.isTouchPanelOpen() && !sessionActive, dispatch)}` : html`<div class="pointer-events-none absolute bottom-7 left-7 flex max-w-[calc(100vw-3.5rem)] flex-wrap gap-x-12 gap-y-3 rounded-[18px] bg-[#0d181f]/90 px-6 py-4 select-none any-pointer-coarse:hidden"><div><div class="text-[15px] font-heading font-bold text-[#fff1d6]">ARROW KEYS</div><div class="mt-1 text-[13px] text-[#aebfba]">MOVE · PUSH CRATES</div></div><div><div class="text-[15px] font-heading font-bold text-[#fff1d6]">SPACE</div><div class="mt-1 text-[13px] text-[#aebfba]">JUMP · CLIMB · FALL</div></div><div><div class="text-[15px] font-heading font-bold text-[#fff1d6]">HOLD SHIFT</div><div class="mt-1 text-[13px] text-[#aebfba]">GRAB · DRAG OBJECTS</div></div><div><div class="text-[15px] font-heading font-bold text-[#fff1d6]">X</div><div class="mt-1 text-[13px] text-[#aebfba]">OPEN CHESTS · READ SIGNS</div></div></div>${mobileControlsTemplate({ world, interaction, dispatch })}`}
-			${world.editor.open ? mobileControlsTemplate({ world, interaction, dispatch }) : html``}
+			${world.editor.open ? mobileControlsTemplate({ world, interaction, dispatch }) : nothing}
 			<div id="editor-create-preview-host" class="contents"></div>
 			${designStudioView.paletteGuidanceTemplate(palettePopover)}
-			${world.editor.invalidPlacement === null && !invalidReleased ? html`` : designStudioView.invalidPlacementTemplate(world, editSessionStatus, dispatch)}
-			${world.readingSign === null ? html`` : designStudioView.signDialogTemplate(world, dispatch)}
+			${world.editor.invalidPlacement === null && !invalidReleased ? nothing : designStudioView.invalidPlacementTemplate(world, editSessionStatus, dispatch)}
+			${world.readingSign === null ? nothing : designStudioView.signDialogTemplate(world, dispatch)}
 		</main>
 	`;
 };

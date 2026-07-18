@@ -1,6 +1,7 @@
 import { Effect } from "effect";
 import { html, type TemplateResult } from "lit-html";
 import { Action, type Action as AppAction } from "../../app/action";
+import { type LitTemplate, nothing } from "../../presentation/lit-template";
 import {
 	copyAuthoredRoomToClipboard,
 	loadAuthoredRoomFromClipboard,
@@ -250,7 +251,7 @@ export const makeDesignStudioPanel = (interaction: DesignStudioInteraction) => {
 			selectedPosition !== undefined &&
 			selectedMaximumBody !== undefined
 		) {
-			let touchHeightInput: TemplateResult = html``;
+			let touchHeightInput: LitTemplate = nothing;
 			if (
 				selectedHeight !== undefined &&
 				selectedHeightLimits !== undefined &&
@@ -269,7 +270,7 @@ export const makeDesignStudioPanel = (interaction: DesignStudioInteraction) => {
 							}),
 						),
 				);
-			let touchSizeInputs: TemplateResult = html``;
+			let touchSizeInputs: LitTemplate = nothing;
 			if (!characterSelected)
 				touchSizeInputs = html`
 					<div class="mt-5 flex gap-3">
@@ -278,7 +279,7 @@ export const makeDesignStudioPanel = (interaction: DesignStudioInteraction) => {
 						${touchHeightInput}
 					</div>
 				`;
-			let touchSignInputs: TemplateResult = html``;
+			let touchSignInputs: LitTemplate = nothing;
 			if (selectedSignContent !== undefined)
 				touchSignInputs = html`
 					<div class="mt-5 border-t border-[#30434a] pt-5">
@@ -424,7 +425,7 @@ export const makeDesignStudioPanel = (interaction: DesignStudioInteraction) => {
 												</div>
 												${
 													characterSelected
-														? html``
+														? nothing
 														: html`<div class="mt-4 flex gap-3">
 													${numberInput(
 														"Width",
@@ -469,13 +470,13 @@ export const makeDesignStudioPanel = (interaction: DesignStudioInteraction) => {
 																	}),
 																),
 														)
-													: html``
+													: nothing
 											}
 										</div>`
 												}
 										${
 											selectedSignContent === undefined
-												? html``
+												? nothing
 												: html`
 													<div class="mt-5 border-t border-[#30434a] pt-4">
 														<label class="block text-[11px] font-bold tracking-[0.14em] text-[#819993] uppercase">

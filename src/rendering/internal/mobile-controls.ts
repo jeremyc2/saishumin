@@ -2,6 +2,7 @@ import { html, type TemplateResult } from "lit-html";
 import { type Action, Action as AppAction } from "../../app/action";
 import { type Control, Controls } from "../../app/control";
 import type { DesignStudioInteraction } from "../../design-studio/interaction/interaction";
+import { type LitTemplate, nothing } from "../../presentation/lit-template";
 import type { Position } from "../../world/components";
 import type { World } from "../../world/world";
 
@@ -64,12 +65,49 @@ const actionButton = ({
 	readonly label: string;
 	readonly onClick: () => void;
 	readonly className?: string;
-}): TemplateResult => html`
-	<button type="button" class=${`${touchButtonClass} px-4 ${className}`} @click=${onClick}>${label}</button>
-`;
+}): TemplateResult => {
+	const finishPointer = (event: PointerEvent, activate: boolean): void => {
+		const target = event.currentTarget;
+		if (!(target instanceof HTMLElement)) return;
+		if (target.dataset["actionPointer"] !== String(event.pointerId)) return;
+		delete target.dataset["actionPointer"];
+		event.preventDefault();
+		if (activate) onClick();
+	};
+	return html`
+		<button
+			type="button"
+			class=${`${touchButtonClass} touch-none px-4 ${className}`}
+			@pointerdown=${(event: PointerEvent) => {
+				const target = event.currentTarget;
+				if (!(target instanceof HTMLElement)) return;
+				if (target.dataset["actionPointer"] !== undefined) return;
+				target.dataset["actionPointer"] = String(event.pointerId);
+				target.setPointerCapture(event.pointerId);
+				event.preventDefault();
+			}}
+			@pointerup=${(event: PointerEvent) => finishPointer(event, true)}
+			@pointercancel=${(event: PointerEvent) => finishPointer(event, false)}
+			@lostpointercapture=${(event: PointerEvent) =>
+				finishPointer(event, false)}
+			@click=${(event: MouseEvent) => {
+				if (event.detail === 0) {
+					onClick();
+					return;
+				}
+				event.preventDefault();
+				event.stopPropagation();
+			}}
+			@contextmenu=${(event: Event) => event.preventDefault()}
+		>${label}</button>
+	`;
+};
 
 const joystickTemplate = (
-	onChange: (vector: Position) => void,
+	onChange: (input: {
+		readonly pointerId: number;
+		readonly vector: Position | null;
+	}) => void,
 ): TemplateResult => {
 	const ownsPointer = (target: HTMLElement, pointerId: number): boolean =>
 		target.dataset["joystickPointer"] === String(pointerId);
@@ -87,7 +125,10 @@ const joystickTemplate = (
 		const visualY = y * scale;
 		target.style.setProperty("--joystick-x", `${visualX}px`);
 		target.style.setProperty("--joystick-y", `${visualY}px`);
-		onChange({ x: visualX / radius, y: visualY / radius });
+		onChange({
+			pointerId: event.pointerId,
+			vector: { x: visualX / radius, y: visualY / radius },
+		});
 	};
 	const release = (event: PointerEvent): void => {
 		const target = event.currentTarget;
@@ -97,7 +138,7 @@ const joystickTemplate = (
 		event.preventDefault();
 		target.style.setProperty("--joystick-x", "0px");
 		target.style.setProperty("--joystick-y", "0px");
-		onChange({ x: 0, y: 0 });
+		onChange({ pointerId: event.pointerId, vector: null });
 	};
 	return html`
 		<div
@@ -108,6 +149,7 @@ const joystickTemplate = (
 			@pointerdown=${(event: PointerEvent) => {
 				const target = event.currentTarget;
 				if (!(target instanceof HTMLElement)) return;
+				if (target.dataset["joystickPointer"] !== undefined) return;
 				target.dataset["joystickPointer"] = String(event.pointerId);
 				target.setPointerCapture(event.pointerId);
 				update(event);
@@ -161,7 +203,7 @@ export const mobileControlsTemplate = ({
 	readonly world: World;
 	readonly interaction: DesignStudioInteraction;
 	readonly dispatch: Dispatch;
-}): TemplateResult => {
+}): LitTemplate => {
 	const editing = world.editor.open;
 	const touchEditActive = interaction.isTouchEditActive();
 	if (
@@ -169,18 +211,20 @@ export const mobileControlsTemplate = ({
 		(interaction.isTouchPanelOpen() || interaction.isTouchDetailsOpen()) &&
 		!touchEditActive
 	)
-		return html``;
-	let actionControls = html``;
+		return nothing;
+	let actionControls: LitTemplate = nothing;
 	if (editing && touchEditActive) {
 		actionControls = html`
-			${actionButton({ label: "CANCEL", onClick: interaction.cancelTouchEdit, className: "border-[#9a625d] bg-[#6f3f3e]/94" })}
+			${actionButton({ label: "CANCEL", onClick: interaction.cancelTouchSelection, className: "border-[#9a625d] bg-[#6f3f3e]/94" })}
 			${actionButton({ label: "PLACE", onClick: interaction.commitTouchEdit, className: "border-[#e8b875] bg-[#5d4528]/94" })}
 		`;
 	}
 	if (editing && !touchEditActive && world.editor.selected !== null) {
+		const modeLabel = interaction.touchEditorMode().toUpperCase();
 		actionControls = html`
-			${actionButton({ label: "CANCEL", onClick: () => dispatch(AppAction.EditorSelectionChanged({ selection: null })), className: "min-h-14 border-[#9a625d] bg-[#6f3f3e]/94" })}
+			${actionButton({ label: "CANCEL", onClick: interaction.cancelTouchSelection, className: "min-h-14 border-[#9a625d] bg-[#6f3f3e]/94" })}
 			${actionButton({ label: "DETAILS", onClick: interaction.openTouchDetails, className: "min-h-14 border-[#e8b875] bg-[#5d4528]/94" })}
+			${actionButton({ label: modeLabel, onClick: interaction.toggleTouchEditorMode, className: "col-span-2 min-h-12 border-[#638390] bg-[#294b57]/94" })}
 		`;
 	}
 	if (!editing) {
@@ -194,9 +238,12 @@ export const mobileControlsTemplate = ({
 		: "relative h-30 w-38 landscape:h-27 landscape:w-35";
 	return html`
 		<div class="pointer-events-none absolute inset-x-0 bottom-0 z-20 hidden items-end justify-between gap-5 px-[max(0.875rem,env(safe-area-inset-left))] pb-[max(2.25rem,calc(env(safe-area-inset-bottom)+1.5rem))] any-pointer-coarse:flex landscape:px-[max(0.75rem,env(safe-area-inset-left))] landscape:pb-[max(0.75rem,env(safe-area-inset-bottom))]" aria-label="Touch controls">
-			${joystickTemplate((vector) => {
-				if (editing) interaction.setTouchJoystick(vector);
-				else changeGameplayJoystick(vector, dispatch);
+			${joystickTemplate(({ pointerId, vector }) => {
+				if (editing) {
+					interaction.updateTouchJoystick({ pointerId, vector });
+					return;
+				}
+				changeGameplayJoystick(vector ?? { x: 0, y: 0 }, dispatch);
 			})}
 			<div class=${`pointer-events-auto shrink-0 touch-none ${actionLayoutClass}`} aria-label="Action controls">
 				${actionControls}

@@ -13,6 +13,7 @@ import {
 	projectedRectangle,
 	viewport,
 } from "../../presentation/geometry/projection";
+import { type LitTemplate, nothing } from "../../presentation/lit-template";
 import {
 	Decoration,
 	type DecorationKind,
@@ -160,9 +161,9 @@ export const makeDesignStudioOverlays = (
 	const createPreviewTemplate = (
 		world: World,
 		invalidPreview: boolean,
-	): TemplateResult => {
+	): LitTemplate => {
 		const preview = interaction.createPreview();
-		if (preview === null) return html``;
+		if (preview === null) return nothing;
 		const body = defaultEditorItemBody(preview.itemKind);
 		const position = preview.position;
 		const characterSpawn =
@@ -256,9 +257,9 @@ export const makeDesignStudioOverlays = (
 			readonly top: number;
 			readonly fading: boolean;
 		} | null,
-	): TemplateResult =>
+	): LitTemplate =>
 		popover === null
-			? html``
+			? nothing
 			: html`<div role="status" class=${`pointer-events-none fixed z-50 w-60 rounded-xl border border-[#d9a969] bg-[#17272e] px-4 py-3 text-[13px] font-semibold text-[#fff1d6] shadow-xl transition-opacity duration-200 ${popover.fading ? "opacity-0" : "opacity-100"}`} style=${`left: ${Math.max(12, popover.left - 252)}px; top: ${popover.top}px;`}>Drag this item onto the room to place it.</div>`;
 	return {
 		invalidPlacementTemplate,

@@ -30,9 +30,11 @@ const interaction = {
 	startTouchPalettePlacement: () => {},
 	startTouchEntityMove: () => {},
 	selectTouchEntity: () => {},
-	setTouchJoystick: () => {},
+	updateTouchJoystick: () => {},
 	commitTouchEdit: () => {},
-	cancelTouchEdit: () => {},
+	cancelTouchSelection: () => {},
+	touchEditorMode: () => "move" as const,
+	toggleTouchEditorMode: () => {},
 	toggleTouchPanel: () => {},
 	isTouchPanelOpen: () => true,
 	isTouchEditActive: () => false,
@@ -261,7 +263,7 @@ describe("game scene", () => {
 	});
 
 	test("offers Cancel and Details for a touch selection", () => {
-		const selected = EntityId(2);
+		const selected = EntityId(8);
 		const world = {
 			...initialWorld,
 			editor: { ...initialWorld.editor, open: true, selected },
@@ -283,6 +285,34 @@ describe("game scene", () => {
 
 		expect(scene).toContain("CANCEL");
 		expect(scene).toContain("DETAILS");
+		expect(scene).toContain("MOVE");
+		expect(scene).toContain("any-pointer-coarse:[stroke-width:56]");
 		expect(scene).toContain("data-touch-details");
+	});
+
+	test("shows the active Resize mode for a touch selection", () => {
+		const selected = EntityId(8);
+		const world = {
+			...initialWorld,
+			editor: { ...initialWorld.editor, open: true, selected },
+		};
+		const touchInteraction = {
+			...interaction,
+			isTouchPanelOpen: () => false,
+			touchEditorMode: () => "resize" as const,
+		};
+		const scene = flattenedTemplate(
+			gameSceneTemplate({
+				world,
+				editSessionStatus: editSessionStatus(world),
+				dispatch: () => {},
+				interaction: touchInteraction,
+				designStudioView: makeDesignStudioView(touchInteraction),
+				onRootPointerDown: () => {},
+			}),
+		);
+
+		expect(scene).toContain("RESIZE");
+		expect(scene).toContain("any-pointer-coarse:[stroke-width:72]");
 	});
 });
