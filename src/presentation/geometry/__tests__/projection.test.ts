@@ -82,9 +82,9 @@ describe("camera projection", () => {
 		const nearRightEdge = Position.make({ x: 1200, y: 320 });
 		const following = followCamera(centered, nearRightEdge);
 
-		expect(following.x).toBe(-140);
+		expect(following.x).toBe(-460);
 		expect(followCamera(following, { x: 1100, y: 320 })).toEqual(following);
-		expect(followCamera(following, { x: 1350, y: 320 }).x).toBe(-290);
+		expect(followCamera(following, { x: 1350, y: 320 }).x).toBe(-610);
 	});
 
 	test("unprojects canvas coordinates without changing scale", () => {

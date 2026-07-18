@@ -235,7 +235,7 @@ export const makeDesignStudioPanel = (interaction: DesignStudioInteraction) => {
 			(character) => character.kind === CharacterKinds.Player,
 		);
 		return html`
-				<aside data-editor-panel class=${`absolute top-0 right-0 z-30 flex h-full w-85 flex-col overscroll-contain border-l border-[#41565a] bg-[#0d181f]/98 text-[#fff1d6] shadow-[-18px_0_44px_rgba(3,9,12,0.38)] transition-transform duration-180 ease-out motion-reduce:transition-none ${panelVisible ? "translate-x-0" : "pointer-events-none translate-x-full"}`}>
+				<aside data-editor-panel class=${`absolute top-0 right-0 z-30 flex h-full w-85 flex-col overscroll-contain border-l border-[#41565a] bg-[#0d181f]/98 text-[#fff1d6] shadow-[-18px_0_44px_rgba(3,9,12,0.38)] transition-transform duration-180 ease-out motion-reduce:transition-none max-md:inset-x-0 max-md:top-auto max-md:bottom-0 max-md:h-[min(72dvh,42rem)] max-md:w-full max-md:border-t max-md:border-l-0 max-md:pb-[env(safe-area-inset-bottom)] pointer-coarse:inset-x-0 pointer-coarse:top-auto pointer-coarse:bottom-0 pointer-coarse:h-[min(72dvh,42rem)] pointer-coarse:w-full pointer-coarse:border-t pointer-coarse:border-l-0 pointer-coarse:pb-[env(safe-area-inset-bottom)] ${panelVisible ? "translate-x-0 max-md:translate-y-0 pointer-coarse:translate-y-0" : "pointer-events-none translate-x-full max-md:translate-x-0 max-md:translate-y-full pointer-coarse:translate-x-0 pointer-coarse:translate-y-full"}`}>
 					<header class="border-b border-[#30434a] px-5 pt-6 pb-4">
 						<div class="text-lg font-heading font-bold tracking-[0.2em] text-[#e8b875] uppercase">Design studio</div>
 						<div class="text-[11px] leading-relaxed text-[#819993]">Scroll to pan · Command/Control-drag to pan</div>

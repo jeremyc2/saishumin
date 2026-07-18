@@ -14,8 +14,9 @@ import { Action } from "./action";
 import { type Control, Controls, controlForKey } from "./control";
 import { completeWorldUpdate } from "./world-update";
 
+document.documentElement.className = "h-full w-full overscroll-none";
 document.body.className =
-	"m-0 overflow-hidden bg-[#14212a] font-sans scheme-dark";
+	"m-0 h-full w-full overflow-hidden overscroll-none bg-[#14212a] font-sans scheme-dark [-webkit-tap-highlight-color:transparent]";
 
 const updateSystemLayer = UpdateSystemService.layer.pipe(
 	Layer.provide(MovementSystemService.layer),

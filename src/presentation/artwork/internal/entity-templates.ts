@@ -770,10 +770,10 @@ const lavaMonsterDrawingForFacing = (
 
 const lavaMonsterInteriorTemplate = (view: LavaMonsterView): TemplateResult => {
 	if (view === "side")
-		return svg`<path class="lava-monster-flame" d="M 1 39 C -3 24 7 18 8 7 C 16 14 15 25 21 27 C 26 28 27 20 30 15 L 30 42 Z" fill="#e75b27" />`;
+		return svg`<path class="origin-bottom transform-fill animate-[lava-monster-flicker_0.48s_ease-in-out_infinite] motion-reduce:animate-none" d="M 1 39 C -3 24 7 18 8 7 C 16 14 15 25 21 27 C 26 28 27 20 30 15 L 30 42 Z" fill="#e75b27" />`;
 	if (view === "front-quarter" || view === "rear-quarter")
-		return svg`<path class="lava-monster-flame" d="M -15 39 C -20 25 -11 18 -10 7 C -1 14 -2 26 5 28 C 13 29 13 17 20 10 C 28 20 31 31 26 42 Z" fill="#e75b27" />`;
-	return svg`<path class="lava-monster-flame" d="M -19 39 C -24 24 -15 17 -14 6 C -4 14 -5 26 3 28 C 11 29 11 17 18 9 C 27 20 31 31 26 42 Z" fill="#e75b27" />`;
+		return svg`<path class="origin-bottom transform-fill animate-[lava-monster-flicker_0.48s_ease-in-out_infinite] motion-reduce:animate-none" d="M -15 39 C -20 25 -11 18 -10 7 C -1 14 -2 26 5 28 C 13 29 13 17 20 10 C 28 20 31 31 26 42 Z" fill="#e75b27" />`;
+	return svg`<path class="origin-bottom transform-fill animate-[lava-monster-flicker_0.48s_ease-in-out_infinite] motion-reduce:animate-none" d="M -19 39 C -24 24 -15 17 -14 6 C -4 14 -5 26 3 28 C 11 29 11 17 18 9 C 27 20 31 31 26 42 Z" fill="#e75b27" />`;
 };
 
 const lavaMonsterFaceTemplate = (view: LavaMonsterView): TemplateResult => {
@@ -820,7 +820,7 @@ export const lavaMonsterTemplate = ({
 	return svg`
 		<ellipse cx=${shadow.x} cy=${shadow.y + 3} rx="30" ry="9" fill="#4b1f1d" opacity="0.3" />
 		<g data-lava-monster data-lava-monster-facing=${facing} data-lava-monster-view=${drawing.view} data-lava-monster-expression=${drawing.expression} transform=${`translate(${base.x} ${base.y - 45})`}>
-			<g class="lava-monster-bob">
+			<g class="animate-[lava-monster-bob_0.75s_ease-in-out_infinite] motion-reduce:animate-none">
 				<g transform=${drawing.mirror ? "scale(-1 1)" : "scale(1 1)"}>
 					<path d=${drawing.bodyPath} fill="#a93824" stroke="#49252a" stroke-width="6" stroke-linejoin="round" />
 					${lavaMonsterInteriorTemplate(drawing.view)}

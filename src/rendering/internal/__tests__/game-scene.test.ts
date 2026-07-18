@@ -14,6 +14,7 @@ import { EntityId } from "../../../world/entity-id";
 import { initialWorld } from "../../../world/initial-world";
 import { playerBody } from "../../../world/world";
 import { gameSceneTemplate } from "../game-scene";
+import { mobileControlsTemplate } from "../mobile-controls";
 
 const interaction = {
 	startPan: () => {},
@@ -113,5 +114,48 @@ describe("game scene", () => {
 		expect(scene.strings.join("")).toContain("SAISHUMIN");
 		expect(scene.strings.join("")).toContain("data-floor-base");
 		expect(scene.strings.join("")).not.toContain("document.");
+	});
+
+	test("includes touch controls and fills narrow screens during play", () => {
+		const scene = flattenedTemplate(
+			gameSceneTemplate({
+				world: initialWorld,
+				editSessionStatus: editSessionStatus(initialWorld),
+				dispatch: () => {},
+				interaction,
+				designStudioView: makeDesignStudioView(interaction),
+				onRootPointerDown: () => {},
+			}),
+		);
+
+		const controls = mobileControlsTemplate(() => {}).strings.join("");
+		expect(scene).toContain("preserveAspectRatio=xMidYMid slice");
+		expect(scene).toContain("▲");
+		expect(scene).toContain("JUMP");
+		expect(controls).toContain('aria-label="Touch controls"');
+		expect(controls).toContain('aria-label="Movement controls"');
+		expect(controls).toContain('aria-label="Action controls"');
+	});
+
+	test("keeps the full canvas visible while editing", () => {
+		const world = {
+			...initialWorld,
+			editor: { ...initialWorld.editor, open: true },
+		};
+		const scene = flattenedTemplate(
+			gameSceneTemplate({
+				world,
+				editSessionStatus: editSessionStatus(world),
+				dispatch: () => {},
+				interaction,
+				designStudioView: makeDesignStudioView(interaction),
+				onRootPointerDown: () => {},
+			}),
+		);
+
+		expect(scene).toContain("preserveAspectRatio=xMidYMid meet");
+		expect(scene).toContain("max-md:translate-y-0");
+		expect(scene).not.toContain("data-panel-visible");
+		expect(scene).not.toContain("JUMP");
 	});
 });

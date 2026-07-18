@@ -7,10 +7,10 @@ const depthProjectionScale = Math.SQRT1_2;
 const cameraOrigin = { x: 220, y: 220 } as const;
 export const viewport = { width: 1600, height: 900 } as const;
 const cameraDeadZone = {
-	left: 320,
-	right: 1280,
-	top: 200,
-	bottom: 700,
+	left: 640,
+	right: 960,
+	top: 280,
+	bottom: 620,
 } as const;
 
 export const project = dual<
