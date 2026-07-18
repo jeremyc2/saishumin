@@ -18,7 +18,7 @@ import {
 } from "../../../world/components";
 import { EntityId } from "../../../world/entity-id";
 import { initialWorld } from "../../../world/initial-world";
-import { playerBody } from "../../../world/world";
+import { playerBody, playerEntityIn } from "../../../world/world";
 import { gameSceneTemplate } from "../game-scene";
 import { mobileControlsTemplate } from "../mobile-controls";
 
@@ -238,6 +238,56 @@ describe("game scene", () => {
 		expect(controls).toContain("text-2xl");
 		expect(controls).not.toContain("max-[380px]:rounded-[0.85rem]");
 		expect(controls).not.toContain("activePointer === event.pointerId");
+	});
+
+	test("shows the player's interaction cue only when a contextual target is available", () => {
+		const player = playerEntityIn(initialWorld);
+		if (player === undefined) throw new Error("Expected player Character");
+		const playerPosition = initialWorld.positions.get(player);
+		const playerCharacter = initialWorld.characters.get(player);
+		if (playerPosition === undefined || playerCharacter === undefined)
+			throw new Error("Expected player state");
+		const sign = EntityId(999);
+		const signBody = Body.make({ width: 88, depth: 56 });
+		const signPosition = Position.make({
+			x: playerPosition.x,
+			y: playerPosition.y - (signBody.depth + playerBody.depth) / 2,
+		});
+		const world = {
+			...initialWorld,
+			positions: new Map(initialWorld.positions).set(sign, signPosition),
+			bodies: new Map(initialWorld.bodies).set(sign, signBody),
+			decorations: new Map(initialWorld.decorations).set(
+				sign,
+				Decoration.make({ kind: DecorationKinds.Sign, height: 104 }),
+			),
+			characters: new Map(initialWorld.characters).set(player, {
+				...playerCharacter,
+				facing: PlayerFacings.Up,
+			}),
+		};
+		const render = (nextWorld: typeof world): string =>
+			flattenedTemplate(
+				gameSceneTemplate({
+					world: nextWorld,
+					editSessionStatus: editSessionStatus(nextWorld),
+					dispatch: () => {},
+					interaction,
+					designStudioView: makeDesignStudioView(interaction),
+					onRootPointerDown: () => {},
+				}),
+			);
+
+		expect(render(world)).toContain("data-player-interaction-cue");
+		expect(
+			render({
+				...world,
+				characters: new Map(world.characters).set(player, {
+					...playerCharacter,
+					facing: PlayerFacings.Down,
+				}),
+			}),
+		).not.toContain("data-player-interaction-cue");
 	});
 
 	test("keeps the full canvas visible while editing", () => {

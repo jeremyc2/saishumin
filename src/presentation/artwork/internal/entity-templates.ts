@@ -630,6 +630,7 @@ type PlayerTemplateInput = {
 	readonly shadowHeight: number;
 	readonly facing: PlayerFacing;
 	readonly handlingObject?: boolean;
+	readonly interactionAvailable?: boolean;
 };
 
 export const playerTemplate = ({
@@ -638,6 +639,7 @@ export const playerTemplate = ({
 	shadowHeight,
 	facing,
 	handlingObject = false,
+	interactionAvailable = false,
 }: PlayerTemplateInput): TemplateResult => {
 	const shadow = project(position, shadowHeight);
 	const wheelContact = project(position, elevation.z);
@@ -682,6 +684,18 @@ export const playerTemplate = ({
 				<path d=${drawing.bodyPath} fill="none" stroke="#503b37" stroke-width="7" stroke-linejoin="round" />
 				${playerFaceTemplate(drawing.view, handlingObject)}
 			</g>
+			${
+				interactionAvailable
+					? svg`<g data-player-interaction-cue aria-label="Interaction available" transform="translate(28 -58)" pointer-events="none">
+						<circle cx="-11" cy="16" r="4" fill="#fff1d6" stroke="#503b37" stroke-width="2.5" />
+						<circle cx="-4" cy="8" r="6" fill="#fff1d6" stroke="#503b37" stroke-width="2.5" />
+						<path d="M -8 -5 C -8 -17 3 -24 17 -24 H 31 C 46 -24 54 -16 54 -5 C 54 7 44 14 30 14 H 16 C 2 14 -8 7 -8 -5 Z" fill="#fff1d6" stroke="#503b37" stroke-width="3.5" stroke-linejoin="round" />
+						<circle cx="13" cy="-5" r="3" fill="#503b37" />
+						<circle cx="23" cy="-5" r="3" fill="#503b37" />
+						<circle cx="33" cy="-5" r="3" fill="#503b37" />
+					</g>`
+					: nothing
+			}
 		</g>
 	`;
 };

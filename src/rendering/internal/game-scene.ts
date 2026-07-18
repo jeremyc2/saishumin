@@ -33,6 +33,7 @@ import {
 } from "../../world/components";
 import type { EntityId } from "../../world/entity-id";
 import { surfaceAt } from "../../world/spatial/collision";
+import { contextualInteractionTarget } from "../../world/spatial/contextual-interaction";
 import {
 	entityBaseElevation,
 	shadowSectionsForEntity,
@@ -63,6 +64,7 @@ type RenderedObject = {
 
 const sceneObjects = (world: World): ReadonlyArray<RenderedObject> => {
 	const objects: Array<RenderedObject> = [];
+	const interactionTarget = contextualInteractionTarget(world);
 	for (const [entity, obstacle] of world.obstacles) {
 		const position = world.positions.get(entity);
 		const body = world.bodies.get(entity);
@@ -174,6 +176,8 @@ const sceneObjects = (world: World): ReadonlyArray<RenderedObject> => {
 								facing: character.facing,
 								handlingObject:
 									world.grabbed !== null || world.pushing !== null,
+								interactionAvailable:
+									interactionTarget !== null && world.grabbed === null,
 							})
 						: lavaMonsterTemplate({
 								position,
