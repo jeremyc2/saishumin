@@ -4,6 +4,7 @@ import { Body, Position } from "../../../world/components";
 import { crateBody, crateHeight } from "../../../world/world";
 import {
 	cameraForFloor,
+	canvasViewportForScreen,
 	followCamera,
 	insetRectangle,
 	project,
@@ -48,6 +49,32 @@ describe("insetRectangle", () => {
 });
 
 describe("camera projection", () => {
+	test("fills portrait and landscape screens without letterboxing the canvas", () => {
+		const portrait = canvasViewportForScreen({
+			screen: { width: 390, height: 844 },
+			zoom: 1,
+		});
+		const landscape = canvasViewportForScreen({
+			screen: { width: 844, height: 390 },
+			zoom: 1,
+		});
+
+		expect(portrait.width / portrait.height).toBeCloseTo(390 / 844);
+		expect(landscape.width / landscape.height).toBeCloseTo(844 / 390);
+		expect(portrait.height).toBeGreaterThan(viewport.height);
+		expect(landscape.width).toBeGreaterThan(viewport.width);
+	});
+
+	test("centers pinch zoom on the same canvas midpoint", () => {
+		const zoomed = canvasViewportForScreen({
+			screen: { width: 390, height: 844 },
+			zoom: 2,
+		});
+
+		expect(zoomed.left + zoomed.width / 2).toBe(viewport.width / 2);
+		expect(zoomed.top + zoomed.height / 2).toBe(viewport.height / 2);
+	});
+
 	test("centers the floor in the viewport", () => {
 		const floorPlan = Body.make({ width: 1160, depth: 640 });
 		const floorCenter = Position.make({
@@ -82,9 +109,9 @@ describe("camera projection", () => {
 		const nearRightEdge = Position.make({ x: 1200, y: 320 });
 		const following = followCamera(centered, nearRightEdge);
 
-		expect(following.x).toBe(-140);
+		expect(following.x).toBe(-460);
 		expect(followCamera(following, { x: 1100, y: 320 })).toEqual(following);
-		expect(followCamera(following, { x: 1350, y: 320 }).x).toBe(-290);
+		expect(followCamera(following, { x: 1350, y: 320 }).x).toBe(-610);
 	});
 
 	test("unprojects canvas coordinates without changing scale", () => {

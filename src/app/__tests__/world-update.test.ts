@@ -27,6 +27,6 @@ describe("application World update", () => {
 			action: Action.Tick({ time: 1050 }),
 		});
 
-		expect(completed.gameCamera.x).toBe(-152.25);
+		expect(completed.gameCamera.x).toBe(-472.25);
 	});
 });

@@ -1,6 +1,8 @@
 import { dual } from "effect/Function";
 import { projectedRectangle } from "../../presentation/geometry/projection";
 import type { Position } from "../../world/components";
+import type { EditorSelection } from "../../world/editor-state";
+import type { EntityId } from "../../world/entity-id";
 import {
 	entityBaseElevation,
 	entityHeight,
@@ -36,6 +38,234 @@ export type DesignStudioInteraction = {
 export const initialDesignStudioInteraction: DesignStudioInteraction = {
 	palettePress: null,
 	popover: null,
+};
+
+const touchPanGraceMilliseconds = 110;
+const touchPanThresholdPixels = 8;
+const decisiveTouchPanThresholdPixels = 24;
+const touchSelectionPanThresholdPixels = 16;
+const decisiveTouchSelectionPanThresholdPixels = 32;
+
+export const shouldPanTouchGesture = ({
+	elapsedMilliseconds,
+	distance,
+	selectionCandidate = false,
+}: {
+	readonly elapsedMilliseconds: number;
+	readonly distance: number;
+	readonly selectionCandidate?: boolean;
+}): boolean => {
+	const threshold = selectionCandidate
+		? touchSelectionPanThresholdPixels
+		: touchPanThresholdPixels;
+	const decisiveThreshold = selectionCandidate
+		? decisiveTouchSelectionPanThresholdPixels
+		: decisiveTouchPanThresholdPixels;
+	return (
+		distance >= threshold &&
+		(elapsedMilliseconds >= touchPanGraceMilliseconds ||
+			distance >= decisiveThreshold)
+	);
+};
+
+export const shouldStartPinchGesture = ({
+	touchCount,
+}: {
+	readonly touchCount: number;
+}): boolean => touchCount >= 2;
+
+export type TouchEntityPointerIntent = "move-entity" | "pan-canvas";
+
+export const touchEntityPointerIntent = ({
+	selection,
+	entity,
+}: {
+	readonly selection: EditorSelection;
+	readonly entity: EntityId;
+}): TouchEntityPointerIntent =>
+	selection === entity ? "move-entity" : "pan-canvas";
+
+export type TouchEditorMode = "move" | "resize";
+
+export const nextTouchEditorMode = (mode: TouchEditorMode): TouchEditorMode =>
+	mode === "move" ? "resize" : "move";
+
+export type TouchJoystickTarget = "selected-entity" | "camera";
+
+export const touchJoystickTarget = (
+	selection: EditorSelection,
+): TouchJoystickTarget =>
+	selection !== null && selection !== "floor" ? "selected-entity" : "camera";
+
+export type TouchResizeDirections = {
+	readonly widthDirection: -1 | 0 | 1;
+	readonly depthDirection: -1 | 0 | 1;
+};
+
+const touchResizeCornerRadiusPixels = 64;
+
+const squaredDistance = (first: Position, second: Position): number => {
+	const x = first.x - second.x;
+	const y = first.y - second.y;
+	return x * x + y * y;
+};
+
+const squaredDistanceToSegment = (
+	pointer: Position,
+	start: Position,
+	end: Position,
+): number => {
+	const x = end.x - start.x;
+	const y = end.y - start.y;
+	const lengthSquared = x * x + y * y;
+	if (lengthSquared <= Number.EPSILON) return squaredDistance(pointer, start);
+	const projection =
+		((pointer.x - start.x) * x + (pointer.y - start.y) * y) / lengthSquared;
+	const boundedProjection = Math.min(1, Math.max(0, projection));
+	return squaredDistance(pointer, {
+		x: start.x + x * boundedProjection,
+		y: start.y + y * boundedProjection,
+	});
+};
+
+const isNearResizeOutline = ({
+	pointer,
+	outline,
+	maximumDistancePixels,
+}: {
+	readonly pointer: Position;
+	readonly outline: readonly [Position, Position, Position, Position];
+	readonly maximumDistancePixels: number;
+}): boolean => {
+	const maximumDistanceSquared = maximumDistancePixels * maximumDistancePixels;
+	for (let index = 0; index < outline.length; index += 1) {
+		const start = outline[index];
+		const end = outline[(index + 1) % outline.length];
+		if (
+			start !== undefined &&
+			end !== undefined &&
+			squaredDistanceToSegment(pointer, start, end) <= maximumDistanceSquared
+		)
+			return true;
+	}
+	return false;
+};
+
+export const touchResizeDirections = ({
+	pointer,
+	outline,
+}: {
+	readonly pointer: Position;
+	readonly outline: readonly [Position, Position, Position, Position];
+}): TouchResizeDirections => {
+	type Corner = TouchResizeDirections & { readonly point: Position };
+	const corners: readonly [Corner, Corner, Corner, Corner] = [
+		{ point: outline[0], widthDirection: -1, depthDirection: -1 },
+		{ point: outline[1], widthDirection: 1, depthDirection: -1 },
+		{ point: outline[2], widthDirection: 1, depthDirection: 1 },
+		{ point: outline[3], widthDirection: -1, depthDirection: 1 },
+	];
+	let nearestCorner: Corner = corners[0];
+	let nearestCornerDistance = squaredDistance(pointer, nearestCorner.point);
+	for (const corner of corners.slice(1)) {
+		const distance = squaredDistance(pointer, corner.point);
+		if (distance >= nearestCornerDistance) continue;
+		nearestCorner = corner;
+		nearestCornerDistance = distance;
+	}
+	if (
+		nearestCornerDistance <=
+		touchResizeCornerRadiusPixels * touchResizeCornerRadiusPixels
+	)
+		return nearestCorner;
+
+	type Side = TouchResizeDirections & {
+		readonly start: Position;
+		readonly end: Position;
+	};
+	const sides: readonly [Side, Side, Side, Side] = [
+		{
+			start: outline[0],
+			end: outline[1],
+			widthDirection: 0,
+			depthDirection: -1,
+		},
+		{
+			start: outline[1],
+			end: outline[2],
+			widthDirection: 1,
+			depthDirection: 0,
+		},
+		{
+			start: outline[2],
+			end: outline[3],
+			widthDirection: 0,
+			depthDirection: 1,
+		},
+		{
+			start: outline[3],
+			end: outline[0],
+			widthDirection: -1,
+			depthDirection: 0,
+		},
+	];
+	let nearestSide: Side = sides[0];
+	let nearestSideDistance = squaredDistanceToSegment(
+		pointer,
+		nearestSide.start,
+		nearestSide.end,
+	);
+	for (const side of sides.slice(1)) {
+		const distance = squaredDistanceToSegment(pointer, side.start, side.end);
+		if (distance >= nearestSideDistance) continue;
+		nearestSide = side;
+		nearestSideDistance = distance;
+	}
+	return nearestSide;
+};
+
+export const touchResizeDirectionsForEvent = ({
+	event,
+	outline,
+	maximumDistancePixels,
+}: {
+	readonly event: PointerEvent;
+	readonly outline: readonly [Position, Position, Position, Position];
+	readonly maximumDistancePixels?: number;
+}): TouchResizeDirections | null => {
+	const target = event.currentTarget;
+	let clientOutline = outline;
+	if (
+		target !== null &&
+		typeof target === "object" &&
+		"getScreenCTM" in target &&
+		typeof target.getScreenCTM === "function"
+	) {
+		const matrix = target.getScreenCTM();
+		if (matrix !== null) {
+			const clientPoint = (point: Position): Position => ({
+				x: matrix.a * point.x + matrix.c * point.y + matrix.e,
+				y: matrix.b * point.x + matrix.d * point.y + matrix.f,
+			});
+			clientOutline = [
+				clientPoint(outline[0]),
+				clientPoint(outline[1]),
+				clientPoint(outline[2]),
+				clientPoint(outline[3]),
+			];
+		}
+	}
+	const pointer = { x: event.clientX, y: event.clientY };
+	if (
+		maximumDistancePixels !== undefined &&
+		!isNearResizeOutline({
+			pointer,
+			outline: clientOutline,
+			maximumDistancePixels,
+		})
+	)
+		return null;
+	return touchResizeDirections({ pointer, outline: clientOutline });
 };
 
 export const isDesignStudioPanelVisible = (world: World): boolean =>
@@ -171,6 +401,35 @@ const axisAutoPanSpeed = (pointer: number, extent: number): number => {
 
 const clamp = (value: number, minimum: number, maximum: number): number =>
 	Math.min(Math.max(value, minimum), maximum);
+
+export const clampCameraToEnvelope = ({
+	camera,
+	viewport,
+	envelope,
+	padding = autoPanEnvelopePadding,
+}: {
+	readonly camera: Position;
+	readonly viewport: ScreenBounds;
+	readonly envelope: ScreenBounds;
+	readonly padding?: number;
+}): Position => {
+	const minimumX = viewport.left + padding - envelope.right;
+	const maximumX = viewport.right - padding - envelope.left;
+	const minimumY = viewport.top + padding - envelope.bottom;
+	const maximumY = viewport.bottom - padding - envelope.top;
+	return {
+		x: clamp(
+			camera.x,
+			Math.min(minimumX, maximumX),
+			Math.max(minimumX, maximumX),
+		),
+		y: clamp(
+			camera.y,
+			Math.min(minimumY, maximumY),
+			Math.max(minimumY, maximumY),
+		),
+	};
+};
 
 const clampedAutoPanAxis = (
 	current: number,

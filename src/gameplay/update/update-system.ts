@@ -2,17 +2,13 @@ import { Context, Effect, Layer } from "effect";
 import { Action } from "../../app/action";
 import { Controls, type Direction, isDirection } from "../../app/control";
 import { updateDesignStudio } from "../../design-studio/design-studio";
-import {
-	DecorationKinds,
-	ObstacleKinds,
-	PlayerFacings,
-} from "../../world/components";
+import { DecorationKinds, ObstacleKinds } from "../../world/components";
 import type { EntityId as EntityIdType } from "../../world/entity-id";
 import { surfaceAt } from "../../world/spatial/collision";
+import { contextualInteractionTarget } from "../../world/spatial/contextual-interaction";
 import { entityBaseElevation } from "../../world/spatial/elevation";
 import {
 	crateGrabDistance,
-	interactionDistance,
 	jumpSpeed,
 	maximumFrameElapsedSeconds,
 	millisecondsPerSecond,
@@ -37,47 +33,6 @@ export class UpdateSystemService extends Context.Service<
 	static readonly layer = Layer.effect(this)(
 		Effect.gen(function* () {
 			const movementSystem = yield* MovementSystemService;
-			const interactableInFrontOfPlayer = (
-				world: World,
-				isInteractable: (entity: EntityIdType) => boolean,
-			): EntityIdType | null => {
-				const playerEntity = playerEntityIn(world);
-				if (playerEntity === undefined) return null;
-				const playerPosition = world.positions.get(playerEntity);
-				const playerElevation = world.elevations.get(playerEntity);
-				const playerCharacter = world.characters.get(playerEntity);
-				if (
-					playerPosition === undefined ||
-					playerElevation === undefined ||
-					playerElevation.velocity !== stationaryVelocity ||
-					playerCharacter?.facing !== PlayerFacings.Up
-				)
-					return null;
-				for (const [entity, objectPosition] of world.positions) {
-					if (!isInteractable(entity)) continue;
-					const objectBody = world.bodies.get(entity);
-					if (
-						objectBody === undefined ||
-						Math.abs(entityBaseElevation(world, entity) - playerElevation.z) >
-							obstacleHeightTolerance
-					)
-						continue;
-					const horizontalOverlap =
-						Math.abs(playerPosition.x - objectPosition.x) <
-						(playerBody.width + objectBody.width) / 2;
-					const frontGap =
-						playerPosition.y -
-						playerBody.depth / 2 -
-						(objectPosition.y + objectBody.depth / 2);
-					if (
-						horizontalOverlap &&
-						frontGap >= 0 &&
-						frontGap <= interactionDistance
-					)
-						return entity;
-				}
-				return null;
-			};
 			const nearestGrabbableObject = (world: World): EntityIdType | null => {
 				const playerEntity = playerEntityIn(world);
 				if (playerEntity === undefined) return null;
@@ -117,43 +72,50 @@ export class UpdateSystemService extends Context.Service<
 				}
 				return nearest;
 			};
+			const interact = (world: World): World => {
+				const target = contextualInteractionTarget(world);
+				if (target === null) return world;
+				if (target.kind === "chest") {
+					const openedChests = new Set(world.openedChests);
+					if (openedChests.has(target.entity))
+						openedChests.delete(target.entity);
+					else openedChests.add(target.entity);
+					return { ...world, openedChests };
+				}
+				return {
+					...world,
+					pressed: new Set<Direction>(),
+					grabbed: null,
+					pushing: null,
+					readingSign: target.entity,
+				};
+			};
 			return {
 				update: ({ world, action }): World =>
 					Action.$match(action, {
 						KeyChanged: ({ key, pressed }) => {
-							if (world.readingSign !== null)
-								return key === Controls.Interact && pressed
-									? { ...world, readingSign: null }
-									: world;
+							if (world.readingSign !== null) {
+								if (key === Controls.Interact && pressed)
+									return { ...world, readingSign: null };
+								if (key === Controls.ContextAction && !pressed)
+									return { ...world, readingSign: null };
+								return world;
+							}
 							if (world.editor.open) return world;
 							if (key === Controls.Interact) {
 								if (!pressed) return world;
-								const chest = interactableInFrontOfPlayer(
-									world,
-									(entity) =>
-										world.obstacles.get(entity)?.kind === ObstacleKinds.Chest,
-								);
-								if (chest !== null) {
-									const openedChests = new Set(world.openedChests);
-									if (openedChests.has(chest)) openedChests.delete(chest);
-									else openedChests.add(chest);
-									return { ...world, openedChests };
+								return interact(world);
+							}
+							if (key === Controls.ContextAction) {
+								if (pressed) {
+									const grabbed = nearestGrabbableObject(world);
+									return grabbed === null
+										? world
+										: { ...world, grabbed, pushing: null };
 								}
-								const sign = interactableInFrontOfPlayer(
-									world,
-									(entity) =>
-										world.decorations.get(entity)?.kind ===
-										DecorationKinds.Sign,
-								);
-								return sign === null
-									? world
-									: {
-											...world,
-											pressed: new Set<Direction>(),
-											grabbed: null,
-											pushing: null,
-											readingSign: sign,
-										};
+								if (world.grabbed !== null)
+									return { ...world, grabbed: null, pushing: null };
+								return interact(world);
 							}
 							if (key === Controls.Grab)
 								return {

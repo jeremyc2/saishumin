@@ -23,11 +23,6 @@
 	--font-heading: "Chillax", ui-sans-serif, system-ui, sans-serif;
 }
 
-html,
-body {
-	overscroll-behavior: none;
-}
-
 @keyframes lava-monster-bob {
 	0%,
 	100% {
@@ -47,23 +42,6 @@ body {
 	50% {
 		transform: scale(0.92, 1.08);
 		opacity: 1;
-	}
-}
-
-.lava-monster-bob {
-	animation: lava-monster-bob 0.75s ease-in-out infinite;
-}
-
-.lava-monster-flame {
-	transform-box: fill-box;
-	transform-origin: center bottom;
-	animation: lava-monster-flicker 0.48s ease-in-out infinite;
-}
-
-@media (prefers-reduced-motion: reduce) {
-	.lava-monster-bob,
-	.lava-monster-flame {
-		animation: none;
 	}
 }
 

@@ -21,7 +21,6 @@ import {
 import { isSupportSurfaceTransformValid } from "../../world/spatial/support-surface";
 import {
 	characterSpawnPosition,
-	isPlayerEntity,
 	lavaMonsterCollisionHeight,
 	obstacleHeightTolerance,
 	playerCollisionHeight,
@@ -41,7 +40,7 @@ export type OriginalPlacement = {
 };
 
 const isBlockingEntity = (world: World, entity: EntityId): boolean =>
-	!isPlayerEntity(world, entity) && isSolidEntity(world, entity);
+	!world.characters.has(entity) && isSolidEntity(world, entity);
 
 const placementBoundaryTolerance = 0.000_001;
 

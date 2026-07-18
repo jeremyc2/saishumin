@@ -14,6 +14,8 @@ import {
 	project,
 	projectedRectangle,
 } from "../../geometry/projection";
+import { type LitTemplate, nothing } from "../../lit-template";
+import { decorationArtworkScale } from "../visual-footprint";
 
 const boxOutlineWidth = 3;
 
@@ -577,7 +579,7 @@ export const decorationTemplate = ({
 	}
 
 	const base = project(position, baseElevation);
-	const scale = Math.max(0.55, Math.min(2.6, (body.width + body.depth) / 140));
+	const scale = decorationArtworkScale(body);
 	if (decoration.kind === DecorationKinds.Sign)
 		return signpostTemplate({
 			position,
@@ -595,13 +597,15 @@ export const decorationTemplate = ({
 		const leafEdge = grabbed ? grabbedEdge : "#294c3c";
 		const potEdge = grabbed ? grabbedEdge : "#563f38";
 		return svg`
-			<g transform=${`translate(${base.x} ${base.y}) scale(${scale} ${heightScale})`}>
-				<ellipse cx="0" cy="3" rx="26" ry="9" fill="#14212a" opacity="0.2" />
+			<g transform=${`translate(${base.x} ${base.y})`}>
+				<ellipse transform=${`scale(${scale})`} cx="0" cy="3" rx="26" ry="9" fill="#14212a" opacity="0.2" />
+				<g transform=${`scale(${scale} ${heightScale})`}>
 				<path d="M -18 -29 Q -26 -58 -8 -66 Q -2 -44 0 -24" fill="#52785d" stroke=${leafEdge} stroke-width="3" />
 				<path d="M 4 -25 Q 7 -64 27 -59 Q 25 -37 10 -20" fill="#6d9568" stroke=${leafEdge} stroke-width="3" />
 				<path d="M -3 -23 Q -5 -74 12 -78 Q 20 -50 7 -19" fill="#88aa73" stroke=${leafEdge} stroke-width="3" />
 				<path d="M -20 -27 L 20 -27 L 15 1 Q 0 10 -15 1 Z" fill="#bb7148" stroke=${potEdge} stroke-width="4" />
 				<path d="M -23 -30 L 23 -30 L 20 -20 L -20 -20 Z" fill="#d58a55" stroke=${potEdge} stroke-width="4" />
+				</g>
 			</g>
 		`;
 	}
@@ -626,6 +630,7 @@ type PlayerTemplateInput = {
 	readonly shadowHeight: number;
 	readonly facing: PlayerFacing;
 	readonly handlingObject?: boolean;
+	readonly interactionAvailable?: boolean;
 };
 
 export const playerTemplate = ({
@@ -634,6 +639,7 @@ export const playerTemplate = ({
 	shadowHeight,
 	facing,
 	handlingObject = false,
+	interactionAvailable = false,
 }: PlayerTemplateInput): TemplateResult => {
 	const shadow = project(position, shadowHeight);
 	const wheelContact = project(position, elevation.z);
@@ -651,7 +657,7 @@ export const playerTemplate = ({
 	const isAirborne =
 		hasSurface && shadowDistance > playerShadowVisual.airborneThreshold;
 	const drawing = playerDrawingForFacing(facing);
-	let shadowTemplate = svg``;
+	let shadowTemplate: LitTemplate = nothing;
 	if (isAirborne)
 		shadowTemplate = svg`<ellipse cx=${shadow.x} cy=${shadow.y + playerShadowVisual.airborneOffset} rx=${playerShadowVisual.airborneRadius.x * shadowScale} ry=${playerShadowVisual.airborneRadius.y * shadowScale} fill="#14212a" opacity=${shadowOpacity} />`;
 	else if (hasSurface)
@@ -678,6 +684,18 @@ export const playerTemplate = ({
 				<path d=${drawing.bodyPath} fill="none" stroke="#503b37" stroke-width="7" stroke-linejoin="round" />
 				${playerFaceTemplate(drawing.view, handlingObject)}
 			</g>
+			${
+				interactionAvailable
+					? svg`<g data-player-interaction-cue aria-label="Interaction available" transform="translate(28 -58)" pointer-events="none">
+						<circle cx="-11" cy="16" r="4" fill="#fff1d6" stroke="#503b37" stroke-width="2.5" />
+						<circle cx="-4" cy="8" r="6" fill="#fff1d6" stroke="#503b37" stroke-width="2.5" />
+						<path d="M -8 -5 C -8 -17 3 -24 17 -24 H 31 C 46 -24 54 -16 54 -5 C 54 7 44 14 30 14 H 16 C 2 14 -8 7 -8 -5 Z" fill="#fff1d6" stroke="#503b37" stroke-width="3.5" stroke-linejoin="round" />
+						<circle cx="13" cy="-5" r="3" fill="#503b37" />
+						<circle cx="23" cy="-5" r="3" fill="#503b37" />
+						<circle cx="33" cy="-5" r="3" fill="#503b37" />
+					</g>`
+					: nothing
+			}
 		</g>
 	`;
 };
@@ -770,14 +788,14 @@ const lavaMonsterDrawingForFacing = (
 
 const lavaMonsterInteriorTemplate = (view: LavaMonsterView): TemplateResult => {
 	if (view === "side")
-		return svg`<path class="lava-monster-flame" d="M 1 39 C -3 24 7 18 8 7 C 16 14 15 25 21 27 C 26 28 27 20 30 15 L 30 42 Z" fill="#e75b27" />`;
+		return svg`<path class="origin-bottom transform-fill animate-[lava-monster-flicker_0.48s_ease-in-out_infinite] motion-reduce:animate-none" d="M 1 39 C -3 24 7 18 8 7 C 16 14 15 25 21 27 C 26 28 27 20 30 15 L 30 42 Z" fill="#e75b27" />`;
 	if (view === "front-quarter" || view === "rear-quarter")
-		return svg`<path class="lava-monster-flame" d="M -15 39 C -20 25 -11 18 -10 7 C -1 14 -2 26 5 28 C 13 29 13 17 20 10 C 28 20 31 31 26 42 Z" fill="#e75b27" />`;
-	return svg`<path class="lava-monster-flame" d="M -19 39 C -24 24 -15 17 -14 6 C -4 14 -5 26 3 28 C 11 29 11 17 18 9 C 27 20 31 31 26 42 Z" fill="#e75b27" />`;
+		return svg`<path class="origin-bottom transform-fill animate-[lava-monster-flicker_0.48s_ease-in-out_infinite] motion-reduce:animate-none" d="M -15 39 C -20 25 -11 18 -10 7 C -1 14 -2 26 5 28 C 13 29 13 17 20 10 C 28 20 31 31 26 42 Z" fill="#e75b27" />`;
+	return svg`<path class="origin-bottom transform-fill animate-[lava-monster-flicker_0.48s_ease-in-out_infinite] motion-reduce:animate-none" d="M -19 39 C -24 24 -15 17 -14 6 C -4 14 -5 26 3 28 C 11 29 11 17 18 9 C 27 20 31 31 26 42 Z" fill="#e75b27" />`;
 };
 
-const lavaMonsterFaceTemplate = (view: LavaMonsterView): TemplateResult => {
-	if (view === "back") return svg``;
+const lavaMonsterFaceTemplate = (view: LavaMonsterView): LitTemplate => {
+	if (view === "back") return nothing;
 	if (view === "rear-quarter")
 		return svg`<path d="M 16 5 L 21 8 L 19 14" fill="none" stroke="#4b2728" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" opacity="0.55" />`;
 	if (view === "side")
@@ -820,7 +838,7 @@ export const lavaMonsterTemplate = ({
 	return svg`
 		<ellipse cx=${shadow.x} cy=${shadow.y + 3} rx="30" ry="9" fill="#4b1f1d" opacity="0.3" />
 		<g data-lava-monster data-lava-monster-facing=${facing} data-lava-monster-view=${drawing.view} data-lava-monster-expression=${drawing.expression} transform=${`translate(${base.x} ${base.y - 45})`}>
-			<g class="lava-monster-bob">
+			<g class="animate-[lava-monster-bob_0.75s_ease-in-out_infinite] motion-reduce:animate-none">
 				<g transform=${drawing.mirror ? "scale(-1 1)" : "scale(1 1)"}>
 					<path d=${drawing.bodyPath} fill="#a93824" stroke="#49252a" stroke-width="6" stroke-linejoin="round" />
 					${lavaMonsterInteriorTemplate(drawing.view)}

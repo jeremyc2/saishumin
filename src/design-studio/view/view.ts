@@ -1,15 +1,19 @@
-import { svg, type TemplateResult } from "lit-html";
+import { svg } from "lit-html";
 import type { Action as AppAction } from "../../app/action";
+import { plantVisualFootprintBody } from "../../presentation/artwork/visual-footprint";
 import {
 	points,
 	projectedRectangle,
 } from "../../presentation/geometry/projection";
 import type { ResizeDirection } from "../../presentation/geometry/resize";
-import type { Position } from "../../world/components";
+import { type LitTemplate, nothing } from "../../presentation/lit-template";
+import { DecorationKinds, type Position } from "../../world/components";
+import type { EntityId } from "../../world/entity-id";
 import { surfaceAt } from "../../world/spatial/collision";
 import { entityBaseElevation } from "../../world/spatial/elevation";
 import { characterSpawnPosition, type World } from "../../world/world";
 import type { DesignStudioInteraction } from "../interaction/interaction";
+import { touchResizeDirectionsForEvent } from "../interaction/pointer";
 import { makeDesignStudioOverlays } from "./overlays";
 import { makeDesignStudioPanel } from "./panel";
 
@@ -23,6 +27,20 @@ const midpoint = (start: Position, end: Position): Position => ({
 	y: (start.y + end.y) / 2,
 });
 
+export const editorEntitySelectionBody = ({
+	world,
+	entity,
+}: {
+	readonly world: World;
+	readonly entity: EntityId;
+}) => {
+	const body = world.bodies.get(entity);
+	if (body === undefined) return undefined;
+	if (world.decorations.get(entity)?.kind === DecorationKinds.Plant)
+		return plantVisualFootprintBody(body);
+	return body;
+};
+
 export type DesignStudioView = ReturnType<typeof makeDesignStudioView>;
 
 export const makeDesignStudioView = (interaction: DesignStudioInteraction) => {
@@ -30,10 +48,11 @@ export const makeDesignStudioView = (interaction: DesignStudioInteraction) => {
 		world: World,
 		invalidPreview: boolean,
 		dispatch: Dispatch,
-	): TemplateResult => {
+	): LitTemplate => {
 		const selected = world.editor.selected;
-		if (selected === null) return svg``;
+		if (selected === null) return nothing;
 		const accent = invalidPreview ? "#e59a91" : "#fff0a8";
+		const resizeTouchMode = interaction.touchEditorMode() === "resize";
 		if (selected === "floor") {
 			const outline = projectedRectangle(
 				{
@@ -153,6 +172,7 @@ export const makeDesignStudioView = (interaction: DesignStudioInteraction) => {
 							y2=${edge.end.y}
 							stroke="transparent"
 							stroke-width="18"
+							vector-effect="non-scaling-stroke"
 							pointer-events="stroke"
 							class=${edge.cursor}
 							@pointerdown=${(event: PointerEvent) =>
@@ -166,7 +186,8 @@ export const makeDesignStudioView = (interaction: DesignStudioInteraction) => {
 						/>`,
 					)}
 					${handles.map(
-						(handle) => svg`<rect
+						(handle) => svg`<g>
+						<rect
 							x=${handle.point.x - selectionHandleSize / 2}
 							y=${handle.point.y - selectionHandleSize / 2}
 							width=${selectionHandleSize}
@@ -184,8 +205,37 @@ export const makeDesignStudioView = (interaction: DesignStudioInteraction) => {
 									handle.depthDirection,
 									dispatch,
 								)}
-						/>`,
+						/></g>`,
 					)}
+					${
+						resizeTouchMode
+							? svg`<polygon
+								data-touch-resize-target
+								points=${points(outline)}
+								fill="none"
+								stroke="#000"
+								stroke-opacity="0.001"
+								stroke-width="128"
+								vector-effect="non-scaling-stroke"
+								pointer-events="stroke"
+								class="hidden any-pointer-coarse:block"
+								@pointerdown=${(event: PointerEvent) => {
+									const directions = touchResizeDirectionsForEvent({
+										event,
+										outline,
+									});
+									if (directions === null) return;
+									interaction.startFloorResize(
+										event,
+										world,
+										directions.widthDirection,
+										directions.depthDirection,
+										dispatch,
+									);
+								}}
+							/>`
+							: nothing
+					}
 				`;
 		}
 
@@ -193,8 +243,8 @@ export const makeDesignStudioView = (interaction: DesignStudioInteraction) => {
 		const position = characterSelected
 			? characterSpawnPosition({ world, entity: selected })
 			: world.positions.get(selected);
-		const body = world.bodies.get(selected);
-		if (position === undefined || body === undefined) return svg``;
+		const body = editorEntitySelectionBody({ world, entity: selected });
+		if (position === undefined || body === undefined) return nothing;
 		const outline = projectedRectangle(
 			position,
 			body,
@@ -202,8 +252,48 @@ export const makeDesignStudioView = (interaction: DesignStudioInteraction) => {
 				? surfaceAt(world, position, body)
 				: entityBaseElevation(world, selected),
 		);
+		const touchMoveTarget = resizeTouchMode
+			? nothing
+			: svg`<polygon
+					data-touch-move-target
+					points=${points(outline)}
+					fill="transparent"
+					stroke="transparent"
+					stroke-width="128"
+					vector-effect="non-scaling-stroke"
+					pointer-events="all"
+					class="hidden any-pointer-coarse:block"
+					@pointerdown=${(event: PointerEvent) =>
+						interaction.startEntityMove(event, world, selected, dispatch)}
+				/>`;
+		const selectionCenter = midpoint(outline[0], outline[2]);
+		const moveIndicatorScale = 1 / interaction.zoom();
+		const touchMovePresentation = resizeTouchMode
+			? nothing
+			: svg`
+					<polygon
+						data-touch-move-highlight
+						points=${points(outline)}
+						fill=${accent}
+						fill-opacity="0.24"
+						stroke=${accent}
+						stroke-width="5"
+						vector-effect="non-scaling-stroke"
+						pointer-events="none"
+						class="hidden any-pointer-coarse:block"
+					/>
+					<g
+						data-touch-move-indicator
+						transform=${`translate(${selectionCenter.x} ${selectionCenter.y}) scale(${moveIndicatorScale})`}
+						pointer-events="none"
+						class="hidden any-pointer-coarse:block"
+					>
+						<circle r="40" fill=${accent} stroke="#503b37" stroke-width="4" vector-effect="non-scaling-stroke" />
+						<path d="M-28 0H28M-28 0l8-8M-28 0l8 8M28 0l-8-8M28 0l-8 8M0-28V28M0-28l-8 8M0-28l8 8M0 28l-8-8M0 28l8-8" fill="none" stroke="#503b37" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke" />
+					</g>
+				`;
 		if (characterSelected)
-			return svg`<polygon points=${points(outline)} fill="none" stroke=${accent} stroke-width="4" stroke-dasharray="10 7" vector-effect="non-scaling-stroke" pointer-events="none" />`;
+			return svg`<polygon points=${points(outline)} fill="none" stroke=${accent} stroke-width="4" stroke-dasharray="10 7" vector-effect="non-scaling-stroke" pointer-events="none" class=${resizeTouchMode ? "" : "any-pointer-coarse:hidden"} />${touchMovePresentation}${touchMoveTarget}`;
 		const edges: ReadonlyArray<{
 			readonly start: Position;
 			readonly end: Position;
@@ -296,7 +386,9 @@ export const makeDesignStudioView = (interaction: DesignStudioInteraction) => {
 			},
 		];
 		return svg`
-				<polygon points=${points(outline)} fill="none" stroke=${accent} stroke-width="4" stroke-dasharray="10 7" vector-effect="non-scaling-stroke" pointer-events="none" />
+				<polygon points=${points(outline)} fill="none" stroke=${accent} stroke-width="4" stroke-dasharray="10 7" vector-effect="non-scaling-stroke" pointer-events="none" class=${resizeTouchMode ? "" : "any-pointer-coarse:hidden"} />
+				${touchMovePresentation}
+				${touchMoveTarget}
 				${edges.map(
 					(edge) => svg`<line
 						x1=${edge.start.x}
@@ -305,8 +397,9 @@ export const makeDesignStudioView = (interaction: DesignStudioInteraction) => {
 						y2=${edge.end.y}
 						stroke="transparent"
 						stroke-width="18"
+						vector-effect="non-scaling-stroke"
 						pointer-events="stroke"
-						class=${edge.cursor}
+						class=${`${edge.cursor} ${resizeTouchMode ? "" : "any-pointer-coarse:hidden"}`}
 						@pointerdown=${(event: PointerEvent) =>
 							interaction.startEntityResize(
 								event,
@@ -319,7 +412,9 @@ export const makeDesignStudioView = (interaction: DesignStudioInteraction) => {
 					/>`,
 				)}
 				${handles.map(
-					(handle) => svg`<rect
+					(handle) => svg`<g>
+						<rect
+							data-selection-handle
 							x=${handle.point.x - selectionHandleSize / 2}
 							y=${handle.point.y - selectionHandleSize / 2}
 							width=${selectionHandleSize}
@@ -328,7 +423,7 @@ export const makeDesignStudioView = (interaction: DesignStudioInteraction) => {
 							fill=${accent}
 							stroke="#503b37"
 							stroke-width="3"
-							class=${handle.cursor}
+							class=${`${handle.cursor} ${resizeTouchMode ? "" : "any-pointer-coarse:hidden"}`}
 							@pointerdown=${(event: PointerEvent) =>
 								interaction.startEntityResize(
 									event,
@@ -338,8 +433,38 @@ export const makeDesignStudioView = (interaction: DesignStudioInteraction) => {
 									handle.depthDirection,
 									dispatch,
 								)}
-						/>`,
+						/></g>`,
 				)}
+				${
+					resizeTouchMode
+						? svg`<polygon
+							data-touch-resize-target
+							points=${points(outline)}
+							fill="none"
+							stroke="#000"
+							stroke-opacity="0.001"
+							stroke-width="128"
+							vector-effect="non-scaling-stroke"
+							pointer-events="stroke"
+							class="hidden any-pointer-coarse:block"
+							@pointerdown=${(event: PointerEvent) => {
+								const directions = touchResizeDirectionsForEvent({
+									event,
+									outline,
+								});
+								if (directions === null) return;
+								interaction.startEntityResize(
+									event,
+									world,
+									selected,
+									directions.widthDirection,
+									directions.depthDirection,
+									dispatch,
+								);
+							}}
+						/>`
+						: nothing
+				}
 			`;
 	};
 

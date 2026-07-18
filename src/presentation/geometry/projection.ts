@@ -6,11 +6,63 @@ const horizontalProjectionScale = 1;
 const depthProjectionScale = Math.SQRT1_2;
 const cameraOrigin = { x: 220, y: 220 } as const;
 export const viewport = { width: 1600, height: 900 } as const;
+export type CanvasViewport = {
+	readonly left: number;
+	readonly top: number;
+	readonly width: number;
+	readonly height: number;
+	readonly right: number;
+	readonly bottom: number;
+};
+
+export const canvasCoverZoomForScreen = (screen: {
+	readonly width: number;
+	readonly height: number;
+}): number => {
+	const screenAspectRatio =
+		Math.max(1, screen.width) / Math.max(1, screen.height);
+	const canvasAspectRatio = viewport.width / viewport.height;
+	return Math.max(
+		screenAspectRatio / canvasAspectRatio,
+		canvasAspectRatio / screenAspectRatio,
+	);
+};
+
+export const canvasViewportForScreen = ({
+	screen,
+	zoom,
+}: {
+	readonly screen: { readonly width: number; readonly height: number };
+	readonly zoom: number;
+}): CanvasViewport => {
+	const safeWidth = Math.max(1, screen.width);
+	const safeHeight = Math.max(1, screen.height);
+	const screenAspectRatio = safeWidth / safeHeight;
+	const canvasAspectRatio = viewport.width / viewport.height;
+	let width = viewport.width;
+	let height = viewport.height;
+	if (screenAspectRatio > canvasAspectRatio)
+		width = viewport.height * screenAspectRatio;
+	else height = viewport.width / screenAspectRatio;
+	const safeZoom = Math.max(Number.EPSILON, zoom);
+	width /= safeZoom;
+	height /= safeZoom;
+	const left = (viewport.width - width) / 2;
+	const top = (viewport.height - height) / 2;
+	return {
+		left,
+		top,
+		width,
+		height,
+		right: left + width,
+		bottom: top + height,
+	};
+};
 const cameraDeadZone = {
-	left: 320,
-	right: 1280,
-	top: 200,
-	bottom: 700,
+	left: 640,
+	right: 960,
+	top: 280,
+	bottom: 620,
 } as const;
 
 export const project = dual<

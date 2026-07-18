@@ -15,18 +15,97 @@ const playerEntity = EntityId(1);
 
 import {
 	autoPanCamera,
+	clampCameraToEnvelope,
 	contentEnvelope,
 	contentEnvelopeIncludingPreview,
 	floorResizePointerDelta,
 	initialDesignStudioInteraction,
 	isDesignStudioPanelVisible,
 	movePalettePress,
+	nextTouchEditorMode,
 	pressPaletteItem,
 	releasePalettePress,
+	shouldPanTouchGesture,
+	shouldStartPinchGesture,
+	touchEntityPointerIntent,
+	touchJoystickTarget,
+	touchResizeDirections,
 	visiblePalettePopover,
 } from "../pointer";
 
 describe("Design Studio interaction", () => {
+	test("reserves a short grace window for a second pinch pointer", () => {
+		expect(
+			shouldPanTouchGesture({ elapsedMilliseconds: 70, distance: 12 }),
+		).toBe(false);
+		expect(
+			shouldPanTouchGesture({ elapsedMilliseconds: 140, distance: 4 }),
+		).toBe(false);
+		expect(
+			shouldPanTouchGesture({ elapsedMilliseconds: 140, distance: 12 }),
+		).toBe(true);
+		expect(shouldStartPinchGesture({ touchCount: 1 })).toBe(false);
+		expect(shouldStartPinchGesture({ touchCount: 2 })).toBe(true);
+	});
+
+	test("starts a decisive one-finger pan before the pinch grace window expires", () => {
+		expect(
+			shouldPanTouchGesture({ elapsedMilliseconds: 70, distance: 24 }),
+		).toBe(true);
+	});
+
+	test("toggles between explicit Move and Resize touch modes", () => {
+		expect(nextTouchEditorMode("move")).toBe("resize");
+		expect(nextTouchEditorMode("resize")).toBe("move");
+	});
+
+	test("routes the joystick to a selected entity and otherwise to the camera", () => {
+		expect(touchJoystickTarget(EntityId(8))).toBe("selected-entity");
+		expect(touchJoystickTarget(null)).toBe("camera");
+		expect(touchJoystickTarget("floor")).toBe("camera");
+	});
+
+	test("pans from an unselected touch object and moves only a selection", () => {
+		const selected = EntityId(8);
+		expect(
+			touchEntityPointerIntent({ selection: selected, entity: selected }),
+		).toBe("move-entity");
+		expect(
+			touchEntityPointerIntent({ selection: null, entity: selected }),
+		).toBe("pan-canvas");
+		expect(
+			touchEntityPointerIntent({
+				selection: EntityId(9),
+				entity: selected,
+			}),
+		).toBe("pan-canvas");
+	});
+
+	test("prefers corners for small resize targets and sides only away from corners", () => {
+		expect(
+			touchResizeDirections({
+				pointer: { x: 40, y: 0 },
+				outline: [
+					{ x: 0, y: 0 },
+					{ x: 80, y: 0 },
+					{ x: 80, y: 60 },
+					{ x: 0, y: 60 },
+				],
+			}),
+		).toMatchObject({ widthDirection: -1, depthDirection: -1 });
+		expect(
+			touchResizeDirections({
+				pointer: { x: 120, y: 0 },
+				outline: [
+					{ x: 0, y: 0 },
+					{ x: 240, y: 0 },
+					{ x: 240, y: 160 },
+					{ x: 0, y: 160 },
+				],
+			}),
+		).toMatchObject({ widthDirection: 0, depthDirection: -1 });
+	});
+
 	test("activates a palette drag only after leaving the item rectangle expanded by 12 pixels", () => {
 		const pressed = pressPaletteItem(initialDesignStudioInteraction, {
 			itemKind: EditorItemKinds.Hopscotch,
@@ -184,6 +263,21 @@ describe("Design Studio interaction", () => {
 			x: 1_000,
 			y: 0,
 		});
+	});
+
+	test("keeps authored terrain inside the viewport after an extreme manual pan", () => {
+		const envelope = contentEnvelope(initialWorld);
+		const viewport = { left: 0, top: 0, right: 1_600, bottom: 900 };
+		const camera = clampCameraToEnvelope({
+			camera: { x: 10_000, y: -10_000 },
+			viewport,
+			envelope,
+		});
+
+		expect(envelope.left + camera.x).toBeLessThan(viewport.right);
+		expect(envelope.right + camera.x).toBeGreaterThan(viewport.left);
+		expect(envelope.top + camera.y).toBeLessThan(viewport.bottom);
+		expect(envelope.bottom + camera.y).toBeGreaterThan(viewport.top);
 	});
 
 	test("keeps a floor resize stationary when the screen pointer has not moved", () => {

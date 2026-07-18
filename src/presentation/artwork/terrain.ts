@@ -1,6 +1,7 @@
 import { svg, type TemplateResult } from "lit-html";
 import { repeat } from "lit-html/directives/repeat.js";
 import type { FloorTerrain } from "../../world/floor";
+import { type LitTemplate, nothing } from "../lit-template";
 import {
 	type OutdoorFloorTile,
 	type TerrainCorner,
@@ -169,12 +170,12 @@ const cornerPath = (corner: TerrainCorner): string => {
 
 const transitionTemplate = (
 	transition: OutdoorFloorTile["transitions"][number],
-): TemplateResult => {
+): LitTemplate => {
 	const palette = terrainPalettes[transition.terrain];
 	if (transition.corner !== undefined) {
 		return svg`<path d=${cornerPath(transition.corner)} fill=${palette.base} />`;
 	}
-	if (transition.edge === undefined) return svg``;
+	if (transition.edge === undefined) return nothing;
 	return svg`
 		<path d=${edgePath(transition.edge)} fill=${palette.base} />
 		<path d=${edgeBoundaryPath(transition.edge)} fill="none" stroke=${palette.dark} stroke-width="1.25" stroke-linecap="round" opacity="0.62" />

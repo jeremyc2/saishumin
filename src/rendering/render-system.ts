@@ -1,5 +1,5 @@
 import { Context, Effect, Layer } from "effect";
-import { html, render } from "lit-html";
+import { render } from "lit-html";
 import type { Action } from "../app/action";
 import { EditSessionStatus } from "../design-studio/edit-session/edit-session";
 import {
@@ -10,6 +10,7 @@ import {
 	type DesignStudioView,
 	makeDesignStudioView,
 } from "../design-studio/view/view";
+import { nothing } from "../presentation/lit-template";
 import type { World } from "../world/world";
 import { gameSceneTemplate } from "./internal/game-scene";
 
@@ -80,7 +81,7 @@ export class RenderSystem extends Context.Service<
 				const preview = interaction?.createPreview();
 				render(
 					preview == null
-						? html``
+						? nothing
 						: designStudioView.createPreviewTemplate(
 								world,
 								EditSessionStatus.$is("InvalidPreview")(

@@ -9,6 +9,7 @@ export const Control = Schema.Literals([
 	" ",
 	"Shift",
 	"x",
+	"b",
 ]);
 export type Control = typeof Control.Type;
 
@@ -20,6 +21,7 @@ export const Controls = {
 	Jump: " ",
 	Grab: "Shift",
 	Interact: "x",
+	ContextAction: "b",
 } as const satisfies Record<string, Control>;
 
 export type Direction = WorldDirection;

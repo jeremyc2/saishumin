@@ -7,11 +7,13 @@ import {
 	decorationTemplate,
 } from "../../presentation/artwork/entities";
 import {
+	canvasViewportForScreen,
 	points,
 	project,
 	projectedRectangle,
 	viewport,
 } from "../../presentation/geometry/projection";
+import { type LitTemplate, nothing } from "../../presentation/lit-template";
 import {
 	Decoration,
 	type DecorationKind,
@@ -75,6 +77,7 @@ const decorationKindForEditorItem = (
 export const makeDesignStudioOverlays = (
 	interaction: DesignStudioInteraction,
 ) => {
+	let signDismissPointer: number | null = null;
 	const invalidPlacementTemplate = (
 		world: World,
 		editSessionStatus: EditSessionStatus,
@@ -130,7 +133,25 @@ export const makeDesignStudioOverlays = (
 						<p id="sign-description" class="mt-2 mb-0 wrap-break-word whitespace-pre-wrap text-base leading-relaxed text-[#5d3b24]">${content.body}</p>
 					</div>
 					<div class="mt-5 flex justify-end">
-						<button type="button" autofocus class="rounded-lg border border-[#5d3b24] bg-[#70462b] px-5 py-2 text-[11px] font-bold tracking-[0.12em] text-[#fff3dc] transition hover:bg-[#845535]" @click=${() => dispatch(Action.SignDismissed())}>DISMISS</button>
+						<button type="button" autofocus class="rounded-lg border border-[#5d3b24] bg-[#70462b] px-5 py-2 text-[11px] font-bold tracking-[0.12em] text-[#fff3dc] transition hover:bg-[#845535]" @pointerdown=${(
+							event: PointerEvent,
+						) => {
+							signDismissPointer = event.pointerId;
+						}} @pointerup=${(event: PointerEvent) => {
+							if (signDismissPointer !== event.pointerId) return;
+							signDismissPointer = null;
+							dispatch(Action.SignDismissed());
+						}} @pointercancel=${(event: PointerEvent) => {
+							if (signDismissPointer === event.pointerId)
+								signDismissPointer = null;
+						}} @click=${(event: MouseEvent) => {
+							if (event.detail !== 0) {
+								event.preventDefault();
+								event.stopPropagation();
+								return;
+							}
+							dispatch(Action.SignDismissed());
+						}}>DISMISS</button>
 					</div>
 				</div>
 			</div>
@@ -140,9 +161,9 @@ export const makeDesignStudioOverlays = (
 	const createPreviewTemplate = (
 		world: World,
 		invalidPreview: boolean,
-	): TemplateResult => {
+	): LitTemplate => {
 		const preview = interaction.createPreview();
-		if (preview === null) return html``;
+		if (preview === null) return nothing;
 		const body = defaultEditorItemBody(preview.itemKind);
 		const position = preview.position;
 		const characterSpawn =
@@ -213,8 +234,15 @@ export const makeDesignStudioOverlays = (
 				baseElevation,
 			});
 		const accent = invalidPreview ? "#e59a91" : "#fff0a8";
+		const canvasViewport = canvasViewportForScreen({
+			screen:
+				typeof window === "undefined"
+					? viewport
+					: { width: window.innerWidth, height: window.innerHeight },
+			zoom: interaction.zoom(),
+		});
 		return html`
-				<svg data-editor-create-preview data-can-drop=${String(preview.canDrop)} aria-hidden="true" class="pointer-events-none absolute inset-0 z-40 h-full w-full" viewBox=${`0 0 ${viewport.width} ${viewport.height}`} preserveAspectRatio="xMidYMid meet">
+				<svg data-editor-create-preview data-can-drop=${String(preview.canDrop)} aria-hidden="true" class="pointer-events-none absolute inset-0 z-40 h-full w-full" viewBox=${`${canvasViewport.left} ${canvasViewport.top} ${canvasViewport.width} ${canvasViewport.height}`} preserveAspectRatio="xMidYMid meet">
 					<g transform=${`translate(${world.editor.camera.x} ${world.editor.camera.y})`}>
 						<g opacity="0.82">${visual}</g>
 						<polygon data-editor-create-outline points=${points(projectedRectangle(position, body, baseElevation))} fill="none" stroke=${accent} stroke-width="4" stroke-dasharray="10 7" vector-effect="non-scaling-stroke" />
@@ -229,9 +257,9 @@ export const makeDesignStudioOverlays = (
 			readonly top: number;
 			readonly fading: boolean;
 		} | null,
-	): TemplateResult =>
+	): LitTemplate =>
 		popover === null
-			? html``
+			? nothing
 			: html`<div role="status" class=${`pointer-events-none fixed z-50 w-60 rounded-xl border border-[#d9a969] bg-[#17272e] px-4 py-3 text-[13px] font-semibold text-[#fff1d6] shadow-xl transition-opacity duration-200 ${popover.fading ? "opacity-0" : "opacity-100"}`} style=${`left: ${Math.max(12, popover.left - 252)}px; top: ${popover.top}px;`}>Drag this item onto the room to place it.</div>`;
 	return {
 		invalidPlacementTemplate,
