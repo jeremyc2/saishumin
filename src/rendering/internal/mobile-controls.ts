@@ -239,16 +239,17 @@ export const mobileControlsTemplate = ({
 	if (editing) {
 		const selected = world.editor.selected;
 		const hasSelection = selected !== null;
-		const canResizeSelection =
-			selected === "floor" ||
-			(selected !== null && !world.characters.has(selected));
+		const canToggleSelectionMode =
+			selected !== null &&
+			selected !== "floor" &&
+			!world.characters.has(selected);
 		const canFinish = hasSelection || world.editor.editSession !== null;
 		const modeLabel =
 			interaction.touchEditorMode() === "move" ? "RESIZE" : "MOVE";
 		actionControls = html`
 			${actionButton({ label: "DONE", onClick: interaction.finishTouchInteraction, disabled: !canFinish, className: "min-h-14 border-[#9a625d] bg-[#6f3f3e]/94" })}
 			${actionButton({ label: "DETAILS", onClick: interaction.openTouchDetails, disabled: !hasSelection, className: "min-h-14 border-[#e8b875] bg-[#5d4528]/94" })}
-			${actionButton({ label: modeLabel, onClick: interaction.toggleTouchEditorMode, disabled: !canResizeSelection, className: "col-span-2 min-h-12 border-[#638390] bg-[#294b57]/94" })}
+			${actionButton({ label: modeLabel, onClick: interaction.toggleTouchEditorMode, disabled: !canToggleSelectionMode, className: "col-span-2 min-h-12 border-[#638390] bg-[#294b57]/94" })}
 		`;
 	}
 	if (!editing) {

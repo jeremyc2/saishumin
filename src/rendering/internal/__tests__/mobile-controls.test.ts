@@ -119,6 +119,10 @@ const resizableSelectedWorld = {
 	...initialWorld,
 	editor: { ...initialWorld.editor, open: true, selected: EntityId(8) },
 };
+const floorSelectedWorld = {
+	...initialWorld,
+	editor: { ...initialWorld.editor, open: true, selected: "floor" as const },
+};
 
 const tapActionButton = (button: TemplateResult, pointerId: number): void => {
 	const target = new FakeHtmlElement();
@@ -267,6 +271,30 @@ describe("mobile controls", () => {
 
 			expect(resize.values[disabledIndex]).toBe(true);
 			tapActionButton(resize, 21);
+			expect(toggles).toBe(0);
+		}));
+
+	test("disables Move while the selected floor remains in Resize mode", () =>
+		withHtmlElement(() => {
+			let toggles = 0;
+			const controls = mobileControlsTemplate({
+				world: floorSelectedWorld,
+				interaction: makeInteraction({
+					touchEditorMode: () => "resize",
+					toggleTouchEditorMode: () => {
+						toggles += 1;
+					},
+				}),
+				dispatch: () => {},
+			});
+			const move = findTemplate(controls, "MOVE");
+			if (move === undefined) throw new Error("Missing Move button");
+			const disabledIndex = move.strings.findIndex((part) =>
+				part.endsWith("?disabled="),
+			);
+
+			expect(move.values[disabledIndex]).toBe(true);
+			tapActionButton(move, 22);
 			expect(toggles).toBe(0);
 		}));
 

@@ -239,6 +239,27 @@ describe("mobile Design Studio interaction", () => {
 			),
 		));
 
+	test("enters Resize mode when selecting the floor", () =>
+		withBrowserHarness(() =>
+			Effect.runPromise(
+				Effect.scoped(
+					Effect.gen(function* () {
+						const interaction = yield* makeDesignStudioInteraction({
+							refresh: () => {},
+							refreshPreview: () => {},
+						});
+						const world = editingWorld("floor");
+
+						interaction.update(world, () => {});
+
+						expect(interaction.touchEditorMode()).toBe("resize");
+						interaction.toggleTouchEditorMode();
+						expect(interaction.touchEditorMode()).toBe("resize");
+					}),
+				),
+			),
+		));
+
 	test("resizes a selected floor with a touch gesture in Resize mode", () =>
 		withBrowserHarness(({ dispatchWindowEvent }) =>
 			Effect.runPromise(

@@ -1590,7 +1590,14 @@ export const makeDesignStudioInteraction = (input: {
 			finishTouchInteraction,
 			touchEditorMode: () => editorTouchMode,
 			toggleTouchEditorMode: () => {
-				if (currentWorld?.editor.open !== true) return;
+				const world = currentWorld;
+				if (world?.editor.open !== true) return;
+				const selected = world.editor.selected;
+				if (
+					selected === "floor" ||
+					(selected !== null && world.characters.has(selected))
+				)
+					return;
 				if (!commitPendingTouchEdit()) return;
 				editorTouchMode = nextTouchEditorMode(editorTouchMode);
 				input.refresh();
@@ -1648,11 +1655,8 @@ export const makeDesignStudioInteraction = (input: {
 			update: (world, dispatch) => {
 				if (world.editor.selected === null) touchDetailsOpen = false;
 				const selected = world.editor.selected;
-				if (
-					selected !== null &&
-					selected !== "floor" &&
-					world.characters.has(selected)
-				)
+				if (selected === "floor") editorTouchMode = "resize";
+				else if (selected !== null && world.characters.has(selected))
 					editorTouchMode = "move";
 				if (world.editor.open && currentWorld?.editor.open !== true) {
 					touchPanelOpen = false;
