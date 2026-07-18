@@ -26,6 +26,11 @@ const midpoint = (start: Position, end: Position): Position => ({
 	x: (start.x + end.x) / 2,
 	y: (start.y + end.y) / 2,
 });
+const moveIndicatorArrowPath = (scale: number): string => {
+	const extent = 28 * scale;
+	const arrowhead = 8 * scale;
+	return `M${-extent} 0H${extent}M${-extent} 0l${arrowhead} ${-arrowhead}M${-extent} 0l${arrowhead} ${arrowhead}M${extent} 0l${-arrowhead} ${-arrowhead}M${extent} 0l${-arrowhead} ${arrowhead}M0 ${-extent}V${extent}M0 ${-extent}l${-arrowhead} ${arrowhead}M0 ${-extent}l${arrowhead} ${arrowhead}M0 ${extent}l${-arrowhead} ${-arrowhead}M0 ${extent}l${arrowhead} ${-arrowhead}`;
+};
 
 export const editorEntitySelectionBody = ({
 	world,
@@ -284,12 +289,12 @@ export const makeDesignStudioView = (interaction: DesignStudioInteraction) => {
 					/>
 					<g
 						data-touch-move-indicator
-						transform=${`translate(${selectionCenter.x} ${selectionCenter.y}) scale(${moveIndicatorScale})`}
+						transform=${`translate(${selectionCenter.x} ${selectionCenter.y})`}
 						pointer-events="none"
 						class="hidden any-pointer-coarse:block"
 					>
-						<circle r="40" fill=${accent} stroke="#503b37" stroke-width="4" vector-effect="non-scaling-stroke" />
-						<path d="M-28 0H28M-28 0l8-8M-28 0l8 8M28 0l-8-8M28 0l-8 8M0-28V28M0-28l-8 8M0-28l8 8M0 28l-8-8M0 28l8-8" fill="none" stroke="#503b37" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke" />
+						<circle r=${40 * moveIndicatorScale} fill=${accent} stroke="#503b37" stroke-width="4" vector-effect="non-scaling-stroke" />
+						<path d=${moveIndicatorArrowPath(moveIndicatorScale)} fill="none" stroke="#503b37" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke" />
 					</g>
 				`;
 		if (characterSelected)

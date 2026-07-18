@@ -485,9 +485,11 @@ describe("game scene", () => {
 			),
 		);
 		const indicator = selection.indexOf("data-touch-move-indicator");
+		const indicatorMarkup = selection.slice(indicator, indicator + 900);
 
 		expect(indicator).toBeGreaterThanOrEqual(0);
-		expect(selection.slice(indicator, indicator + 300)).toContain("scale(0.5)");
+		expect(indicatorMarkup).not.toContain("scale(");
+		expect(indicatorMarkup).toContain("M-14 0H14");
 	});
 
 	test("offers Move while Resize mode is active", () => {
