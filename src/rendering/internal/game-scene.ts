@@ -2,6 +2,7 @@ import { html, svg, type TemplateResult } from "lit-html";
 import { Action, type Action as AppAction } from "../../app/action";
 import { EditSessionStatus } from "../../design-studio/edit-session/edit-session";
 import type { DesignStudioInteraction } from "../../design-studio/interaction/interaction";
+import { touchResizeDirectionsForEvent } from "../../design-studio/interaction/pointer";
 import type { DesignStudioView } from "../../design-studio/view/view";
 import {
 	boxTemplate,
@@ -30,6 +31,7 @@ import {
 	CharacterKinds,
 	DecorationKinds,
 	ObstacleKinds,
+	type Position,
 } from "../../world/components";
 import type { EntityId } from "../../world/entity-id";
 import { surfaceAt } from "../../world/spatial/collision";
@@ -46,6 +48,7 @@ type Dispatch = (action: AppAction) => void;
 const floorGridSpacing = { x: 100, y: 80 } as const;
 const floorGridStrokeWidth = 2;
 const floorGridOpacity = 0.32;
+const floorTouchResizeMarginPixels = 64;
 
 const interiorGridCoordinates = (
 	extent: number,
@@ -259,8 +262,36 @@ export const gameSceneTemplate = ({
 		const y = world.floorOrigin.y + offset;
 		return svg`<line x1=${project({ x: world.floorOrigin.x, y }).x} y1=${project({ x: world.floorOrigin.x, y }).y} x2=${project({ x: world.floorOrigin.x + world.floorPlan.width, y }).x} y2=${project({ x: world.floorOrigin.x + world.floorPlan.width, y }).y} />`;
 	});
+	const startSelectedFloorTouch = (
+		event: PointerEvent,
+		outline: readonly [Position, Position, Position, Position],
+	): boolean => {
+		if (event.pointerType !== "touch" || world.editor.selected !== "floor")
+			return false;
+		event.stopPropagation();
+		if (interaction.touchEditorMode() === "resize") {
+			const directions = touchResizeDirectionsForEvent({
+				event,
+				outline,
+				maximumDistancePixels: floorTouchResizeMarginPixels,
+			});
+			if (directions !== null) {
+				interaction.startFloorResize(
+					event,
+					world,
+					directions.widthDirection,
+					directions.depthDirection,
+					dispatch,
+				);
+				return true;
+			}
+		}
+		interaction.startPan(event, world);
+		return true;
+	};
 	const floorPointerDown = (event: PointerEvent): void => {
 		if (!world.editor.open) return;
+		if (startSelectedFloorTouch(event, floor)) return;
 		event.stopPropagation();
 		if (interaction.isPanGesture(event)) interaction.startPan(event, world);
 		else if (event.button === 0)
@@ -274,6 +305,13 @@ export const gameSceneTemplate = ({
 	};
 	const canvasPointerDown = (event: PointerEvent): void => {
 		if (!world.editor.open) return;
+		const floorAtCamera = [
+			{ x: floor[0].x + camera.x, y: floor[0].y + camera.y },
+			{ x: floor[1].x + camera.x, y: floor[1].y + camera.y },
+			{ x: floor[2].x + camera.x, y: floor[2].y + camera.y },
+			{ x: floor[3].x + camera.x, y: floor[3].y + camera.y },
+		] as const;
+		if (startSelectedFloorTouch(event, floorAtCamera)) return;
 		if (interaction.isPanGesture(event)) interaction.startPan(event, world);
 		else if (event.button === 0)
 			dispatch(Action.EditorSelectionChanged({ selection: null }));

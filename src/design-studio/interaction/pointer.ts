@@ -128,6 +128,29 @@ const squaredDistanceToSegment = (
 	});
 };
 
+const isNearResizeOutline = ({
+	pointer,
+	outline,
+	maximumDistancePixels,
+}: {
+	readonly pointer: Position;
+	readonly outline: readonly [Position, Position, Position, Position];
+	readonly maximumDistancePixels: number;
+}): boolean => {
+	const maximumDistanceSquared = maximumDistancePixels * maximumDistancePixels;
+	for (let index = 0; index < outline.length; index += 1) {
+		const start = outline[index];
+		const end = outline[(index + 1) % outline.length];
+		if (
+			start !== undefined &&
+			end !== undefined &&
+			squaredDistanceToSegment(pointer, start, end) <= maximumDistanceSquared
+		)
+			return true;
+	}
+	return false;
+};
+
 export const touchResizeDirections = ({
 	pointer,
 	outline,
@@ -199,6 +222,50 @@ export const touchResizeDirections = ({
 		nearestSideDistance = distance;
 	}
 	return nearestSide;
+};
+
+export const touchResizeDirectionsForEvent = ({
+	event,
+	outline,
+	maximumDistancePixels,
+}: {
+	readonly event: PointerEvent;
+	readonly outline: readonly [Position, Position, Position, Position];
+	readonly maximumDistancePixels?: number;
+}): TouchResizeDirections | null => {
+	const target = event.currentTarget;
+	let clientOutline = outline;
+	if (
+		target !== null &&
+		typeof target === "object" &&
+		"getScreenCTM" in target &&
+		typeof target.getScreenCTM === "function"
+	) {
+		const matrix = target.getScreenCTM();
+		if (matrix !== null) {
+			const clientPoint = (point: Position): Position => ({
+				x: matrix.a * point.x + matrix.c * point.y + matrix.e,
+				y: matrix.b * point.x + matrix.d * point.y + matrix.f,
+			});
+			clientOutline = [
+				clientPoint(outline[0]),
+				clientPoint(outline[1]),
+				clientPoint(outline[2]),
+				clientPoint(outline[3]),
+			];
+		}
+	}
+	const pointer = { x: event.clientX, y: event.clientY };
+	if (
+		maximumDistancePixels !== undefined &&
+		!isNearResizeOutline({
+			pointer,
+			outline: clientOutline,
+			maximumDistancePixels,
+		})
+	)
+		return null;
+	return touchResizeDirections({ pointer, outline: clientOutline });
 };
 
 export const isDesignStudioPanelVisible = (world: World): boolean =>

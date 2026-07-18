@@ -13,7 +13,7 @@ import { surfaceAt } from "../../world/spatial/collision";
 import { entityBaseElevation } from "../../world/spatial/elevation";
 import { characterSpawnPosition, type World } from "../../world/world";
 import type { DesignStudioInteraction } from "../interaction/interaction";
-import { touchResizeDirections } from "../interaction/pointer";
+import { touchResizeDirectionsForEvent } from "../interaction/pointer";
 import { makeDesignStudioOverlays } from "./overlays";
 import { makeDesignStudioPanel } from "./panel";
 
@@ -26,37 +26,6 @@ const midpoint = (start: Position, end: Position): Position => ({
 	x: (start.x + end.x) / 2,
 	y: (start.y + end.y) / 2,
 });
-
-const touchResizeDirectionsForEvent = (
-	event: PointerEvent,
-	outline: readonly [Position, Position, Position, Position],
-) => {
-	const target = event.currentTarget;
-	if (!(target instanceof SVGGraphicsElement))
-		return touchResizeDirections({
-			pointer: { x: event.clientX, y: event.clientY },
-			outline,
-		});
-	const matrix = target.getScreenCTM();
-	if (matrix === null)
-		return touchResizeDirections({
-			pointer: { x: event.clientX, y: event.clientY },
-			outline,
-		});
-	const clientPoint = (point: Position): Position => ({
-		x: matrix.a * point.x + matrix.c * point.y + matrix.e,
-		y: matrix.b * point.x + matrix.d * point.y + matrix.f,
-	});
-	return touchResizeDirections({
-		pointer: { x: event.clientX, y: event.clientY },
-		outline: [
-			clientPoint(outline[0]),
-			clientPoint(outline[1]),
-			clientPoint(outline[2]),
-			clientPoint(outline[3]),
-		],
-	});
-};
 
 export const editorEntitySelectionBody = ({
 	world,
@@ -251,10 +220,11 @@ export const makeDesignStudioView = (interaction: DesignStudioInteraction) => {
 								pointer-events="stroke"
 								class="hidden any-pointer-coarse:block"
 								@pointerdown=${(event: PointerEvent) => {
-									const directions = touchResizeDirectionsForEvent(
+									const directions = touchResizeDirectionsForEvent({
 										event,
 										outline,
-									);
+									});
+									if (directions === null) return;
 									interaction.startFloorResize(
 										event,
 										world,
@@ -477,10 +447,11 @@ export const makeDesignStudioView = (interaction: DesignStudioInteraction) => {
 							pointer-events="stroke"
 							class="hidden any-pointer-coarse:block"
 							@pointerdown=${(event: PointerEvent) => {
-								const directions = touchResizeDirectionsForEvent(
+								const directions = touchResizeDirectionsForEvent({
 									event,
 									outline,
-								);
+								});
+								if (directions === null) return;
 								interaction.startEntityResize(
 									event,
 									world,
