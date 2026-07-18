@@ -125,6 +125,7 @@ const tapActionButton = (button: TemplateResult, pointerId: number): void => {
 		pointerId,
 		currentTarget: target,
 		preventDefault: () => {},
+		stopPropagation: () => {},
 	} as unknown as PointerEvent);
 	eventHandler<PointerEvent>(
 		button,
@@ -133,6 +134,7 @@ const tapActionButton = (button: TemplateResult, pointerId: number): void => {
 		pointerId,
 		currentTarget: target,
 		preventDefault: () => {},
+		stopPropagation: () => {},
 	} as unknown as PointerEvent);
 };
 
@@ -225,6 +227,7 @@ describe("mobile controls", () => {
 				pointerId: 7,
 				currentTarget: target,
 				preventDefault: () => {},
+				stopPropagation: () => {},
 			} as unknown as PointerEvent);
 
 			const rerendered = mobileControlsTemplate({
@@ -242,6 +245,7 @@ describe("mobile controls", () => {
 				pointerId: 7,
 				currentTarget: target,
 				preventDefault: () => {},
+				stopPropagation: () => {},
 			} as unknown as PointerEvent);
 
 			expect(finished).toBe(1);
@@ -270,6 +274,7 @@ describe("mobile controls", () => {
 				pointerId: 8,
 				currentTarget: target,
 				preventDefault: () => {},
+				stopPropagation: () => {},
 			} as unknown as PointerEvent);
 			const rerenderedControls = mobileControlsTemplate({
 				world: selectedWorld,
@@ -286,6 +291,7 @@ describe("mobile controls", () => {
 				pointerId: 8,
 				currentTarget: target,
 				preventDefault: () => {},
+				stopPropagation: () => {},
 			} as unknown as PointerEvent);
 			eventHandler<MouseEvent>(
 				rerenderedDetails,
@@ -323,6 +329,7 @@ describe("mobile controls", () => {
 				pointerId: 10,
 				currentTarget: target,
 				preventDefault: () => {},
+				stopPropagation: () => {},
 			} as unknown as PointerEvent);
 			eventHandler<PointerEvent>(
 				details,
@@ -331,6 +338,7 @@ describe("mobile controls", () => {
 				pointerId: 10,
 				currentTarget: target,
 				preventDefault: () => {},
+				stopPropagation: () => {},
 			} as unknown as PointerEvent);
 			eventHandler<MouseEvent>(
 				details,
@@ -343,6 +351,33 @@ describe("mobile controls", () => {
 			} as unknown as MouseEvent);
 
 			expect(opened).toBe(1);
+		}));
+
+	test("isolates Details pointer movement from the World gesture", () =>
+		withHtmlElement(() => {
+			const controls = mobileControlsTemplate({
+				world: selectedWorld,
+				interaction: makeInteraction(),
+				dispatch: () => {},
+			});
+			const details = findTemplate(controls, "DETAILS");
+			if (details === undefined) throw new Error("Missing Details button");
+			const target = new FakeHtmlElement();
+			let stopped = 0;
+			const event = {
+				pointerId: 12,
+				currentTarget: target,
+				preventDefault: () => {},
+				stopPropagation: () => {
+					stopped += 1;
+				},
+			} as unknown as PointerEvent;
+
+			eventHandler<PointerEvent>(details, "pointerdown")(event);
+			eventHandler<PointerEvent>(details, "pointermove")(event);
+			eventHandler<PointerEvent>(details, "pointerup")(event);
+
+			expect(stopped).toBe(3);
 		}));
 
 	test("releases the joystick across a game re-render", () =>

@@ -171,6 +171,226 @@ describe("mobile Design Studio interaction", () => {
 			));
 	}
 
+	test("commits a valid move before opening Details", () =>
+		withBrowserHarness(({ runFrame }) =>
+			Effect.runPromise(
+				Effect.scoped(
+					Effect.gen(function* () {
+						const selected = EntityId(8);
+						let world = editingWorld(selected);
+						const originalPosition = world.positions.get(selected);
+						if (originalPosition === undefined)
+							throw new Error("Expected selected entity position");
+						const interaction = yield* makeDesignStudioInteraction({
+							refresh: () => {},
+							refreshPreview: () => {},
+						});
+						const dispatch = (action: AppAction): void => {
+							world = applyAction(world, action);
+							interaction.update(world, dispatch);
+						};
+						interaction.update(world, dispatch);
+						interaction.updateTouchJoystick({
+							pointerId: 51,
+							vector: { x: 1, y: 0 },
+						});
+						runFrame(0);
+						runFrame(16);
+						runFrame(32);
+						const operation = world.editor.editSession?.operation;
+						if (operation?.kind !== "move")
+							throw new Error("Expected active move Edit Session");
+						const movedPosition = operation.position;
+
+						interaction.openTouchDetails();
+
+						expect(interaction.isTouchDetailsOpen()).toBe(true);
+						expect(world.editor.editSession).toBeNull();
+						expect(world.editor.selected).toBe(selected);
+						expect(world.positions.get(selected)).toEqual(movedPosition);
+						expect(world.positions.get(selected)).not.toEqual(originalPosition);
+					}),
+				),
+			),
+		));
+
+	test("commits a valid move before selecting another entity", () =>
+		withBrowserHarness(({ runFrame, dispatchWindowEvent }) =>
+			Effect.runPromise(
+				Effect.scoped(
+					Effect.gen(function* () {
+						const first = EntityId(8);
+						const second = EntityId(9);
+						let world = editingWorld(first);
+						const originalPosition = world.positions.get(first);
+						if (originalPosition === undefined)
+							throw new Error("Expected first entity position");
+						const interaction = yield* makeDesignStudioInteraction({
+							refresh: () => {},
+							refreshPreview: () => {},
+						});
+						const dispatch = (action: AppAction): void => {
+							world = applyAction(world, action);
+							interaction.update(world, dispatch);
+						};
+						interaction.update(world, dispatch);
+						interaction.toggleTouchEditorMode();
+						interaction.updateTouchJoystick({
+							pointerId: 52,
+							vector: { x: 1, y: 0 },
+						});
+						runFrame(0);
+						runFrame(16);
+						runFrame(32);
+						const operation = world.editor.editSession?.operation;
+						if (operation?.kind !== "move")
+							throw new Error("Expected active move Edit Session");
+						const movedPosition = operation.position;
+
+						interaction.selectTouchEntity(world, second, dispatch);
+
+						expect(world.editor.editSession).toBeNull();
+						expect(world.editor.selected).toBe(second);
+						expect(interaction.touchEditorMode()).toBe("resize");
+						expect(world.positions.get(first)).toEqual(movedPosition);
+						expect(world.positions.get(first)).not.toEqual(originalPosition);
+
+						interaction.toggleTouchEditorMode();
+						expect(interaction.touchEditorMode()).toBe("move");
+						interaction.startEntityMove(
+							{
+								button: 0,
+								clientX: 650,
+								clientY: 470,
+								pointerId: 55,
+								pointerType: "touch",
+								timeStamp: 100,
+								preventDefault: () => {},
+								stopPropagation: () => {},
+							} as unknown as PointerEvent,
+							world,
+							second,
+							dispatch,
+						);
+						dispatchWindowEvent("pointermove", {
+							clientX: 700,
+							clientY: 470,
+							pointerId: 55,
+							pointerType: "touch",
+							timeStamp: 200,
+							preventDefault: () => {},
+						} as unknown as PointerEvent);
+						const secondOperation = world.editor.editSession?.operation;
+						expect(secondOperation?.kind).toBe("move");
+						if (secondOperation?.kind !== "move") return;
+						expect(secondOperation.entity).toBe(second);
+					}),
+				),
+			),
+		));
+
+	test("commits a valid move before toggling Move and Resize", () =>
+		withBrowserHarness(({ runFrame, dispatchWindowEvent }) =>
+			Effect.runPromise(
+				Effect.scoped(
+					Effect.gen(function* () {
+						const selected = EntityId(8);
+						let world = editingWorld(selected);
+						const originalPosition = world.positions.get(selected);
+						if (originalPosition === undefined)
+							throw new Error("Expected selected entity position");
+						const interaction = yield* makeDesignStudioInteraction({
+							refresh: () => {},
+							refreshPreview: () => {},
+						});
+						const dispatch = (action: AppAction): void => {
+							world = applyAction(world, action);
+							interaction.update(world, dispatch);
+						};
+						interaction.update(world, dispatch);
+						interaction.updateTouchJoystick({
+							pointerId: 53,
+							vector: { x: 1, y: 0 },
+						});
+						runFrame(0);
+						runFrame(16);
+						runFrame(32);
+						const operation = world.editor.editSession?.operation;
+						if (operation?.kind !== "move")
+							throw new Error("Expected active move Edit Session");
+						const movedPosition = operation.position;
+
+						interaction.toggleTouchEditorMode();
+
+						expect(interaction.touchEditorMode()).toBe("resize");
+						expect(world.editor.editSession).toBeNull();
+						expect(world.editor.selected).toBe(selected);
+						expect(world.positions.get(selected)).toEqual(movedPosition);
+						expect(world.positions.get(selected)).not.toEqual(originalPosition);
+
+						interaction.startEntityResize(
+							{
+								button: 0,
+								clientX: 650,
+								clientY: 470,
+								pointerId: 54,
+								pointerType: "touch",
+								preventDefault: () => {},
+								stopPropagation: () => {},
+							} as unknown as PointerEvent,
+							world,
+							selected,
+							1,
+							0,
+							dispatch,
+						);
+						const resizeOperation = world.editor.editSession?.operation;
+						expect(resizeOperation?.kind).toBe("resize");
+						dispatchWindowEvent("pointermove", {
+							clientX: 690,
+							clientY: 470,
+							pointerId: 54,
+							pointerType: "touch",
+							preventDefault: () => {},
+						} as unknown as PointerEvent);
+						dispatchWindowEvent("pointerup", {
+							pointerId: 54,
+						} as PointerEvent);
+						expect(world.editor.editSession).not.toBeNull();
+						const firstResize = world.editor.editSession?.operation;
+						if (firstResize?.kind !== "resize") return;
+						interaction.startEntityResize(
+							{
+								button: 0,
+								clientX: 690,
+								clientY: 470,
+								pointerId: 56,
+								pointerType: "touch",
+								preventDefault: () => {},
+								stopPropagation: () => {},
+							} as unknown as PointerEvent,
+							world,
+							selected,
+							1,
+							0,
+							dispatch,
+						);
+						dispatchWindowEvent("pointermove", {
+							clientX: 730,
+							clientY: 470,
+							pointerId: 56,
+							pointerType: "touch",
+							preventDefault: () => {},
+						} as unknown as PointerEvent);
+						const secondResize = world.editor.editSession?.operation;
+						expect(secondResize?.kind).toBe("resize");
+						if (secondResize?.kind !== "resize") return;
+						expect(secondResize.body).not.toEqual(firstResize.body);
+					}),
+				),
+			),
+		));
+
 	test("pans from an unselected entity without turning the drag into a selection click", () =>
 		withBrowserHarness(({ dispatchWindowEvent }) =>
 			Effect.runPromise(
@@ -325,8 +545,28 @@ describe("mobile Design Studio interaction", () => {
 						expect(world.editor.editSession).not.toBeNull();
 						const operationAfterTouch = world.editor.editSession?.operation;
 						if (operationAfterTouch?.kind !== "move") return;
+						interaction.selectTouchEntity(world, selected, dispatch);
+						expect(world.editor.editSession).not.toBeNull();
 						expect(operationAfterTouch.originalPosition).toEqual(
 							originalPosition,
+						);
+						const positionAfterTouch = operationAfterTouch.position;
+						actions.length = 0;
+						dispatchWindowEvent("pointermove", {
+							clientX: 780,
+							clientY: 580,
+							pointerId: 43,
+							pointerType: "touch",
+							preventDefault: () => {},
+						} as unknown as PointerEvent);
+						expect(actions.some(Action.$is("EditorEditSessionPreviewed"))).toBe(
+							false,
+						);
+						const operationAfterControlPointer =
+							world.editor.editSession?.operation;
+						if (operationAfterControlPointer?.kind !== "move") return;
+						expect(operationAfterControlPointer.position).toEqual(
+							positionAfterTouch,
 						);
 					}),
 				),

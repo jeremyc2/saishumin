@@ -71,6 +71,7 @@ const actionButton = ({
 	const finishPointer = (event: PointerEvent, activate: boolean): void => {
 		const target = event.currentTarget;
 		if (!(target instanceof HTMLElement)) return;
+		event.stopPropagation();
 		if (target.dataset["actionPointer"] !== String(event.pointerId)) return;
 		delete target.dataset["actionPointer"];
 		event.preventDefault();
@@ -88,12 +89,17 @@ const actionButton = ({
 				if (disabled) return;
 				const target = event.currentTarget;
 				if (!(target instanceof HTMLElement)) return;
+				event.stopPropagation();
 				if (target.dataset["actionPointer"] !== undefined) return;
 				delete target.dataset["actionActivated"];
 				delete target.dataset["actionCancelled"];
 				target.dataset["actionPointer"] = String(event.pointerId);
 				target.setPointerCapture(event.pointerId);
 				event.preventDefault();
+			}}
+			@pointermove=${(event: PointerEvent) => {
+				event.preventDefault();
+				event.stopPropagation();
 			}}
 			@pointerup=${(event: PointerEvent) => finishPointer(event, true)}
 			@pointercancel=${(event: PointerEvent) => {

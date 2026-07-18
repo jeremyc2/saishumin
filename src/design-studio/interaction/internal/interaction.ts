@@ -63,6 +63,7 @@ type ActiveInteraction =
 			readonly position: Position;
 			readonly body: Body;
 			readonly touchControl?: "joystick" | "pointer";
+			readonly touchPointerId?: number;
 	  }
 	| {
 			readonly kind: "resize";
@@ -72,6 +73,7 @@ type ActiveInteraction =
 			readonly body: Body;
 			readonly widthDirection: ResizeDirection;
 			readonly depthDirection: ResizeDirection;
+			readonly touchPointerId?: number;
 	  }
 	| {
 			readonly kind: "create";
@@ -487,7 +489,10 @@ export const makeDesignStudioInteraction = (input: {
 				position,
 				body,
 				...(event.pointerType === "touch"
-					? { touchControl: "pointer" as const }
+					? {
+							touchControl: "pointer" as const,
+							touchPointerId: event.pointerId,
+						}
 					: {}),
 			};
 			if (continuingTouchMove) return;
@@ -521,17 +526,29 @@ export const makeDesignStudioInteraction = (input: {
 				event.stopPropagation();
 				return;
 			}
-			if (world.editor.editSession !== null || activeInteraction !== undefined)
-				return;
+			const session = world.editor.editSession;
+			const continuingTouchResize =
+				event.pointerType === "touch" &&
+				session?.operation.kind === "resize" &&
+				session.operation.entity === entity;
 			event.stopPropagation();
+			if (
+				(!continuingTouchResize && session !== null) ||
+				activeInteraction !== undefined
+			)
+				return;
 			if (event.pointerType !== "touch" && isPanGesture(event)) {
 				startPan(event, world);
 				return;
 			}
 			if (event.button !== 0) return;
 			const pointer = pointerWorldPosition(event, world.editor.camera);
-			const position = world.positions.get(entity);
-			const body = world.bodies.get(entity);
+			let position = world.positions.get(entity);
+			let body = world.bodies.get(entity);
+			if (continuingTouchResize) {
+				position = session.operation.position;
+				body = session.operation.body;
+			}
 			if (pointer === undefined || position === undefined || body === undefined)
 				return;
 			event.preventDefault();
@@ -544,7 +561,11 @@ export const makeDesignStudioInteraction = (input: {
 				body,
 				widthDirection,
 				depthDirection,
+				...(event.pointerType === "touch"
+					? { touchPointerId: event.pointerId }
+					: {}),
 			};
+			if (continuingTouchResize) return;
 			dispatch(
 				Action.EditorEditSessionBegan({
 					operation: {
@@ -729,6 +750,8 @@ export const makeDesignStudioInteraction = (input: {
 			dispatch: Dispatch,
 		): void => {
 			if (!usesTouchControls() || !world.editor.open) return;
+			if (currentWorld?.editor.selected !== entity && !commitPendingTouchEdit())
+				return;
 			touchPanelOpen = false;
 			touchDetailsOpen = false;
 			dispatch(Action.EditorSelectionChanged({ selection: entity }));
@@ -838,6 +861,15 @@ export const makeDesignStudioInteraction = (input: {
 				(interaction.kind === "create" &&
 					interaction.touchControlled === true) ||
 				(interaction.kind === "move" && interaction.touchControl === "joystick")
+			)
+				return;
+			if (
+				(interaction.kind === "move" &&
+					interaction.touchControl === "pointer" &&
+					interaction.touchPointerId !== event.pointerId) ||
+				(interaction.kind === "resize" &&
+					interaction.touchPointerId !== undefined &&
+					interaction.touchPointerId !== event.pointerId)
 			)
 				return;
 
@@ -997,11 +1029,28 @@ export const makeDesignStudioInteraction = (input: {
 			}
 			const interaction = activeInteraction;
 			if (
-				(interaction?.kind === "create" &&
-					interaction.touchControlled === true) ||
-				(interaction?.kind === "move" && interaction.touchControl !== undefined)
+				interaction?.kind === "create" &&
+				interaction.touchControlled === true
 			)
 				return;
+			if (
+				interaction?.kind === "move" &&
+				interaction.touchControl === "joystick"
+			)
+				return;
+			if (
+				(interaction?.kind === "move" &&
+					interaction.touchControl === "pointer") ||
+				(interaction?.kind === "resize" &&
+					interaction.touchPointerId !== undefined)
+			) {
+				if (interaction.touchPointerId !== event.pointerId) return;
+				activeInteraction = undefined;
+				latestPointer = undefined;
+				previousAutoPanTime = undefined;
+				input.refreshPreview();
+				return;
+			}
 			const world = currentWorld;
 			const dispatch = currentDispatch;
 			activeInteraction = undefined;
@@ -1156,6 +1205,23 @@ export const makeDesignStudioInteraction = (input: {
 			}
 		};
 
+		const commitPendingTouchEdit = (): boolean => {
+			const world = currentWorld;
+			const dispatch = currentDispatch;
+			activeInteraction = undefined;
+			pinchGesture = undefined;
+			latestPointer = undefined;
+			previousAutoPanTime = undefined;
+			clearTouchJoystick();
+			suppressTouchGestureClick = false;
+			touchPointers.clear();
+			input.refreshPreview();
+			if (world?.editor.editSession === null) return true;
+			if (world === undefined || dispatch === undefined) return false;
+			dispatch(Action.EditorEditSessionCommitted());
+			return currentWorld?.editor.editSession === null;
+		};
+
 		const finishTouchInteraction = (): void => {
 			const world = currentWorld;
 			const dispatch = currentDispatch;
@@ -1167,7 +1233,6 @@ export const makeDesignStudioInteraction = (input: {
 			suppressTouchGestureClick = false;
 			touchPanelOpen = false;
 			touchDetailsOpen = false;
-			editorTouchMode = "move";
 			touchPointers.clear();
 			if (world !== undefined && world.editor.editSession !== null)
 				dispatch?.(Action.EditorEditSessionCommitted());
@@ -1512,6 +1577,7 @@ export const makeDesignStudioInteraction = (input: {
 			touchEditorMode: () => editorTouchMode,
 			toggleTouchEditorMode: () => {
 				if (currentWorld?.editor.open !== true) return;
+				if (!commitPendingTouchEdit()) return;
 				editorTouchMode = nextTouchEditorMode(editorTouchMode);
 				input.refresh();
 			},
@@ -1535,10 +1601,7 @@ export const makeDesignStudioInteraction = (input: {
 			openTouchDetails: () => {
 				const world = currentWorld;
 				if (world === undefined || world.editor.selected === null) return;
-				clearTouchJoystick();
-				activeInteraction = undefined;
-				if (world.editor.editSession !== null)
-					currentDispatch?.(Action.EditorEditSessionCancelled());
+				if (!commitPendingTouchEdit()) return;
 				touchDetailsOpen = true;
 				input.refresh();
 			},
@@ -1569,11 +1632,7 @@ export const makeDesignStudioInteraction = (input: {
 				input.refresh();
 			},
 			update: (world, dispatch) => {
-				if (world.editor.selected === null) {
-					touchDetailsOpen = false;
-					editorTouchMode = "move";
-				} else if (world.editor.selected !== currentWorld?.editor.selected)
-					editorTouchMode = "move";
+				if (world.editor.selected === null) touchDetailsOpen = false;
 				if (world.editor.open && currentWorld?.editor.open !== true)
 					touchPanelOpen = false;
 				else if (!world.editor.open) {
