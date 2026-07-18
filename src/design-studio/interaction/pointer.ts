@@ -43,17 +43,30 @@ export const initialDesignStudioInteraction: DesignStudioInteraction = {
 const touchPanGraceMilliseconds = 110;
 const touchPanThresholdPixels = 8;
 const decisiveTouchPanThresholdPixels = 24;
+const touchSelectionPanThresholdPixels = 16;
+const decisiveTouchSelectionPanThresholdPixels = 32;
 
 export const shouldPanTouchGesture = ({
 	elapsedMilliseconds,
 	distance,
+	selectionCandidate = false,
 }: {
 	readonly elapsedMilliseconds: number;
 	readonly distance: number;
-}): boolean =>
-	distance >= touchPanThresholdPixels &&
-	(elapsedMilliseconds >= touchPanGraceMilliseconds ||
-		distance >= decisiveTouchPanThresholdPixels);
+	readonly selectionCandidate?: boolean;
+}): boolean => {
+	const threshold = selectionCandidate
+		? touchSelectionPanThresholdPixels
+		: touchPanThresholdPixels;
+	const decisiveThreshold = selectionCandidate
+		? decisiveTouchSelectionPanThresholdPixels
+		: decisiveTouchPanThresholdPixels;
+	return (
+		distance >= threshold &&
+		(elapsedMilliseconds >= touchPanGraceMilliseconds ||
+			distance >= decisiveThreshold)
+	);
+};
 
 export const shouldStartPinchGesture = ({
 	touchCount,

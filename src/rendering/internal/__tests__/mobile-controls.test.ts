@@ -115,6 +115,10 @@ const selectedWorld = {
 	...initialWorld,
 	editor: { ...initialWorld.editor, open: true, selected: EntityId(2) },
 };
+const resizableSelectedWorld = {
+	...initialWorld,
+	editor: { ...initialWorld.editor, open: true, selected: EntityId(8) },
+};
 
 const tapActionButton = (button: TemplateResult, pointerId: number): void => {
 	const target = new FakeHtmlElement();
@@ -136,9 +140,79 @@ const tapActionButton = (button: TemplateResult, pointerId: number): void => {
 		preventDefault: () => {},
 		stopPropagation: () => {},
 	} as unknown as PointerEvent);
+	eventHandler<MouseEvent>(
+		button,
+		"click",
+	)({
+		detail: 1,
+		currentTarget: target,
+		preventDefault: () => {},
+		stopPropagation: () => {},
+	} as unknown as MouseEvent);
 };
 
 describe("mobile controls", () => {
+	test("activates a mode change once when pointer-up rerenders the button", () =>
+		withHtmlElement(() => {
+			let mode: "move" | "resize" = "move";
+			let toggles = 0;
+			const interaction = makeInteraction({
+				touchEditorMode: () => mode,
+				toggleTouchEditorMode: () => {
+					toggles += 1;
+					mode = mode === "move" ? "resize" : "move";
+				},
+			});
+			const initialControls = mobileControlsTemplate({
+				world: resizableSelectedWorld,
+				interaction,
+				dispatch: () => {},
+			});
+			const initialModeButton = findTemplate(initialControls, "RESIZE");
+			if (initialModeButton === undefined)
+				throw new Error("Missing Resize button");
+			const initialTarget = new FakeHtmlElement();
+			eventHandler<PointerEvent>(
+				initialModeButton,
+				"pointerdown",
+			)({
+				pointerId: 20,
+				currentTarget: initialTarget,
+				preventDefault: () => {},
+				stopPropagation: () => {},
+			} as unknown as PointerEvent);
+			eventHandler<PointerEvent>(
+				initialModeButton,
+				"pointerup",
+			)({
+				pointerId: 20,
+				currentTarget: initialTarget,
+				preventDefault: () => {},
+				stopPropagation: () => {},
+			} as unknown as PointerEvent);
+
+			const rerenderedControls = mobileControlsTemplate({
+				world: resizableSelectedWorld,
+				interaction,
+				dispatch: () => {},
+			});
+			const rerenderedModeButton = findTemplate(rerenderedControls, "RESIZE");
+			if (rerenderedModeButton === undefined)
+				throw new Error("Missing rerendered Resize button");
+			eventHandler<MouseEvent>(
+				rerenderedModeButton,
+				"click",
+			)({
+				detail: 1,
+				currentTarget: new FakeHtmlElement(),
+				preventDefault: () => {},
+				stopPropagation: () => {},
+			} as unknown as MouseEvent);
+
+			expect(toggles).toBe(1);
+			expect(String(mode)).toBe("resize");
+		}));
+
 	test("disables Done with no selection or active Edit Session", () =>
 		withHtmlElement(() => {
 			let finished = 0;
@@ -161,10 +235,39 @@ describe("mobile controls", () => {
 			});
 			const done = findTemplate(controls, "DONE");
 			if (done === undefined) throw new Error("Missing Done button");
+			const className = done.values.find(
+				(value): value is string =>
+					typeof value === "string" && value.includes("touch-none"),
+			);
+			expect(className).toBeDefined();
+			expect(className).not.toContain("active:");
 
 			tapActionButton(done, 6);
 
 			expect(finished).toBe(0);
+		}));
+
+	test("disables Resize for a selected Character", () =>
+		withHtmlElement(() => {
+			let toggles = 0;
+			const controls = mobileControlsTemplate({
+				world: selectedWorld,
+				interaction: makeInteraction({
+					toggleTouchEditorMode: () => {
+						toggles += 1;
+					},
+				}),
+				dispatch: () => {},
+			});
+			const resize = findTemplate(controls, "RESIZE");
+			if (resize === undefined) throw new Error("Missing Resize button");
+			const disabledIndex = resize.strings.findIndex((part) =>
+				part.endsWith("?disabled="),
+			);
+
+			expect(resize.values[disabledIndex]).toBe(true);
+			tapActionButton(resize, 21);
+			expect(toggles).toBe(0);
 		}));
 
 	test("keeps Done enabled for an unselected placement preview", () =>
@@ -247,6 +350,15 @@ describe("mobile controls", () => {
 				preventDefault: () => {},
 				stopPropagation: () => {},
 			} as unknown as PointerEvent);
+			eventHandler<MouseEvent>(
+				rerenderedButton,
+				"click",
+			)({
+				detail: 1,
+				currentTarget: target,
+				preventDefault: () => {},
+				stopPropagation: () => {},
+			} as unknown as MouseEvent);
 
 			expect(finished).toBe(1);
 		}));
@@ -293,6 +405,7 @@ describe("mobile controls", () => {
 				preventDefault: () => {},
 				stopPropagation: () => {},
 			} as unknown as PointerEvent);
+			expect(opened).toBe(0);
 			eventHandler<MouseEvent>(
 				rerenderedDetails,
 				"click",

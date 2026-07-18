@@ -15,6 +15,19 @@ export type CanvasViewport = {
 	readonly bottom: number;
 };
 
+export const canvasCoverZoomForScreen = (screen: {
+	readonly width: number;
+	readonly height: number;
+}): number => {
+	const screenAspectRatio =
+		Math.max(1, screen.width) / Math.max(1, screen.height);
+	const canvasAspectRatio = viewport.width / viewport.height;
+	return Math.max(
+		screenAspectRatio / canvasAspectRatio,
+		canvasAspectRatio / screenAspectRatio,
+	);
+};
+
 export const canvasViewportForScreen = ({
 	screen,
 	zoom,

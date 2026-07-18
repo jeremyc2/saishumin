@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { Action } from "../../../app/action";
 import { editSessionStatus } from "../../../design-studio/edit-session/edit-session";
 import {
 	editorEntitySelectionBody,
@@ -20,6 +21,50 @@ import { initialWorld } from "../../../world/initial-world";
 import { playerBody } from "../../../world/world";
 import { gameSceneTemplate } from "../game-scene";
 import { mobileControlsTemplate } from "../mobile-controls";
+
+const templateResult = (value: unknown) => {
+	if (value === null || typeof value !== "object") return undefined;
+	if (!("strings" in value) || !("values" in value)) return undefined;
+	return value as {
+		readonly strings: ReadonlyArray<string>;
+		readonly values: ReadonlyArray<unknown>;
+	};
+};
+
+const findTemplate = (
+	value: unknown,
+	marker: string,
+): ReturnType<typeof templateResult> => {
+	const template = templateResult(value);
+	if (template === undefined) return undefined;
+	if (
+		template.strings.join("").includes(marker) ||
+		template.values.includes(marker)
+	)
+		return template;
+	for (const child of template.values) {
+		if (Array.isArray(child)) {
+			for (const item of child) {
+				const found = findTemplate(item, marker);
+				if (found !== undefined) return found;
+			}
+			continue;
+		}
+		const found = findTemplate(child, marker);
+		if (found !== undefined) return found;
+	}
+	return undefined;
+};
+
+const clickHandlerBefore = (
+	template: NonNullable<ReturnType<typeof templateResult>>,
+	marker: string,
+) => {
+	const markerIndex = template.values.indexOf(marker);
+	const handler = template.values[markerIndex - 1];
+	if (typeof handler !== "function") throw new Error("Missing click handler");
+	return handler as () => void;
+};
 
 const interaction = {
 	startPan: () => {},
@@ -219,6 +264,57 @@ describe("game scene", () => {
 		expect(scene).not.toContain(" gap-2 landscape:grid-cols-4");
 		expect(scene).not.toContain("data-panel-visible");
 		expect(scene).not.toContain("Grab or interact");
+	});
+
+	test("finishes a pending mobile edit before Play", () => {
+		const selected = EntityId(8);
+		const position = initialWorld.positions.get(selected);
+		const body = initialWorld.bodies.get(selected);
+		if (position === undefined || body === undefined)
+			throw new Error("Expected selected Entity geometry");
+		const world = {
+			...initialWorld,
+			editor: {
+				...initialWorld.editor,
+				open: true,
+				selected,
+				editSession: {
+					operation: {
+						kind: "move" as const,
+						entity: selected,
+						originalPosition: position,
+						originalBody: body,
+						position: { x: position.x + 20, y: position.y },
+					},
+					validity: { kind: "valid" as const },
+					phase: "active" as const,
+				},
+			},
+		};
+		const events: Array<string> = [];
+		const touchInteraction = {
+			...interaction,
+			usesTouchControls: () => true,
+			finishTouchInteraction: () => {
+				events.push("finish");
+			},
+		};
+		const scene = gameSceneTemplate({
+			world,
+			editSessionStatus: editSessionStatus(world),
+			dispatch: (action) => {
+				if (Action.$is("EditorToggled")(action)) events.push("play");
+			},
+			interaction: touchInteraction,
+			designStudioView: makeDesignStudioView(touchInteraction),
+			onRootPointerDown: () => {},
+		});
+		const play = findTemplate(scene, "PLAY");
+		if (play === undefined) throw new Error("Missing Play button");
+
+		clickHandlerBefore(play, "PLAY")();
+
+		expect(events).toEqual(["finish", "play"]);
 	});
 
 	test("keeps Done, Details, and the target mode visible during a touch edit", () => {

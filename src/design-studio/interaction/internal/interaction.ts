@@ -1,6 +1,7 @@
 import { Effect, type Scope } from "effect";
 import { Action, type Action as AppAction } from "../../../app/action";
 import {
+	canvasCoverZoomForScreen,
 	canvasViewportForScreen,
 	unproject,
 } from "../../../presentation/geometry/projection";
@@ -55,6 +56,7 @@ type ActiveInteraction =
 			readonly camera: Position;
 			readonly touchClientPointer?: Position;
 			readonly touchStartedAt?: number;
+			readonly touchSelectionCandidate?: EntityId;
 	  }
 	| {
 			readonly kind: "move";
@@ -109,7 +111,7 @@ const touchItemSpeed = 180;
 const touchCameraSpeed = 480;
 const maximumTouchFrameElapsedSeconds = 0.05;
 const minimumEditorZoom = 0.65;
-const maximumEditorZoom = 4;
+const maximumEditorZoom = 6;
 const usesTouchControls = (): boolean =>
 	window.matchMedia("(any-pointer: coarse)").matches;
 
@@ -381,7 +383,11 @@ export const makeDesignStudioInteraction = (input: {
 			return pointer === undefined ? undefined : unproject(pointer);
 		};
 
-		const startPan = (event: PointerEvent, world: World): void => {
+		const startPan = (
+			event: PointerEvent,
+			world: World,
+			touchSelectionCandidate?: EntityId,
+		): void => {
 			if (event.button !== 0 && event.button !== 1) return;
 			const dispatch = currentDispatch;
 			if (
@@ -402,6 +408,10 @@ export const makeDesignStudioInteraction = (input: {
 						: undefined,
 				touchStartedAt:
 					event.pointerType === "touch" ? event.timeStamp : undefined,
+				...(event.pointerType === "touch" &&
+				touchSelectionCandidate !== undefined
+					? { touchSelectionCandidate }
+					: {}),
 			};
 		};
 
@@ -427,7 +437,7 @@ export const makeDesignStudioInteraction = (input: {
 				}) === "pan-canvas"
 			) {
 				event.stopPropagation();
-				startPan(event, world);
+				startPan(event, world, entity);
 				return;
 			}
 			const session = world.editor.editSession;
@@ -752,6 +762,7 @@ export const makeDesignStudioInteraction = (input: {
 			if (!usesTouchControls() || !world.editor.open) return;
 			if (currentWorld?.editor.selected !== entity && !commitPendingTouchEdit())
 				return;
+			if (world.characters.has(entity)) editorTouchMode = "move";
 			touchPanelOpen = false;
 			touchDetailsOpen = false;
 			dispatch(Action.EditorSelectionChanged({ selection: entity }));
@@ -884,6 +895,8 @@ export const makeDesignStudioInteraction = (input: {
 							event.clientX - interaction.touchClientPointer.x,
 							event.clientY - interaction.touchClientPointer.y,
 						),
+						selectionCandidate:
+							interaction.touchSelectionCandidate !== undefined,
 					})
 				)
 					return;
@@ -1633,9 +1646,27 @@ export const makeDesignStudioInteraction = (input: {
 			},
 			update: (world, dispatch) => {
 				if (world.editor.selected === null) touchDetailsOpen = false;
-				if (world.editor.open && currentWorld?.editor.open !== true)
+				const selected = world.editor.selected;
+				if (
+					selected !== null &&
+					selected !== "floor" &&
+					world.characters.has(selected)
+				)
+					editorTouchMode = "move";
+				if (world.editor.open && currentWorld?.editor.open !== true) {
 					touchPanelOpen = false;
-				else if (!world.editor.open) {
+					if (usesTouchControls())
+						editorZoom = Math.min(
+							maximumEditorZoom,
+							Math.max(
+								minimumEditorZoom,
+								canvasCoverZoomForScreen({
+									width: window.innerWidth,
+									height: window.innerHeight,
+								}),
+							),
+						);
+				} else if (!world.editor.open) {
 					touchPanelOpen = false;
 					touchDetailsOpen = false;
 					clearTouchJoystick();

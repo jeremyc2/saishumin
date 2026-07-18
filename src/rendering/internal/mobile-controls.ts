@@ -9,7 +9,9 @@ import type { World } from "../../world/world";
 type Dispatch = (action: Action) => void;
 
 const touchButtonClass =
-	"inline-flex min-h-12 min-w-12 select-none items-center justify-center rounded-2xl border border-[#e8b875]/65 bg-[#0d181f]/88 font-heading text-[0.7rem] font-bold tracking-[0.06em] text-[#fff1d6] shadow-[0_0.5rem_1.5rem_rgb(0_0_0/28%)] active:translate-y-px active:scale-[0.97] active:border-[#fff0a8] active:bg-[#44574d]/96 max-[380px]:min-h-11 max-[380px]:min-w-[2.6rem] [-webkit-touch-callout:none]";
+	"inline-flex min-h-12 min-w-12 select-none items-center justify-center rounded-2xl border border-[#e8b875]/65 bg-[#0d181f]/88 font-heading text-[0.7rem] font-bold tracking-[0.06em] text-[#fff1d6] shadow-[0_0.5rem_1.5rem_rgb(0_0_0/28%)] max-[380px]:min-h-11 max-[380px]:min-w-[2.6rem] [-webkit-touch-callout:none]";
+const touchButtonActiveClass =
+	"active:translate-y-px active:scale-[0.97] active:border-[#fff0a8] active:bg-[#44574d]/96";
 
 const controlButton = ({
 	control,
@@ -43,7 +45,7 @@ const controlButton = ({
 	return html`
 		<button
 			type="button"
-			class=${`${touchButtonClass} ${className}`}
+			class=${`${touchButtonClass} ${touchButtonActiveClass} ${className}`}
 			aria-label=${label}
 			@pointerdown=${(event: PointerEvent) => changeControl(event, true)}
 			@pointerup=${(event: PointerEvent) => changeControl(event, false)}
@@ -68,22 +70,19 @@ const actionButton = ({
 	readonly className?: string;
 	readonly disabled?: boolean;
 }): TemplateResult => {
-	const finishPointer = (event: PointerEvent, activate: boolean): void => {
+	const finishPointer = (event: PointerEvent, completed: boolean): void => {
 		const target = event.currentTarget;
 		if (!(target instanceof HTMLElement)) return;
 		event.stopPropagation();
 		if (target.dataset["actionPointer"] !== String(event.pointerId)) return;
 		delete target.dataset["actionPointer"];
-		event.preventDefault();
-		if (activate) {
-			target.dataset["actionActivated"] = "true";
-			onClick();
-		}
+		if (completed) target.dataset["actionCompleted"] = "true";
 	};
+	const activeClass = disabled ? "" : touchButtonActiveClass;
 	return html`
 		<button
 			type="button"
-			class=${`${touchButtonClass} touch-none px-4 disabled:opacity-45 disabled:active:transform-none ${className}`}
+			class=${`${touchButtonClass} ${activeClass} touch-none px-4 disabled:opacity-45 ${className}`}
 			?disabled=${disabled}
 			@pointerdown=${(event: PointerEvent) => {
 				if (disabled) return;
@@ -91,11 +90,10 @@ const actionButton = ({
 				if (!(target instanceof HTMLElement)) return;
 				event.stopPropagation();
 				if (target.dataset["actionPointer"] !== undefined) return;
-				delete target.dataset["actionActivated"];
+				delete target.dataset["actionCompleted"];
 				delete target.dataset["actionCancelled"];
 				target.dataset["actionPointer"] = String(event.pointerId);
 				target.setPointerCapture(event.pointerId);
-				event.preventDefault();
 			}}
 			@pointermove=${(event: PointerEvent) => {
 				event.preventDefault();
@@ -118,11 +116,10 @@ const actionButton = ({
 				}
 				const target = event.currentTarget;
 				if (!(target instanceof HTMLElement)) return;
-				const alreadyActivated = target.dataset["actionActivated"] === "true";
 				const cancelled = target.dataset["actionCancelled"] === "true";
-				delete target.dataset["actionActivated"];
+				delete target.dataset["actionCompleted"];
 				delete target.dataset["actionCancelled"];
-				if (!alreadyActivated && !cancelled) onClick();
+				if (!cancelled) onClick();
 				event.preventDefault();
 				event.stopPropagation();
 			}}
@@ -240,14 +237,18 @@ export const mobileControlsTemplate = ({
 		return nothing;
 	let actionControls: LitTemplate = nothing;
 	if (editing) {
-		const hasSelection = world.editor.selected !== null;
+		const selected = world.editor.selected;
+		const hasSelection = selected !== null;
+		const canResizeSelection =
+			selected === "floor" ||
+			(selected !== null && !world.characters.has(selected));
 		const canFinish = hasSelection || world.editor.editSession !== null;
 		const modeLabel =
 			interaction.touchEditorMode() === "move" ? "RESIZE" : "MOVE";
 		actionControls = html`
 			${actionButton({ label: "DONE", onClick: interaction.finishTouchInteraction, disabled: !canFinish, className: "min-h-14 border-[#9a625d] bg-[#6f3f3e]/94" })}
 			${actionButton({ label: "DETAILS", onClick: interaction.openTouchDetails, disabled: !hasSelection, className: "min-h-14 border-[#e8b875] bg-[#5d4528]/94" })}
-			${actionButton({ label: modeLabel, onClick: interaction.toggleTouchEditorMode, disabled: !hasSelection, className: "col-span-2 min-h-12 border-[#638390] bg-[#294b57]/94" })}
+			${actionButton({ label: modeLabel, onClick: interaction.toggleTouchEditorMode, disabled: !canResizeSelection, className: "col-span-2 min-h-12 border-[#638390] bg-[#294b57]/94" })}
 		`;
 	}
 	if (!editing) {

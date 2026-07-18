@@ -19,6 +19,10 @@ type BrowserHarness = {
 
 const withBrowserHarness = <Result>(
 	run: (harness: BrowserHarness) => Promise<Result>,
+	screen: { readonly width: number; readonly height: number } = {
+		width: 1600,
+		height: 900,
+	},
 ): Promise<Result> => {
 	const globalRecord = globalThis as unknown as Record<string, unknown>;
 	const names = [
@@ -55,6 +59,8 @@ const withBrowserHarness = <Result>(
 	}
 	const canvas = new FakeSvgElement();
 	globalRecord["window"] = {
+		innerWidth: screen.width,
+		innerHeight: screen.height,
 		matchMedia: () => ({ matches: true }),
 		addEventListener: (type: string, listener: EventListener) => {
 			const typeListeners = listeners.get(type) ?? new Set<EventListener>();
@@ -103,7 +109,7 @@ const withBrowserHarness = <Result>(
 	}
 };
 
-const editingWorld = (selected: EntityId | null): World => ({
+const editingWorld = (selected: EntityId | "floor" | null): World => ({
 	...initialWorld,
 	editor: { ...initialWorld.editor, open: true, selected },
 });
@@ -131,13 +137,168 @@ const applyAction = (world: World, action: AppAction): World => {
 };
 
 describe("mobile Design Studio interaction", () => {
+	test("keeps the mobile play framing when entering the Design Studio", () =>
+		withBrowserHarness(
+			() =>
+				Effect.runPromise(
+					Effect.scoped(
+						Effect.gen(function* () {
+							const interaction = yield* makeDesignStudioInteraction({
+								refresh: () => {},
+								refreshPreview: () => {},
+							});
+							const dispatch = (): void => {};
+							interaction.update(initialWorld, dispatch);
+							interaction.update(editingWorld(null), dispatch);
+
+							expect(interaction.zoom()).toBeCloseTo(1600 / 900 / (390 / 844));
+						}),
+					),
+				),
+			{ width: 390, height: 844 },
+		));
+
+	test("selects an Entity despite ordinary finger jitter", () =>
+		withBrowserHarness(({ dispatchWindowEvent }) =>
+			Effect.runPromise(
+				Effect.scoped(
+					Effect.gen(function* () {
+						const selected = EntityId(8);
+						const candidate = EntityId(9);
+						let world = editingWorld(selected);
+						const actions: Array<AppAction> = [];
+						const interaction = yield* makeDesignStudioInteraction({
+							refresh: () => {},
+							refreshPreview: () => {},
+						});
+						const dispatch = (action: AppAction): void => {
+							actions.push(action);
+							world = applyAction(world, action);
+							interaction.update(world, dispatch);
+						};
+						interaction.update(world, dispatch);
+						interaction.startEntityMove(
+							{
+								button: 0,
+								clientX: 400,
+								clientY: 300,
+								pointerId: 61,
+								pointerType: "touch",
+								timeStamp: 0,
+								preventDefault: () => {},
+								stopPropagation: () => {},
+							} as unknown as PointerEvent,
+							world,
+							candidate,
+							dispatch,
+						);
+						dispatchWindowEvent("pointermove", {
+							clientX: 412,
+							clientY: 300,
+							pointerId: 61,
+							pointerType: "touch",
+							timeStamp: 140,
+							preventDefault: () => {},
+						} as unknown as PointerEvent);
+						dispatchWindowEvent("pointerup", {
+							pointerId: 61,
+						} as PointerEvent);
+						if (!interaction.consumeTouchGestureClick())
+							interaction.selectTouchEntity(world, candidate, dispatch);
+
+						expect(world.editor.selected).toBe(candidate);
+						expect(actions.some(Action.$is("EditorCameraChanged"))).toBe(false);
+					}),
+				),
+			),
+		));
+
+	test("returns to Move mode when selecting a non-resizable Character", () =>
+		withBrowserHarness(() =>
+			Effect.runPromise(
+				Effect.scoped(
+					Effect.gen(function* () {
+						let world = editingWorld(EntityId(8));
+						const interaction = yield* makeDesignStudioInteraction({
+							refresh: () => {},
+							refreshPreview: () => {},
+						});
+						const dispatch = (action: AppAction): void => {
+							world = applyAction(world, action);
+							interaction.update(world, dispatch);
+						};
+						interaction.update(world, dispatch);
+						interaction.toggleTouchEditorMode();
+						expect(interaction.touchEditorMode()).toBe("resize");
+
+						interaction.selectTouchEntity(world, EntityId(2), dispatch);
+
+						expect(interaction.touchEditorMode()).toBe("move");
+					}),
+				),
+			),
+		));
+
+	test("resizes a selected floor with a touch gesture in Resize mode", () =>
+		withBrowserHarness(({ dispatchWindowEvent }) =>
+			Effect.runPromise(
+				Effect.scoped(
+					Effect.gen(function* () {
+						let world = editingWorld("floor");
+						const originalFloorPlan = world.floorPlan;
+						const actions: Array<AppAction> = [];
+						const interaction = yield* makeDesignStudioInteraction({
+							refresh: () => {},
+							refreshPreview: () => {},
+						});
+						const dispatch = (action: AppAction): void => {
+							actions.push(action);
+							world = applyAction(world, action);
+							interaction.update(world, dispatch);
+						};
+						interaction.update(world, dispatch);
+						interaction.toggleTouchEditorMode();
+						interaction.startFloorResize(
+							{
+								button: 0,
+								clientX: 700,
+								clientY: 450,
+								pointerId: 60,
+								pointerType: "touch",
+								preventDefault: () => {},
+								stopPropagation: () => {},
+							} as unknown as PointerEvent,
+							world,
+							1,
+							1,
+							dispatch,
+						);
+						dispatchWindowEvent("pointermove", {
+							clientX: 740,
+							clientY: 490,
+							pointerId: 60,
+							pointerType: "touch",
+							preventDefault: () => {},
+						} as unknown as PointerEvent);
+
+						const operation = world.editor.editSession?.operation;
+						expect(interaction.touchEditorMode()).toBe("resize");
+						expect(operation?.kind).toBe("resize-floor");
+						if (operation?.kind !== "resize-floor") return;
+						expect(operation.floorPlan).not.toEqual(originalFloorPlan);
+						expect(actions.some(Action.$is("EditorCameraChanged"))).toBe(false);
+					}),
+				),
+			),
+		));
+
 	for (const mode of ["move", "resize"] as const) {
 		test(`moves the selected entity with the joystick in ${mode} mode`, () =>
 			withBrowserHarness(({ runFrame }) =>
 				Effect.runPromise(
 					Effect.scoped(
 						Effect.gen(function* () {
-							const selected = EntityId(2);
+							const selected = EntityId(8);
 							let world = editingWorld(selected);
 							const originalPosition = world.positions.get(selected);
 							if (originalPosition === undefined)
@@ -425,7 +586,7 @@ describe("mobile Design Studio interaction", () => {
 							dispatch,
 						);
 						dispatchWindowEvent("pointermove", {
-							clientX: 124,
+							clientX: 136,
 							clientY: 100,
 							pointerId: 31,
 							pointerType: "touch",

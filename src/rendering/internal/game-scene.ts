@@ -280,6 +280,11 @@ export const gameSceneTemplate = ({
 		dispatch(Action.EditorSelectionChanged({ selection: null }));
 	};
 	const palettePopover = interaction.palettePopover();
+	const togglePlay = (): void => {
+		if (world.editor.open && world.editor.editSession !== null)
+			interaction.finishTouchInteraction();
+		dispatch(Action.EditorToggled());
+	};
 	let canvasClass = "";
 	if (world.editor.open) {
 		canvasClass = "world-editor-canvas touch-none select-none";
@@ -314,7 +319,7 @@ export const gameSceneTemplate = ({
 			</svg>
 			<h1 class="pointer-events-none absolute top-7 left-7 m-0 select-none text-[27px] font-heading font-bold tracking-[0.16em] text-[#fff1d6] any-pointer-coarse:top-[max(0.75rem,env(safe-area-inset-top))] any-pointer-coarse:left-[max(0.875rem,env(safe-area-inset-left))] any-pointer-coarse:text-base">SAISHUMIN</h1>
 			<div class=${`absolute top-6 z-40 flex flex-row items-center gap-2 any-pointer-coarse:top-[max(0.625rem,env(safe-area-inset-top))] any-pointer-coarse:right-[max(0.75rem,env(safe-area-inset-right))] ${world.editor.open && !sessionActive ? "right-[360px]" : "right-6"} ${world.editor.open && (interaction.isTouchPanelOpen() || interaction.isTouchDetailsOpen()) ? "any-pointer-coarse:hidden" : ""}`}>
-				<button type="button" class="inline-flex items-center gap-2 rounded-xl border border-[#e8b875]/70 bg-[#0d181f]/92 px-4 py-3 text-[12px] font-bold tracking-[0.12em] text-[#fff1d6] shadow-lg transition-colors hover:bg-[#1b2d34] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#fff1d6] any-pointer-coarse:min-h-11 any-pointer-coarse:px-[0.8rem] any-pointer-coarse:py-[0.65rem] any-pointer-coarse:text-[0.625rem]" @click=${() => dispatch(Action.EditorToggled())}>
+				<button type="button" class="inline-flex items-center gap-2 rounded-xl border border-[#e8b875]/70 bg-[#0d181f]/92 px-4 py-3 text-[12px] font-bold tracking-[0.12em] text-[#fff1d6] shadow-lg transition-colors hover:bg-[#1b2d34] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#fff1d6] any-pointer-coarse:min-h-11 any-pointer-coarse:px-[0.8rem] any-pointer-coarse:py-[0.65rem] any-pointer-coarse:text-[0.625rem]" @click=${togglePlay}>
 					${world.editor.open ? "PLAY" : "EDIT"}
 				</button>
 				${world.editor.open && !sessionActive && !interaction.isTouchPanelOpen() ? html`<button type="button" class="hidden min-h-11 items-center rounded-xl border border-[#46656b] bg-[#1b333a]/94 px-3 py-[0.65rem] text-[0.625rem] font-bold tracking-[0.1em] text-[#dcecea] shadow-lg any-pointer-coarse:inline-flex" @click=${interaction.toggleTouchPanel}>OBJECTS</button>` : nothing}
