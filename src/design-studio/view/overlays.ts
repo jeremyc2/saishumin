@@ -41,14 +41,6 @@ import {
 
 type Dispatch = (action: AppAction) => void;
 
-export const shouldDismissDialogClick = ({
-	pointerStarted,
-	clickDetail,
-}: {
-	readonly pointerStarted: boolean;
-	readonly clickDetail: number;
-}): boolean => pointerStarted || clickDetail === 0;
-
 export const invalidPreviewDescription = (input: {
 	readonly rejectionReason: EditSessionRejectionReason | null;
 	readonly invalidPlacementKind: InvalidPlacement["kind"] | null;
@@ -84,6 +76,7 @@ const decorationKindForEditorItem = (
 export const makeDesignStudioOverlays = (
 	interaction: DesignStudioInteraction,
 ) => {
+	let signDismissPointer: number | null = null;
 	const invalidPlacementTemplate = (
 		world: World,
 		editSessionStatus: EditSessionStatus,
@@ -127,7 +120,6 @@ export const makeDesignStudioOverlays = (
 		world: World,
 		dispatch: Dispatch,
 	): TemplateResult => {
-		let dismissPointerStarted = false;
 		const content =
 			world.readingSign === null
 				? defaultSignContent
@@ -140,17 +132,19 @@ export const makeDesignStudioOverlays = (
 						<p id="sign-description" class="mt-2 mb-0 wrap-break-word whitespace-pre-wrap text-base leading-relaxed text-[#5d3b24]">${content.body}</p>
 					</div>
 					<div class="mt-5 flex justify-end">
-						<button type="button" autofocus class="rounded-lg border border-[#5d3b24] bg-[#70462b] px-5 py-2 text-[11px] font-bold tracking-[0.12em] text-[#fff3dc] transition hover:bg-[#845535]" @pointerdown=${() => {
-							dismissPointerStarted = true;
-						}} @pointercancel=${() => {
-							dismissPointerStarted = false;
+						<button type="button" autofocus class="rounded-lg border border-[#5d3b24] bg-[#70462b] px-5 py-2 text-[11px] font-bold tracking-[0.12em] text-[#fff3dc] transition hover:bg-[#845535]" @pointerdown=${(
+							event: PointerEvent,
+						) => {
+							signDismissPointer = event.pointerId;
+						}} @pointerup=${(event: PointerEvent) => {
+							if (signDismissPointer !== event.pointerId) return;
+							signDismissPointer = null;
+							dispatch(Action.SignDismissed());
+						}} @pointercancel=${(event: PointerEvent) => {
+							if (signDismissPointer === event.pointerId)
+								signDismissPointer = null;
 						}} @click=${(event: MouseEvent) => {
-							const shouldDismiss = shouldDismissDialogClick({
-								pointerStarted: dismissPointerStarted,
-								clickDetail: event.detail,
-							});
-							dismissPointerStarted = false;
-							if (!shouldDismiss) {
+							if (event.detail !== 0) {
 								event.preventDefault();
 								event.stopPropagation();
 								return;

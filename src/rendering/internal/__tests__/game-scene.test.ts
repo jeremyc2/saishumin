@@ -183,6 +183,7 @@ describe("game scene", () => {
 		expect(scene).toContain("Movement joystick");
 		expect(scene).toContain("Grab or interact");
 		expect(scene).toContain("Jump");
+		expect(scene).toContain("EDIT");
 		expect(controls).toContain("Touch controls");
 		expect(controls).toContain("Movement joystick");
 		expect(controls).toContain("Action controls");
