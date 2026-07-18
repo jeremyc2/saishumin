@@ -258,6 +258,81 @@ describe("mobile Design Studio interaction", () => {
 			),
 		));
 
+	test("switches a selected move from joystick to touch without panning or committing", () =>
+		withBrowserHarness(({ runFrame, dispatchWindowEvent }) =>
+			Effect.runPromise(
+				Effect.scoped(
+					Effect.gen(function* () {
+						const selected = EntityId(8);
+						let world = editingWorld(selected);
+						const originalPosition = world.positions.get(selected);
+						if (originalPosition === undefined)
+							throw new Error("Expected selected entity position");
+						const actions: Array<AppAction> = [];
+						const interaction = yield* makeDesignStudioInteraction({
+							refresh: () => {},
+							refreshPreview: () => {},
+						});
+						const dispatch = (action: AppAction): void => {
+							actions.push(action);
+							world = applyAction(world, action);
+							interaction.update(world, dispatch);
+						};
+						interaction.update(world, dispatch);
+						interaction.updateTouchJoystick({
+							pointerId: 41,
+							vector: { x: 1, y: 0 },
+						});
+						runFrame(0);
+						runFrame(16);
+						runFrame(32);
+						interaction.updateTouchJoystick({ pointerId: 41, vector: null });
+						const operationBeforeTouch = world.editor.editSession?.operation;
+						if (operationBeforeTouch?.kind !== "move")
+							throw new Error("Expected joystick move Edit Session");
+						let stopped = false;
+						const pointerDown = {
+							button: 0,
+							clientX: 650,
+							clientY: 470,
+							pointerId: 42,
+							pointerType: "touch",
+							timeStamp: 100,
+							preventDefault: () => {},
+							stopPropagation: () => {
+								stopped = true;
+							},
+						} as unknown as PointerEvent;
+						interaction.startEntityMove(pointerDown, world, selected, dispatch);
+						if (!stopped) interaction.startPan(pointerDown, world);
+						actions.length = 0;
+						dispatchWindowEvent("pointermove", {
+							clientX: 700,
+							clientY: 470,
+							pointerId: 42,
+							pointerType: "touch",
+							timeStamp: 200,
+							preventDefault: () => {},
+						} as unknown as PointerEvent);
+
+						expect(actions.some(Action.$is("EditorCameraChanged"))).toBe(false);
+						expect(actions.some(Action.$is("EditorEditSessionPreviewed"))).toBe(
+							true,
+						);
+						dispatchWindowEvent("pointerup", {
+							pointerId: 42,
+						} as PointerEvent);
+						expect(world.editor.editSession).not.toBeNull();
+						const operationAfterTouch = world.editor.editSession?.operation;
+						if (operationAfterTouch?.kind !== "move") return;
+						expect(operationAfterTouch.originalPosition).toEqual(
+							originalPosition,
+						);
+					}),
+				),
+			),
+		));
+
 	test("Done commits the active edit and clears selection while Details opens", () =>
 		withBrowserHarness(() =>
 			Effect.runPromise(

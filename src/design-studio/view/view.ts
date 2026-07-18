@@ -288,15 +288,40 @@ export const makeDesignStudioView = (interaction: DesignStudioInteraction) => {
 					points=${points(outline)}
 					fill="transparent"
 					stroke="transparent"
-					stroke-width="72"
+					stroke-width="128"
 					vector-effect="non-scaling-stroke"
 					pointer-events="all"
 					class="hidden any-pointer-coarse:block"
 					@pointerdown=${(event: PointerEvent) =>
 						interaction.startEntityMove(event, world, selected, dispatch)}
 				/>`;
+		const selectionCenter = midpoint(outline[0], outline[2]);
+		const touchMovePresentation = resizeTouchMode
+			? nothing
+			: svg`
+					<polygon
+						data-touch-move-highlight
+						points=${points(outline)}
+						fill=${accent}
+						fill-opacity="0.24"
+						stroke=${accent}
+						stroke-width="5"
+						vector-effect="non-scaling-stroke"
+						pointer-events="none"
+						class="hidden any-pointer-coarse:block"
+					/>
+					<g
+						data-touch-move-indicator
+						transform=${`translate(${selectionCenter.x} ${selectionCenter.y})`}
+						pointer-events="none"
+						class="hidden any-pointer-coarse:block"
+					>
+						<circle r="40" fill=${accent} stroke="#503b37" stroke-width="4" vector-effect="non-scaling-stroke" />
+						<path d="M-28 0H28M-28 0l8-8M-28 0l8 8M28 0l-8-8M28 0l-8 8M0-28V28M0-28l-8 8M0-28l8 8M0 28l-8-8M0 28l8-8" fill="none" stroke="#503b37" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke" />
+					</g>
+				`;
 		if (characterSelected)
-			return svg`<polygon points=${points(outline)} fill="none" stroke=${accent} stroke-width="4" stroke-dasharray="10 7" vector-effect="non-scaling-stroke" pointer-events="none" />${touchMoveTarget}`;
+			return svg`<polygon points=${points(outline)} fill="none" stroke=${accent} stroke-width="4" stroke-dasharray="10 7" vector-effect="non-scaling-stroke" pointer-events="none" class=${resizeTouchMode ? "" : "any-pointer-coarse:hidden"} />${touchMovePresentation}${touchMoveTarget}`;
 		const edges: ReadonlyArray<{
 			readonly start: Position;
 			readonly end: Position;
@@ -389,7 +414,8 @@ export const makeDesignStudioView = (interaction: DesignStudioInteraction) => {
 			},
 		];
 		return svg`
-				<polygon points=${points(outline)} fill="none" stroke=${accent} stroke-width="4" stroke-dasharray="10 7" vector-effect="non-scaling-stroke" pointer-events="none" />
+				<polygon points=${points(outline)} fill="none" stroke=${accent} stroke-width="4" stroke-dasharray="10 7" vector-effect="non-scaling-stroke" pointer-events="none" class=${resizeTouchMode ? "" : "any-pointer-coarse:hidden"} />
+				${touchMovePresentation}
 				${touchMoveTarget}
 				${edges.map(
 					(edge) => svg`<line
@@ -401,7 +427,7 @@ export const makeDesignStudioView = (interaction: DesignStudioInteraction) => {
 						stroke-width="18"
 						vector-effect="non-scaling-stroke"
 						pointer-events="stroke"
-						class=${edge.cursor}
+						class=${`${edge.cursor} ${resizeTouchMode ? "" : "any-pointer-coarse:hidden"}`}
 						@pointerdown=${(event: PointerEvent) =>
 							interaction.startEntityResize(
 								event,
@@ -416,6 +442,7 @@ export const makeDesignStudioView = (interaction: DesignStudioInteraction) => {
 				${handles.map(
 					(handle) => svg`<g>
 						<rect
+							data-selection-handle
 							x=${handle.point.x - selectionHandleSize / 2}
 							y=${handle.point.y - selectionHandleSize / 2}
 							width=${selectionHandleSize}
@@ -424,7 +451,7 @@ export const makeDesignStudioView = (interaction: DesignStudioInteraction) => {
 							fill=${accent}
 							stroke="#503b37"
 							stroke-width="3"
-							class=${handle.cursor}
+							class=${`${handle.cursor} ${resizeTouchMode ? "" : "any-pointer-coarse:hidden"}`}
 							@pointerdown=${(event: PointerEvent) =>
 								interaction.startEntityResize(
 									event,

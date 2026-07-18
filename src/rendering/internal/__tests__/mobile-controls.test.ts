@@ -292,9 +292,55 @@ describe("mobile controls", () => {
 				"click",
 			)({
 				detail: 1,
+				currentTarget: target,
 				preventDefault: () => {},
 				stopPropagation: () => {},
-			} as MouseEvent);
+			} as unknown as MouseEvent);
+
+			expect(opened).toBe(1);
+		}));
+
+	test("opens Details from the native click fallback after capture is lost", () =>
+		withHtmlElement(() => {
+			let opened = 0;
+			const interaction = makeInteraction({
+				openTouchDetails: () => {
+					opened += 1;
+				},
+			});
+			const controls = mobileControlsTemplate({
+				world: selectedWorld,
+				interaction,
+				dispatch: () => {},
+			});
+			const details = findTemplate(controls, "DETAILS");
+			if (details === undefined) throw new Error("Missing Details button");
+			const target = new FakeHtmlElement();
+			eventHandler<PointerEvent>(
+				details,
+				"pointerdown",
+			)({
+				pointerId: 10,
+				currentTarget: target,
+				preventDefault: () => {},
+			} as unknown as PointerEvent);
+			eventHandler<PointerEvent>(
+				details,
+				"lostpointercapture",
+			)({
+				pointerId: 10,
+				currentTarget: target,
+				preventDefault: () => {},
+			} as unknown as PointerEvent);
+			eventHandler<MouseEvent>(
+				details,
+				"click",
+			)({
+				detail: 1,
+				currentTarget: target,
+				preventDefault: () => {},
+				stopPropagation: () => {},
+			} as unknown as MouseEvent);
 
 			expect(opened).toBe(1);
 		}));

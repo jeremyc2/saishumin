@@ -74,7 +74,10 @@ const actionButton = ({
 		if (target.dataset["actionPointer"] !== String(event.pointerId)) return;
 		delete target.dataset["actionPointer"];
 		event.preventDefault();
-		if (activate) onClick();
+		if (activate) {
+			target.dataset["actionActivated"] = "true";
+			onClick();
+		}
 	};
 	return html`
 		<button
@@ -86,12 +89,19 @@ const actionButton = ({
 				const target = event.currentTarget;
 				if (!(target instanceof HTMLElement)) return;
 				if (target.dataset["actionPointer"] !== undefined) return;
+				delete target.dataset["actionActivated"];
+				delete target.dataset["actionCancelled"];
 				target.dataset["actionPointer"] = String(event.pointerId);
 				target.setPointerCapture(event.pointerId);
 				event.preventDefault();
 			}}
 			@pointerup=${(event: PointerEvent) => finishPointer(event, true)}
-			@pointercancel=${(event: PointerEvent) => finishPointer(event, false)}
+			@pointercancel=${(event: PointerEvent) => {
+				const target = event.currentTarget;
+				if (target instanceof HTMLElement)
+					target.dataset["actionCancelled"] = "true";
+				finishPointer(event, false);
+			}}
 			@lostpointercapture=${(event: PointerEvent) =>
 				finishPointer(event, false)}
 			@click=${(event: MouseEvent) => {
@@ -100,6 +110,13 @@ const actionButton = ({
 					onClick();
 					return;
 				}
+				const target = event.currentTarget;
+				if (!(target instanceof HTMLElement)) return;
+				const alreadyActivated = target.dataset["actionActivated"] === "true";
+				const cancelled = target.dataset["actionCancelled"] === "true";
+				delete target.dataset["actionActivated"];
+				delete target.dataset["actionCancelled"];
+				if (!alreadyActivated && !cancelled) onClick();
 				event.preventDefault();
 				event.stopPropagation();
 			}}

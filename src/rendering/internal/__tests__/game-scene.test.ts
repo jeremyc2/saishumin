@@ -271,13 +271,17 @@ describe("game scene", () => {
 			...interaction,
 			isTouchPanelOpen: () => false,
 		};
+		const designStudioView = makeDesignStudioView(touchInteraction);
+		const selection = flattenedTemplate(
+			designStudioView.selectionTemplate(world, false, () => {}),
+		);
 		const scene = flattenedTemplate(
 			gameSceneTemplate({
 				world,
 				editSessionStatus: editSessionStatus(world),
 				dispatch: () => {},
 				interaction: touchInteraction,
-				designStudioView: makeDesignStudioView(touchInteraction),
+				designStudioView,
 				onRootPointerDown: () => {},
 			}),
 		);
@@ -287,7 +291,14 @@ describe("game scene", () => {
 		expect(scene).toContain("RESIZE");
 		expect(scene).not.toContain("CANCEL");
 		expect(scene).toContain("data-touch-move-target");
-		expect(scene).toContain('stroke-width="72"');
+		expect(selection).toContain("data-touch-move-highlight");
+		expect(selection).toContain("data-touch-move-indicator");
+		const firstHandle = selection.indexOf("data-selection-handle");
+		expect(firstHandle).toBeGreaterThanOrEqual(0);
+		expect(selection.slice(firstHandle, firstHandle + 500)).toContain(
+			"any-pointer-coarse:hidden",
+		);
+		expect(scene).toContain('stroke-width="128"');
 		expect(scene).toContain("data-touch-details");
 	});
 
@@ -302,19 +313,30 @@ describe("game scene", () => {
 			isTouchPanelOpen: () => false,
 			touchEditorMode: () => "resize" as const,
 		};
+		const designStudioView = makeDesignStudioView(touchInteraction);
+		const selection = flattenedTemplate(
+			designStudioView.selectionTemplate(world, false, () => {}),
+		);
 		const scene = flattenedTemplate(
 			gameSceneTemplate({
 				world,
 				editSessionStatus: editSessionStatus(world),
 				dispatch: () => {},
 				interaction: touchInteraction,
-				designStudioView: makeDesignStudioView(touchInteraction),
+				designStudioView,
 				onRootPointerDown: () => {},
 			}),
 		);
 
 		expect(scene).toContain("MOVE");
 		expect(scene).toContain("data-touch-resize-target");
+		expect(selection).not.toContain("data-touch-move-highlight");
+		expect(selection).not.toContain("data-touch-move-indicator");
+		const firstHandle = selection.indexOf("data-selection-handle");
+		expect(firstHandle).toBeGreaterThanOrEqual(0);
+		expect(selection.slice(firstHandle, firstHandle + 500)).not.toContain(
+			"any-pointer-coarse:hidden",
+		);
 		expect(scene).toContain('stroke-width="128"');
 	});
 });

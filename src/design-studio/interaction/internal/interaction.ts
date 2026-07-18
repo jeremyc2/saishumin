@@ -62,7 +62,7 @@ type ActiveInteraction =
 			readonly grabOffset: Position;
 			readonly position: Position;
 			readonly body: Body;
-			readonly touchControlled?: boolean;
+			readonly touchControl?: "joystick" | "pointer";
 	  }
 	| {
 			readonly kind: "resize";
@@ -428,8 +428,28 @@ export const makeDesignStudioInteraction = (input: {
 				startPan(event, world);
 				return;
 			}
-			if (world.editor.editSession !== null || activeInteraction !== undefined)
+			const session = world.editor.editSession;
+			let continuingTouchMove = false;
+			let position: Position | undefined;
+			if (
+				event.pointerType === "touch" &&
+				session?.operation.kind === "move" &&
+				session.operation.entity === entity
+			) {
+				continuingTouchMove = true;
+				position = session.operation.position;
+			} else if (world.characters.has(entity)) {
+				position = characterSpawnPosition({ world, entity });
+			} else {
+				position = world.positions.get(entity);
+			}
+			if (
+				!continuingTouchMove &&
+				(session !== null || activeInteraction !== undefined)
+			) {
+				event.stopPropagation();
 				return;
+			}
 			event.stopPropagation();
 			if (event.pointerType !== "touch" && isPanGesture(event)) {
 				startPan(event, world);
@@ -440,9 +460,6 @@ export const makeDesignStudioInteraction = (input: {
 				event,
 				world.editor.camera,
 			);
-			const position = world.characters.has(entity)
-				? characterSpawnPosition({ world, entity })
-				: world.positions.get(entity);
 			const body = world.bodies.get(entity);
 			if (
 				projectedPointer === undefined ||
@@ -451,13 +468,14 @@ export const makeDesignStudioInteraction = (input: {
 			)
 				return;
 			event.preventDefault();
+			clearTouchJoystick();
 			latestPointer = { x: event.clientX, y: event.clientY };
-			dispatch(Action.EditorSelectionChanged({ selection: entity }));
+			const previewWorld = continuingTouchMove ? editSessionView(world) : world;
 			const pointerAtBase = unproject(
 				projectedPointer,
-				world.characters.has(entity)
-					? surfaceAt(world, position, body)
-					: entityBaseElevation(world, entity),
+				previewWorld.characters.has(entity)
+					? surfaceAt(previewWorld, position, body)
+					: entityBaseElevation(previewWorld, entity),
 			);
 			activeInteraction = {
 				kind: "move",
@@ -468,7 +486,12 @@ export const makeDesignStudioInteraction = (input: {
 				},
 				position,
 				body,
+				...(event.pointerType === "touch"
+					? { touchControl: "pointer" as const }
+					: {}),
 			};
+			if (continuingTouchMove) return;
+			dispatch(Action.EditorSelectionChanged({ selection: entity }));
 			dispatch(
 				Action.EditorEditSessionBegan({
 					operation: {
@@ -681,7 +704,7 @@ export const makeDesignStudioInteraction = (input: {
 				grabOffset: { x: 0, y: 0 },
 				position,
 				body,
-				touchControlled: true,
+				touchControl: "joystick",
 			};
 			touchPanelOpen = false;
 			touchDetailsOpen = false;
@@ -812,8 +835,9 @@ export const makeDesignStudioInteraction = (input: {
 			)
 				return;
 			if (
-				(interaction.kind === "create" || interaction.kind === "move") &&
-				interaction.touchControlled === true
+				(interaction.kind === "create" &&
+					interaction.touchControlled === true) ||
+				(interaction.kind === "move" && interaction.touchControl === "joystick")
 			)
 				return;
 
@@ -973,8 +997,9 @@ export const makeDesignStudioInteraction = (input: {
 			}
 			const interaction = activeInteraction;
 			if (
-				(interaction?.kind === "create" || interaction?.kind === "move") &&
-				interaction.touchControlled === true
+				(interaction?.kind === "create" &&
+					interaction.touchControlled === true) ||
+				(interaction?.kind === "move" && interaction.touchControl !== undefined)
 			)
 				return;
 			const world = currentWorld;
@@ -1181,7 +1206,7 @@ export const makeDesignStudioInteraction = (input: {
 				if (selected === null || selected === "floor") return;
 				const isSelectedTouchMove =
 					interaction?.kind === "move" &&
-					interaction.touchControlled === true &&
+					interaction.touchControl === "joystick" &&
 					interaction.entity === selected;
 				if (world.editor.editSession === null) {
 					if (!isSelectedTouchMove) {
@@ -1191,16 +1216,24 @@ export const makeDesignStudioInteraction = (input: {
 					previousTouchJoystickTime = time;
 					return;
 				}
-				if (!isSelectedTouchMove) {
-					activeInteraction = undefined;
-					dispatch(Action.EditorEditSessionCancelled());
-					previousTouchJoystickTime = time;
-					return;
-				}
 				const operation = world.editor.editSession.operation;
 				if (operation.kind !== "move" || operation.entity !== selected) {
 					activeInteraction = undefined;
 					dispatch(Action.EditorEditSessionCancelled());
+					return;
+				}
+				if (!isSelectedTouchMove) {
+					const body = world.bodies.get(selected);
+					if (body === undefined) return;
+					activeInteraction = {
+						kind: "move",
+						entity: selected,
+						grabOffset: { x: 0, y: 0 },
+						position: operation.position,
+						body,
+						touchControl: "joystick",
+					};
+					previousTouchJoystickTime = time;
 					return;
 				}
 				const currentPosition = operation.position;
@@ -1253,8 +1286,10 @@ export const makeDesignStudioInteraction = (input: {
 				interaction !== undefined &&
 				interaction.kind !== "pan" &&
 				!(
-					(interaction.kind === "create" || interaction.kind === "move") &&
-					interaction.touchControlled === true
+					(interaction.kind === "create" &&
+						interaction.touchControlled === true) ||
+					(interaction.kind === "move" &&
+						interaction.touchControl !== undefined)
 				) &&
 				world !== undefined &&
 				world.editor.editSession !== null &&
