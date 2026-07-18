@@ -153,14 +153,12 @@ export type DesignStudioInteraction = {
 		readonly pointerId: number;
 		readonly vector: Position | null;
 	}) => void;
-	readonly commitTouchEdit: () => void;
-	readonly cancelTouchSelection: () => void;
+	readonly finishTouchInteraction: () => void;
 	readonly touchEditorMode: () => TouchEditorMode;
 	readonly toggleTouchEditorMode: () => void;
 	readonly consumeTouchGestureClick: () => boolean;
 	readonly toggleTouchPanel: () => void;
 	readonly isTouchPanelOpen: () => boolean;
-	readonly isTouchEditActive: () => boolean;
 	readonly openTouchDetails: () => void;
 	readonly closeTouchDetails: () => void;
 	readonly isTouchDetailsOpen: () => boolean;
@@ -1133,24 +1131,7 @@ export const makeDesignStudioInteraction = (input: {
 			}
 		};
 
-		const commitTouchEdit = (): void => {
-			const interaction = activeInteraction;
-			if (
-				(interaction?.kind !== "create" && interaction?.kind !== "move") ||
-				interaction.touchControlled !== true
-			)
-				return;
-			activeInteraction = undefined;
-			clearTouchJoystick();
-			touchPanelOpen = true;
-			touchDetailsOpen = false;
-			currentDispatch?.(Action.EditorEditSessionCommitted());
-			input.refreshPreview();
-			input.refresh();
-		};
-
-		const cancelTouchSelection = (): void => {
-			const interaction = activeInteraction;
+		const finishTouchInteraction = (): void => {
 			const world = currentWorld;
 			const dispatch = currentDispatch;
 			activeInteraction = undefined;
@@ -1162,12 +1143,9 @@ export const makeDesignStudioInteraction = (input: {
 			touchPanelOpen = false;
 			touchDetailsOpen = false;
 			editorTouchMode = "move";
-			if (
-				dispatch !== undefined &&
-				((world !== undefined && world.editor.editSession !== null) ||
-					(interaction !== undefined && interaction.kind !== "pan"))
-			)
-				dispatch(Action.EditorEditSessionCancelled());
+			touchPointers.clear();
+			if (world !== undefined && world.editor.editSession !== null)
+				dispatch?.(Action.EditorEditSessionCommitted());
 			dispatch?.(Action.EditorSelectionChanged({ selection: null }));
 			input.refreshPreview();
 			input.refresh();
@@ -1495,8 +1473,7 @@ export const makeDesignStudioInteraction = (input: {
 				if (vector.x === 0 && vector.y === 0)
 					previousTouchJoystickTime = undefined;
 			},
-			commitTouchEdit,
-			cancelTouchSelection,
+			finishTouchInteraction,
 			touchEditorMode: () => editorTouchMode,
 			toggleTouchEditorMode: () => {
 				if (currentWorld?.editor.open !== true) return;
@@ -1520,13 +1497,6 @@ export const makeDesignStudioInteraction = (input: {
 				input.refresh();
 			},
 			isTouchPanelOpen: () => touchPanelOpen,
-			isTouchEditActive: () => {
-				const interaction = activeInteraction;
-				return (
-					(interaction?.kind === "create" || interaction?.kind === "move") &&
-					interaction.touchControlled === true
-				);
-			},
 			openTouchDetails: () => {
 				const world = currentWorld;
 				if (world === undefined || world.editor.selected === null) return;

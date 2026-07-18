@@ -258,7 +258,7 @@ describe("mobile Design Studio interaction", () => {
 			),
 		));
 
-	test("Cancel clears the active edit and selection while Details opens", () =>
+	test("Done commits the active edit and clears selection while Details opens", () =>
 		withBrowserHarness(() =>
 			Effect.runPromise(
 				Effect.scoped(
@@ -291,10 +291,81 @@ describe("mobile Design Studio interaction", () => {
 						});
 						interaction.update(world, dispatch);
 						expect(world.editor.editSession).not.toBeNull();
-						interaction.cancelTouchSelection();
+						interaction.finishTouchInteraction();
 						expect(world.editor.editSession).toBeNull();
 						expect(world.editor.selected).toBeNull();
 						expect(interaction.isTouchDetailsOpen()).toBe(false);
+					}),
+				),
+			),
+		));
+
+	test("committing a touch placement does not reopen the Object Palette", () =>
+		withBrowserHarness(() =>
+			Effect.runPromise(
+				Effect.scoped(
+					Effect.gen(function* () {
+						let world = editingWorld(null);
+						const interaction = yield* makeDesignStudioInteraction({
+							refresh: () => {},
+							refreshPreview: () => {},
+						});
+						const dispatch = (action: AppAction): void => {
+							world = applyAction(world, action);
+							interaction.update(world, dispatch);
+						};
+						interaction.update(world, dispatch);
+						interaction.startTouchPalettePlacement("plant", world, dispatch);
+						expect(world.editor.editSession).not.toBeNull();
+
+						interaction.finishTouchInteraction();
+
+						expect(world.editor.editSession).toBeNull();
+						expect(interaction.isTouchPanelOpen()).toBe(false);
+					}),
+				),
+			),
+		));
+
+	test("Done releases an invalid move and cancellation restores its authored origin", () =>
+		withBrowserHarness(() =>
+			Effect.runPromise(
+				Effect.scoped(
+					Effect.gen(function* () {
+						const selected = EntityId(8);
+						let world = editingWorld(selected);
+						const originalPosition = world.positions.get(selected);
+						const body = world.bodies.get(selected);
+						if (originalPosition === undefined || body === undefined)
+							throw new Error("Expected selected entity geometry");
+						const interaction = yield* makeDesignStudioInteraction({
+							refresh: () => {},
+							refreshPreview: () => {},
+						});
+						const dispatch = (action: AppAction): void => {
+							world = applyAction(world, action);
+							interaction.update(world, dispatch);
+						};
+						interaction.update(world, dispatch);
+						dispatch(
+							Action.EditorEditSessionBegan({
+								operation: {
+									kind: "move",
+									entity: selected,
+									originalPosition,
+									originalBody: body,
+									position: { x: -1_000, y: -1_000 },
+								},
+							}),
+						);
+
+						interaction.finishTouchInteraction();
+
+						expect(world.editor.editSession?.phase).toBe("invalid-released");
+						expect(world.editor.selected).toBeNull();
+						dispatch(Action.EditorEditSessionCancelled());
+						expect(world.editor.editSession).toBeNull();
+						expect(world.positions.get(selected)).toEqual(originalPosition);
 					}),
 				),
 			),

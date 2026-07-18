@@ -30,14 +30,12 @@ const interaction = {
 	startTouchPalettePlacement: () => {},
 	selectTouchEntity: () => {},
 	updateTouchJoystick: () => {},
-	commitTouchEdit: () => {},
-	cancelTouchSelection: () => {},
+	finishTouchInteraction: () => {},
 	touchEditorMode: () => "move" as const,
 	toggleTouchEditorMode: () => {},
 	consumeTouchGestureClick: () => false,
 	toggleTouchPanel: () => {},
 	isTouchPanelOpen: () => true,
-	isTouchEditActive: () => false,
 	openTouchDetails: () => {},
 	closeTouchDetails: () => {},
 	isTouchDetailsOpen: () => false,
@@ -223,7 +221,7 @@ describe("game scene", () => {
 		expect(scene).not.toContain("Grab or interact");
 	});
 
-	test("shows Place and Cancel while a touch edit is active", () => {
+	test("keeps Done, Details, and the target mode visible during a touch edit", () => {
 		const world = {
 			...initialWorld,
 			editor: {
@@ -243,7 +241,6 @@ describe("game scene", () => {
 		const touchInteraction = {
 			...interaction,
 			isTouchPanelOpen: () => false,
-			isTouchEditActive: () => true,
 		};
 		const scene = flattenedTemplate(
 			gameSceneTemplate({
@@ -257,12 +254,14 @@ describe("game scene", () => {
 		);
 
 		expect(scene).toContain("Movement joystick");
-		expect(scene).toContain("PLACE");
-		expect(scene).toContain("CANCEL");
+		expect(scene).toContain("DONE");
+		expect(scene).toContain("DETAILS");
+		expect(scene).toContain("RESIZE");
+		expect(scene).not.toContain("CANCEL");
 		expect(scene).not.toContain("Grab or interact");
 	});
 
-	test("offers Cancel and Details for a touch selection", () => {
+	test("offers Done, Details, and the target mode for a touch selection", () => {
 		const selected = EntityId(8);
 		const world = {
 			...initialWorld,
@@ -283,14 +282,16 @@ describe("game scene", () => {
 			}),
 		);
 
-		expect(scene).toContain("CANCEL");
+		expect(scene).toContain("DONE");
 		expect(scene).toContain("DETAILS");
-		expect(scene).toContain("MOVE");
-		expect(scene).toContain("any-pointer-coarse:[stroke-width:56]");
+		expect(scene).toContain("RESIZE");
+		expect(scene).not.toContain("CANCEL");
+		expect(scene).toContain("data-touch-move-target");
+		expect(scene).toContain('stroke-width="72"');
 		expect(scene).toContain("data-touch-details");
 	});
 
-	test("shows the active Resize mode for a touch selection", () => {
+	test("offers Move while Resize mode is active", () => {
 		const selected = EntityId(8);
 		const world = {
 			...initialWorld,
@@ -312,7 +313,8 @@ describe("game scene", () => {
 			}),
 		);
 
-		expect(scene).toContain("RESIZE");
-		expect(scene).toContain("any-pointer-coarse:[stroke-width:72]");
+		expect(scene).toContain("MOVE");
+		expect(scene).toContain("data-touch-resize-target");
+		expect(scene).toContain('stroke-width="128"');
 	});
 });

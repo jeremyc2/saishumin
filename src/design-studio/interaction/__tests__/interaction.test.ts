@@ -27,8 +27,9 @@ import {
 	releasePalettePress,
 	shouldPanTouchGesture,
 	shouldStartPinchGesture,
-	touchJoystickTarget,
 	touchEntityPointerIntent,
+	touchJoystickTarget,
+	touchResizeDirections,
 	visiblePalettePopover,
 } from "../pointer";
 
@@ -78,6 +79,31 @@ describe("Design Studio interaction", () => {
 				entity: selected,
 			}),
 		).toBe("pan-canvas");
+	});
+
+	test("prefers corners for small resize targets and sides only away from corners", () => {
+		expect(
+			touchResizeDirections({
+				pointer: { x: 40, y: 0 },
+				outline: [
+					{ x: 0, y: 0 },
+					{ x: 80, y: 0 },
+					{ x: 80, y: 60 },
+					{ x: 0, y: 60 },
+				],
+			}),
+		).toMatchObject({ widthDirection: -1, depthDirection: -1 });
+		expect(
+			touchResizeDirections({
+				pointer: { x: 120, y: 0 },
+				outline: [
+					{ x: 0, y: 0 },
+					{ x: 240, y: 0 },
+					{ x: 240, y: 160 },
+					{ x: 0, y: 160 },
+				],
+			}),
+		).toMatchObject({ widthDirection: 0, depthDirection: -1 });
 	});
 
 	test("activates a palette drag only after leaving the item rectangle expanded by 12 pixels", () => {

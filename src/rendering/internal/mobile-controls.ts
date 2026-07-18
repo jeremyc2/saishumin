@@ -61,10 +61,12 @@ const actionButton = ({
 	label,
 	onClick,
 	className = "",
+	disabled = false,
 }: {
 	readonly label: string;
 	readonly onClick: () => void;
 	readonly className?: string;
+	readonly disabled?: boolean;
 }): TemplateResult => {
 	const finishPointer = (event: PointerEvent, activate: boolean): void => {
 		const target = event.currentTarget;
@@ -77,8 +79,10 @@ const actionButton = ({
 	return html`
 		<button
 			type="button"
-			class=${`${touchButtonClass} touch-none px-4 ${className}`}
+			class=${`${touchButtonClass} touch-none px-4 disabled:opacity-45 disabled:active:transform-none ${className}`}
+			?disabled=${disabled}
 			@pointerdown=${(event: PointerEvent) => {
+				if (disabled) return;
 				const target = event.currentTarget;
 				if (!(target instanceof HTMLElement)) return;
 				if (target.dataset["actionPointer"] !== undefined) return;
@@ -91,6 +95,7 @@ const actionButton = ({
 			@lostpointercapture=${(event: PointerEvent) =>
 				finishPointer(event, false)}
 			@click=${(event: MouseEvent) => {
+				if (disabled) return;
 				if (event.detail === 0) {
 					onClick();
 					return;
@@ -205,26 +210,20 @@ export const mobileControlsTemplate = ({
 	readonly dispatch: Dispatch;
 }): LitTemplate => {
 	const editing = world.editor.open;
-	const touchEditActive = interaction.isTouchEditActive();
 	if (
 		editing &&
-		(interaction.isTouchPanelOpen() || interaction.isTouchDetailsOpen()) &&
-		!touchEditActive
+		(interaction.isTouchPanelOpen() || interaction.isTouchDetailsOpen())
 	)
 		return nothing;
 	let actionControls: LitTemplate = nothing;
-	if (editing && touchEditActive) {
+	if (editing) {
+		const hasSelection = world.editor.selected !== null;
+		const modeLabel =
+			interaction.touchEditorMode() === "move" ? "RESIZE" : "MOVE";
 		actionControls = html`
-			${actionButton({ label: "CANCEL", onClick: interaction.cancelTouchSelection, className: "border-[#9a625d] bg-[#6f3f3e]/94" })}
-			${actionButton({ label: "PLACE", onClick: interaction.commitTouchEdit, className: "border-[#e8b875] bg-[#5d4528]/94" })}
-		`;
-	}
-	if (editing && !touchEditActive && world.editor.selected !== null) {
-		const modeLabel = interaction.touchEditorMode().toUpperCase();
-		actionControls = html`
-			${actionButton({ label: "CANCEL", onClick: interaction.cancelTouchSelection, className: "min-h-14 border-[#9a625d] bg-[#6f3f3e]/94" })}
-			${actionButton({ label: "DETAILS", onClick: interaction.openTouchDetails, className: "min-h-14 border-[#e8b875] bg-[#5d4528]/94" })}
-			${actionButton({ label: modeLabel, onClick: interaction.toggleTouchEditorMode, className: "col-span-2 min-h-12 border-[#638390] bg-[#294b57]/94" })}
+			${actionButton({ label: "DONE", onClick: interaction.finishTouchInteraction, className: "min-h-14 border-[#9a625d] bg-[#6f3f3e]/94" })}
+			${actionButton({ label: "DETAILS", onClick: interaction.openTouchDetails, disabled: !hasSelection, className: "min-h-14 border-[#e8b875] bg-[#5d4528]/94" })}
+			${actionButton({ label: modeLabel, onClick: interaction.toggleTouchEditorMode, disabled: !hasSelection, className: "col-span-2 min-h-12 border-[#638390] bg-[#294b57]/94" })}
 		`;
 	}
 	if (!editing) {

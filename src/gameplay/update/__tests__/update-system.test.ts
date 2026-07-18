@@ -664,6 +664,44 @@ describe("UpdateSystemService", () => {
 		).toBe(true);
 	});
 
+	test("allows Editor Items at the live positions of moved characters", () => {
+		const entity = crateEntities[0];
+		const lavaMonsterEntity = EntityId(2);
+		const originalPosition = initialWorld.positions.get(entity);
+		expect(originalPosition).toBeDefined();
+		if (originalPosition === undefined) return;
+		const livePositions = [
+			[playerEntity, Position.make({ x: 500, y: 180 })],
+			[lavaMonsterEntity, Position.make({ x: 700, y: 180 })],
+		] as const;
+		const world = {
+			...initialWorld,
+			positions: new Map(initialWorld.positions),
+		};
+		for (const [character, position] of livePositions)
+			world.positions.set(character, position);
+		const editing = updateSystem.update({
+			world,
+			action: Action.EditorToggled(),
+		});
+
+		for (const [, position] of livePositions) {
+			const begun = updateSystem.update({
+				world: editing,
+				action: Action.EditorEditSessionBegan({
+					operation: {
+						kind: "move",
+						entity,
+						originalPosition,
+						originalBody: crateBody,
+						position,
+					},
+				}),
+			});
+			expect(begun.editor.editSession?.validity).toEqual({ kind: "valid" });
+		}
+	});
+
 	test("moves the player when a tick reaches the update interface", () => {
 		const positions = new Map([
 			[playerEntity, Position.make({ x: 1200, y: 320 })],

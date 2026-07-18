@@ -84,6 +84,110 @@ export const touchJoystickTarget = (
 ): TouchJoystickTarget =>
 	selection !== null && selection !== "floor" ? "selected-entity" : "camera";
 
+export type TouchResizeDirections = {
+	readonly widthDirection: -1 | 0 | 1;
+	readonly depthDirection: -1 | 0 | 1;
+};
+
+const touchResizeCornerRadiusPixels = 64;
+
+const squaredDistance = (first: Position, second: Position): number => {
+	const x = first.x - second.x;
+	const y = first.y - second.y;
+	return x * x + y * y;
+};
+
+const squaredDistanceToSegment = (
+	pointer: Position,
+	start: Position,
+	end: Position,
+): number => {
+	const x = end.x - start.x;
+	const y = end.y - start.y;
+	const lengthSquared = x * x + y * y;
+	if (lengthSquared <= Number.EPSILON) return squaredDistance(pointer, start);
+	const projection =
+		((pointer.x - start.x) * x + (pointer.y - start.y) * y) / lengthSquared;
+	const boundedProjection = Math.min(1, Math.max(0, projection));
+	return squaredDistance(pointer, {
+		x: start.x + x * boundedProjection,
+		y: start.y + y * boundedProjection,
+	});
+};
+
+export const touchResizeDirections = ({
+	pointer,
+	outline,
+}: {
+	readonly pointer: Position;
+	readonly outline: readonly [Position, Position, Position, Position];
+}): TouchResizeDirections => {
+	type Corner = TouchResizeDirections & { readonly point: Position };
+	const corners: readonly [Corner, Corner, Corner, Corner] = [
+		{ point: outline[0], widthDirection: -1, depthDirection: -1 },
+		{ point: outline[1], widthDirection: 1, depthDirection: -1 },
+		{ point: outline[2], widthDirection: 1, depthDirection: 1 },
+		{ point: outline[3], widthDirection: -1, depthDirection: 1 },
+	];
+	let nearestCorner: Corner = corners[0];
+	let nearestCornerDistance = squaredDistance(pointer, nearestCorner.point);
+	for (const corner of corners.slice(1)) {
+		const distance = squaredDistance(pointer, corner.point);
+		if (distance >= nearestCornerDistance) continue;
+		nearestCorner = corner;
+		nearestCornerDistance = distance;
+	}
+	if (
+		nearestCornerDistance <=
+		touchResizeCornerRadiusPixels * touchResizeCornerRadiusPixels
+	)
+		return nearestCorner;
+
+	type Side = TouchResizeDirections & {
+		readonly start: Position;
+		readonly end: Position;
+	};
+	const sides: readonly [Side, Side, Side, Side] = [
+		{
+			start: outline[0],
+			end: outline[1],
+			widthDirection: 0,
+			depthDirection: -1,
+		},
+		{
+			start: outline[1],
+			end: outline[2],
+			widthDirection: 1,
+			depthDirection: 0,
+		},
+		{
+			start: outline[2],
+			end: outline[3],
+			widthDirection: 0,
+			depthDirection: 1,
+		},
+		{
+			start: outline[3],
+			end: outline[0],
+			widthDirection: -1,
+			depthDirection: 0,
+		},
+	];
+	let nearestSide: Side = sides[0];
+	let nearestSideDistance = squaredDistanceToSegment(
+		pointer,
+		nearestSide.start,
+		nearestSide.end,
+	);
+	for (const side of sides.slice(1)) {
+		const distance = squaredDistanceToSegment(pointer, side.start, side.end);
+		if (distance >= nearestSideDistance) continue;
+		nearestSide = side;
+		nearestSideDistance = distance;
+	}
+	return nearestSide;
+};
+
 export const isDesignStudioPanelVisible = (world: World): boolean =>
 	world.editor.editSession === null;
 

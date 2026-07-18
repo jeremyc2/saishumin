@@ -90,14 +90,12 @@ const makeInteraction = (
 	startTouchPalettePlacement: () => {},
 	selectTouchEntity: () => {},
 	updateTouchJoystick: () => {},
-	commitTouchEdit: () => {},
-	cancelTouchSelection: () => {},
+	finishTouchInteraction: () => {},
 	touchEditorMode: () => "move",
 	toggleTouchEditorMode: () => {},
 	consumeTouchGestureClick: () => false,
 	toggleTouchPanel: () => {},
 	isTouchPanelOpen: () => false,
-	isTouchEditActive: () => false,
 	openTouchDetails: () => {},
 	closeTouchDetails: () => {},
 	isTouchDetailsOpen: () => false,
@@ -119,12 +117,12 @@ const selectedWorld = {
 };
 
 describe("mobile controls", () => {
-	test("completes an action-button tap across a game re-render", () =>
+	test("completes a Done tap across a game re-render", () =>
 		withHtmlElement(() => {
-			let cancelled = 0;
+			let finished = 0;
 			const interaction = makeInteraction({
-				cancelTouchSelection: () => {
-					cancelled += 1;
+				finishTouchInteraction: () => {
+					finished += 1;
 				},
 			});
 			const initial = mobileControlsTemplate({
@@ -132,8 +130,8 @@ describe("mobile controls", () => {
 				interaction,
 				dispatch: () => {},
 			});
-			const initialButton = findTemplate(initial, "CANCEL");
-			if (initialButton === undefined) throw new Error("Missing Cancel button");
+			const initialButton = findTemplate(initial, "DONE");
+			if (initialButton === undefined) throw new Error("Missing Done button");
 			const target = new FakeHtmlElement();
 			eventHandler<PointerEvent>(
 				initialButton,
@@ -149,9 +147,9 @@ describe("mobile controls", () => {
 				interaction,
 				dispatch: () => {},
 			});
-			const rerenderedButton = findTemplate(rerendered, "CANCEL");
+			const rerenderedButton = findTemplate(rerendered, "DONE");
 			if (rerenderedButton === undefined)
-				throw new Error("Missing rerendered Cancel button");
+				throw new Error("Missing rerendered Done button");
 			eventHandler<PointerEvent>(
 				rerenderedButton,
 				"pointerup",
@@ -161,7 +159,59 @@ describe("mobile controls", () => {
 				preventDefault: () => {},
 			} as unknown as PointerEvent);
 
-			expect(cancelled).toBe(1);
+			expect(finished).toBe(1);
+		}));
+
+	test("opens Details once for a completed tap and its synthesized click", () =>
+		withHtmlElement(() => {
+			let opened = 0;
+			const interaction = makeInteraction({
+				openTouchDetails: () => {
+					opened += 1;
+				},
+			});
+			const controls = mobileControlsTemplate({
+				world: selectedWorld,
+				interaction,
+				dispatch: () => {},
+			});
+			const details = findTemplate(controls, "DETAILS");
+			if (details === undefined) throw new Error("Missing Details button");
+			const target = new FakeHtmlElement();
+			eventHandler<PointerEvent>(
+				details,
+				"pointerdown",
+			)({
+				pointerId: 8,
+				currentTarget: target,
+				preventDefault: () => {},
+			} as unknown as PointerEvent);
+			const rerenderedControls = mobileControlsTemplate({
+				world: selectedWorld,
+				interaction,
+				dispatch: () => {},
+			});
+			const rerenderedDetails = findTemplate(rerenderedControls, "DETAILS");
+			if (rerenderedDetails === undefined)
+				throw new Error("Missing rerendered Details button");
+			eventHandler<PointerEvent>(
+				rerenderedDetails,
+				"pointerup",
+			)({
+				pointerId: 8,
+				currentTarget: target,
+				preventDefault: () => {},
+			} as unknown as PointerEvent);
+			eventHandler<MouseEvent>(
+				rerenderedDetails,
+				"click",
+			)({
+				detail: 1,
+				preventDefault: () => {},
+				stopPropagation: () => {},
+			} as MouseEvent);
+
+			expect(opened).toBe(1);
 		}));
 
 	test("releases the joystick across a game re-render", () =>
