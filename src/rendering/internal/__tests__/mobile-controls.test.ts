@@ -116,7 +116,92 @@ const selectedWorld = {
 	editor: { ...initialWorld.editor, open: true, selected: EntityId(2) },
 };
 
+const tapActionButton = (button: TemplateResult, pointerId: number): void => {
+	const target = new FakeHtmlElement();
+	eventHandler<PointerEvent>(
+		button,
+		"pointerdown",
+	)({
+		pointerId,
+		currentTarget: target,
+		preventDefault: () => {},
+	} as unknown as PointerEvent);
+	eventHandler<PointerEvent>(
+		button,
+		"pointerup",
+	)({
+		pointerId,
+		currentTarget: target,
+		preventDefault: () => {},
+	} as unknown as PointerEvent);
+};
+
 describe("mobile controls", () => {
+	test("disables Done with no selection or active Edit Session", () =>
+		withHtmlElement(() => {
+			let finished = 0;
+			const interaction = makeInteraction({
+				finishTouchInteraction: () => {
+					finished += 1;
+				},
+			});
+			const controls = mobileControlsTemplate({
+				world: {
+					...initialWorld,
+					editor: {
+						...initialWorld.editor,
+						open: true,
+						selected: null,
+					},
+				},
+				interaction,
+				dispatch: () => {},
+			});
+			const done = findTemplate(controls, "DONE");
+			if (done === undefined) throw new Error("Missing Done button");
+
+			tapActionButton(done, 6);
+
+			expect(finished).toBe(0);
+		}));
+
+	test("keeps Done enabled for an unselected placement preview", () =>
+		withHtmlElement(() => {
+			let finished = 0;
+			const interaction = makeInteraction({
+				finishTouchInteraction: () => {
+					finished += 1;
+				},
+			});
+			const controls = mobileControlsTemplate({
+				world: {
+					...initialWorld,
+					editor: {
+						...initialWorld.editor,
+						open: true,
+						selected: null,
+						editSession: {
+							operation: {
+								kind: "create",
+								itemKind: "plant",
+								position: { x: 500, y: 300 },
+							},
+							validity: { kind: "valid" },
+							phase: "active",
+						},
+					},
+				},
+				interaction,
+				dispatch: () => {},
+			});
+			const done = findTemplate(controls, "DONE");
+			if (done === undefined) throw new Error("Missing Done button");
+
+			tapActionButton(done, 5);
+
+			expect(finished).toBe(1);
+		}));
+
 	test("completes a Done tap across a game re-render", () =>
 		withHtmlElement(() => {
 			let finished = 0;

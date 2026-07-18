@@ -218,10 +218,11 @@ export const mobileControlsTemplate = ({
 	let actionControls: LitTemplate = nothing;
 	if (editing) {
 		const hasSelection = world.editor.selected !== null;
+		const canFinish = hasSelection || world.editor.editSession !== null;
 		const modeLabel =
 			interaction.touchEditorMode() === "move" ? "RESIZE" : "MOVE";
 		actionControls = html`
-			${actionButton({ label: "DONE", onClick: interaction.finishTouchInteraction, className: "min-h-14 border-[#9a625d] bg-[#6f3f3e]/94" })}
+			${actionButton({ label: "DONE", onClick: interaction.finishTouchInteraction, disabled: !canFinish, className: "min-h-14 border-[#9a625d] bg-[#6f3f3e]/94" })}
 			${actionButton({ label: "DETAILS", onClick: interaction.openTouchDetails, disabled: !hasSelection, className: "min-h-14 border-[#e8b875] bg-[#5d4528]/94" })}
 			${actionButton({ label: modeLabel, onClick: interaction.toggleTouchEditorMode, disabled: !hasSelection, className: "col-span-2 min-h-12 border-[#638390] bg-[#294b57]/94" })}
 		`;
