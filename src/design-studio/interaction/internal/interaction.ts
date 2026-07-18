@@ -237,7 +237,6 @@ export const makeDesignStudioInteraction = (input: {
 		const trackTouchPointerDown = (
 			event: PointerEvent,
 			world: World,
-			dispatch: Dispatch,
 		): boolean => {
 			if (event.pointerType !== "touch" || !world.editor.open) return false;
 			if (touchPointers.size === 0) suppressTouchGestureClick = false;
@@ -270,11 +269,6 @@ export const makeDesignStudioInteraction = (input: {
 			activeInteraction = undefined;
 			latestPointer = undefined;
 			previousAutoPanTime = undefined;
-			if (
-				world.editor.editSession !== null ||
-				(interaction !== undefined && interaction.kind !== "pan")
-			)
-				dispatch(Action.EditorEditSessionCancelled());
 			event.preventDefault();
 			return true;
 		};
@@ -389,12 +383,7 @@ export const makeDesignStudioInteraction = (input: {
 			touchSelectionCandidate?: EntityId,
 		): void => {
 			if (event.button !== 0 && event.button !== 1) return;
-			const dispatch = currentDispatch;
-			if (
-				dispatch !== undefined &&
-				trackTouchPointerDown(event, world, dispatch)
-			)
-				return;
+			if (trackTouchPointerDown(event, world)) return;
 			const pointer = svgPosition(event.clientX, event.clientY);
 			if (pointer === undefined) return;
 			event.preventDefault();
@@ -425,7 +414,7 @@ export const makeDesignStudioInteraction = (input: {
 			dispatch: Dispatch,
 		): void => {
 			if (!world.editor.open) return;
-			if (trackTouchPointerDown(event, world, dispatch)) {
+			if (trackTouchPointerDown(event, world)) {
 				event.stopPropagation();
 				return;
 			}
@@ -532,7 +521,7 @@ export const makeDesignStudioInteraction = (input: {
 				startEntityMove(event, world, entity, dispatch);
 				return;
 			}
-			if (trackTouchPointerDown(event, world, dispatch)) {
+			if (trackTouchPointerDown(event, world)) {
 				event.stopPropagation();
 				return;
 			}
@@ -602,7 +591,7 @@ export const makeDesignStudioInteraction = (input: {
 				startPan(event, world);
 				return;
 			}
-			if (trackTouchPointerDown(event, world, dispatch)) {
+			if (trackTouchPointerDown(event, world)) {
 				event.stopPropagation();
 				return;
 			}

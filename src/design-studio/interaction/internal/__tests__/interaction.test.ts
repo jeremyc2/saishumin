@@ -794,6 +794,94 @@ describe("mobile Design Studio interaction", () => {
 			),
 		));
 
+	test("preserves a pending touch move while pinch-zooming and panning", () =>
+		withBrowserHarness(({ dispatchWindowEvent }) =>
+			Effect.runPromise(
+				Effect.scoped(
+					Effect.gen(function* () {
+						const selected = EntityId(8);
+						let world = editingWorld(selected);
+						const actions: Array<AppAction> = [];
+						const interaction = yield* makeDesignStudioInteraction({
+							refresh: () => {},
+							refreshPreview: () => {},
+						});
+						const dispatch = (action: AppAction): void => {
+							actions.push(action);
+							world = applyAction(world, action);
+							interaction.update(world, dispatch);
+						};
+						interaction.update(world, dispatch);
+						interaction.startEntityMove(
+							{
+								button: 0,
+								clientX: 650,
+								clientY: 470,
+								pointerId: 50,
+								pointerType: "touch",
+								timeStamp: 100,
+								preventDefault: () => {},
+								stopPropagation: () => {},
+							} as unknown as PointerEvent,
+							world,
+							selected,
+							dispatch,
+						);
+						dispatchWindowEvent("pointermove", {
+							clientX: 700,
+							clientY: 470,
+							pointerId: 50,
+							pointerType: "touch",
+							timeStamp: 180,
+							preventDefault: () => {},
+						} as unknown as PointerEvent);
+						dispatchWindowEvent("pointerup", {
+							pointerId: 50,
+						} as PointerEvent);
+						const pendingMove = world.editor.editSession?.operation;
+						if (pendingMove?.kind !== "move")
+							throw new Error("Expected pending move Edit Session");
+						const pendingPosition = pendingMove.position;
+						const zoomBeforePinch = interaction.zoom();
+
+						for (const pointer of [
+							{ pointerId: 51, clientX: 300 },
+							{ pointerId: 52, clientX: 500 },
+						])
+							interaction.startPan(
+								{
+									button: 0,
+									clientX: pointer.clientX,
+									clientY: 300,
+									pointerId: pointer.pointerId,
+									pointerType: "touch",
+									timeStamp: 300,
+									preventDefault: () => {},
+								} as unknown as PointerEvent,
+								world,
+							);
+						dispatchWindowEvent("pointermove", {
+							clientX: 550,
+							clientY: 320,
+							pointerId: 52,
+							pointerType: "touch",
+							preventDefault: () => {},
+						} as unknown as PointerEvent);
+
+						const moveAfterPinch = world.editor.editSession?.operation;
+						expect(moveAfterPinch?.kind).toBe("move");
+						if (moveAfterPinch?.kind !== "move") return;
+						expect(moveAfterPinch.position).toEqual(pendingPosition);
+						expect(interaction.zoom()).not.toBe(zoomBeforePinch);
+						expect(actions.some(Action.$is("EditorCameraChanged"))).toBe(true);
+						expect(actions.some(Action.$is("EditorEditSessionCancelled"))).toBe(
+							false,
+						);
+					}),
+				),
+			),
+		));
+
 	test("Done commits the active edit and clears selection while Details opens", () =>
 		withBrowserHarness(() =>
 			Effect.runPromise(
