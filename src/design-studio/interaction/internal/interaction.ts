@@ -35,14 +35,14 @@ import {
 	floorResizePointerDelta,
 	initialDesignStudioInteraction,
 	movePalettePress,
+	nextTouchEditorMode,
 	pressPaletteItem,
 	releasePalettePress,
-	nextTouchEditorMode,
 	shouldPanTouchGesture,
 	shouldStartPinchGesture,
+	type TouchEditorMode,
 	touchEntityPointerIntent,
 	touchJoystickTarget,
-	type TouchEditorMode,
 	visiblePalettePopover,
 } from "../pointer";
 
@@ -144,11 +144,6 @@ export type DesignStudioInteraction = {
 		world: World,
 		dispatch: Dispatch,
 	) => void;
-	readonly startTouchEntityMove: (
-		world: World,
-		entity: EntityId,
-		dispatch: Dispatch,
-	) => void;
 	readonly selectTouchEntity: (
 		world: World,
 		entity: EntityId,
@@ -162,6 +157,7 @@ export type DesignStudioInteraction = {
 	readonly cancelTouchSelection: () => void;
 	readonly touchEditorMode: () => TouchEditorMode;
 	readonly toggleTouchEditorMode: () => void;
+	readonly consumeTouchGestureClick: () => boolean;
 	readonly toggleTouchPanel: () => void;
 	readonly isTouchPanelOpen: () => boolean;
 	readonly isTouchEditActive: () => boolean;
@@ -209,6 +205,7 @@ export const makeDesignStudioInteraction = (input: {
 		let previousTouchJoystickTime: number | undefined;
 		let editorZoom = 1;
 		const touchPointers = new Map<number, Position>();
+		let suppressTouchGestureClick = false;
 		let pinchGesture:
 			| {
 					readonly distance: number;
@@ -241,6 +238,7 @@ export const makeDesignStudioInteraction = (input: {
 			dispatch: Dispatch,
 		): boolean => {
 			if (event.pointerType !== "touch" || !world.editor.open) return false;
+			if (touchPointers.size === 0) suppressTouchGestureClick = false;
 			touchPointers.set(event.pointerId, {
 				x: event.clientX,
 				y: event.clientY,
@@ -266,6 +264,7 @@ export const makeDesignStudioInteraction = (input: {
 						? interaction.camera
 						: world.editor.camera,
 			};
+			suppressTouchGestureClick = true;
 			activeInteraction = undefined;
 			latestPointer = undefined;
 			previousAutoPanTime = undefined;
@@ -836,6 +835,7 @@ export const makeDesignStudioInteraction = (input: {
 					return;
 				const pointer = svgPosition(event.clientX, event.clientY);
 				if (pointer === undefined) return;
+				if (event.pointerType === "touch") suppressTouchGestureClick = true;
 				dispatch(
 					Action.EditorCameraChanged({
 						camera: clampedCamera(world, {
@@ -1158,6 +1158,7 @@ export const makeDesignStudioInteraction = (input: {
 			latestPointer = undefined;
 			previousAutoPanTime = undefined;
 			clearTouchJoystick();
+			suppressTouchGestureClick = false;
 			touchPanelOpen = false;
 			touchDetailsOpen = false;
 			editorTouchMode = "move";
@@ -1463,6 +1464,7 @@ export const makeDesignStudioInteraction = (input: {
 					touchPanelOpen = false;
 					touchDetailsOpen = false;
 					editorTouchMode = "move";
+					suppressTouchGestureClick = false;
 					editorZoom = 1;
 					touchPointers.clear();
 					pinchGesture = undefined;
@@ -1477,7 +1479,6 @@ export const makeDesignStudioInteraction = (input: {
 			startFloorResize,
 			startPaletteDrag,
 			startTouchPalettePlacement,
-			startTouchEntityMove,
 			selectTouchEntity,
 			updateTouchJoystick: ({ pointerId, vector }) => {
 				if (vector === null) {
@@ -1501,6 +1502,11 @@ export const makeDesignStudioInteraction = (input: {
 				if (currentWorld?.editor.open !== true) return;
 				editorTouchMode = nextTouchEditorMode(editorTouchMode);
 				input.refresh();
+			},
+			consumeTouchGestureClick: () => {
+				if (!suppressTouchGestureClick) return false;
+				suppressTouchGestureClick = false;
+				return true;
 			},
 			toggleTouchPanel: () => {
 				if (
@@ -1571,6 +1577,7 @@ export const makeDesignStudioInteraction = (input: {
 					clearTouchJoystick();
 					activeInteraction = undefined;
 					editorTouchMode = "move";
+					suppressTouchGestureClick = false;
 					editorZoom = 1;
 					touchPointers.clear();
 					pinchGesture = undefined;

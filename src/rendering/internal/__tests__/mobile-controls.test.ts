@@ -88,13 +88,13 @@ const makeInteraction = (
 	startFloorResize: () => {},
 	startPaletteDrag: () => {},
 	startTouchPalettePlacement: () => {},
-	startTouchEntityMove: () => {},
 	selectTouchEntity: () => {},
 	updateTouchJoystick: () => {},
 	commitTouchEdit: () => {},
 	cancelTouchSelection: () => {},
 	touchEditorMode: () => "move",
 	toggleTouchEditorMode: () => {},
+	consumeTouchGestureClick: () => false,
 	toggleTouchPanel: () => {},
 	isTouchPanelOpen: () => false,
 	isTouchEditActive: () => false,
@@ -135,7 +135,10 @@ describe("mobile controls", () => {
 			const initialButton = findTemplate(initial, "CANCEL");
 			if (initialButton === undefined) throw new Error("Missing Cancel button");
 			const target = new FakeHtmlElement();
-			eventHandler<PointerEvent>(initialButton, "pointerdown")({
+			eventHandler<PointerEvent>(
+				initialButton,
+				"pointerdown",
+			)({
 				pointerId: 7,
 				currentTarget: target,
 				preventDefault: () => {},
@@ -149,7 +152,10 @@ describe("mobile controls", () => {
 			const rerenderedButton = findTemplate(rerendered, "CANCEL");
 			if (rerenderedButton === undefined)
 				throw new Error("Missing rerendered Cancel button");
-			eventHandler<PointerEvent>(rerenderedButton, "pointerup")({
+			eventHandler<PointerEvent>(
+				rerenderedButton,
+				"pointerup",
+			)({
 				pointerId: 7,
 				currentTarget: target,
 				preventDefault: () => {},
@@ -171,10 +177,16 @@ describe("mobile controls", () => {
 				interaction,
 				dispatch: () => {},
 			});
-			const initialJoystick = findTemplate(initial, 'aria-label="Movement joystick"');
+			const initialJoystick = findTemplate(
+				initial,
+				'aria-label="Movement joystick"',
+			);
 			if (initialJoystick === undefined) throw new Error("Missing joystick");
 			const target = new FakeHtmlElement();
-			eventHandler<PointerEvent>(initialJoystick, "pointerdown")({
+			eventHandler<PointerEvent>(
+				initialJoystick,
+				"pointerdown",
+			)({
 				pointerId: 9,
 				clientX: 100,
 				clientY: 64,
@@ -193,7 +205,10 @@ describe("mobile controls", () => {
 			);
 			if (rerenderedJoystick === undefined)
 				throw new Error("Missing rerendered joystick");
-			eventHandler<PointerEvent>(rerenderedJoystick, "pointerup")({
+			eventHandler<PointerEvent>(
+				rerenderedJoystick,
+				"pointerup",
+			)({
 				pointerId: 9,
 				currentTarget: target,
 				preventDefault: () => {},

@@ -319,11 +319,7 @@ export const makeDesignStudioPanel = (interaction: DesignStudioInteraction) => {
 						<div class="text-base font-bold">${entityLabel(world, selectedEntity)}</div>
 						<div class="mt-1 text-xs text-[#819993]">X ${Math.round(selectedPosition.x)} · Y ${Math.round(selectedPosition.y)}</div>
 					</div>
-					<div class="flex gap-2">
-						<button type="button" class="min-h-11 rounded-lg border border-[#8e6b3d] bg-[#5d4528] px-4 text-xs font-bold" @click=${() => {
-							interaction.closeTouchDetails();
-							interaction.startTouchEntityMove(world, selectedEntity, dispatch);
-						}}>MOVE</button>
+					<div>
 						<button type="button" class="min-h-11 rounded-lg border border-[#704a45] px-4 text-xs font-bold text-[#ef9f8e]" @click=${() => dispatch(Action.EditorDeleteSelected())}>DELETE</button>
 					</div>
 				</div>

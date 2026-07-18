@@ -265,6 +265,7 @@ export const gameSceneTemplate = ({
 	const floorClick = (event: PointerEvent): void => {
 		if (!world.editor.open || !interaction.usesTouchControls()) return;
 		event.stopPropagation();
+		if (interaction.consumeTouchGestureClick()) return;
 		dispatch(Action.EditorSelectionChanged({ selection: "floor" }));
 	};
 	const canvasPointerDown = (event: PointerEvent): void => {
@@ -274,8 +275,9 @@ export const gameSceneTemplate = ({
 			dispatch(Action.EditorSelectionChanged({ selection: null }));
 	};
 	const canvasClick = (): void => {
-		if (world.editor.open && interaction.usesTouchControls())
-			dispatch(Action.EditorSelectionChanged({ selection: null }));
+		if (!world.editor.open || !interaction.usesTouchControls()) return;
+		if (interaction.consumeTouchGestureClick()) return;
+		dispatch(Action.EditorSelectionChanged({ selection: null }));
 	};
 	const palettePopover = interaction.palettePopover();
 	let canvasClass = "";
@@ -290,6 +292,7 @@ export const gameSceneTemplate = ({
 			event: PointerEvent,
 		) => {
 			event.stopPropagation();
+			if (interaction.consumeTouchGestureClick()) return;
 			interaction.selectTouchEntity(world, entity, dispatch);
 		}}>${template}</g>`;
 	});

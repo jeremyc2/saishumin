@@ -1,15 +1,15 @@
 import { describe, expect, test } from "bun:test";
 import { Effect } from "effect";
 import { Action, type Action as AppAction } from "../../../../app/action";
+import { EntityId } from "../../../../world/entity-id";
+import { initialWorld } from "../../../../world/initial-world";
+import type { World } from "../../../../world/world";
 import {
 	beginEditSession,
 	cancelEditSession,
 	commitEditSession,
 	previewEditSession,
 } from "../../../edit-session/edit-session";
-import { EntityId } from "../../../../world/entity-id";
-import { initialWorld } from "../../../../world/initial-world";
-import type { World } from "../../../../world/world";
 import { makeDesignStudioInteraction } from "../interaction";
 
 type BrowserHarness = {
@@ -29,11 +29,31 @@ const withBrowserHarness = <Result>(
 		"cancelAnimationFrame",
 	] as const;
 	const originals = new Map(
-		names.map((name) => [name, Object.getOwnPropertyDescriptor(globalThis, name)]),
+		names.map((name) => [
+			name,
+			Object.getOwnPropertyDescriptor(globalThis, name),
+		]),
 	);
 	const listeners = new Map<string, Set<EventListener>>();
 	const frames: Array<FrameRequestCallback> = [];
 	let nextFrameId = 1;
+	class FakeSvgElement {
+		getScreenCTM() {
+			return { a: 1, d: 1, inverse: () => ({}) };
+		}
+		createSVGPoint() {
+			const point = {
+				x: 0,
+				y: 0,
+				matrixTransform: () => ({ x: point.x, y: point.y }),
+			};
+			return point;
+		}
+		getBoundingClientRect() {
+			return { left: 0, top: 0, width: 800, height: 600 };
+		}
+	}
+	const canvas = new FakeSvgElement();
 	globalRecord["window"] = {
 		matchMedia: () => ({ matches: true }),
 		addEventListener: (type: string, listener: EventListener) => {
@@ -46,10 +66,11 @@ const withBrowserHarness = <Result>(
 		},
 	};
 	globalRecord["document"] = {
-		querySelector: () => null,
+		querySelector: (selector: string) =>
+			selector === "#world-canvas" ? canvas : null,
 		elementFromPoint: () => null,
 	};
-	globalRecord["SVGSVGElement"] = class {};
+	globalRecord["SVGSVGElement"] = FakeSvgElement;
 	globalRecord["requestAnimationFrame"] = (callback: FrameRequestCallback) => {
 		frames.push(callback);
 		const frameId = nextFrameId;
@@ -68,7 +89,8 @@ const withBrowserHarness = <Result>(
 		return run({
 			runFrame: (time) => {
 				const frame = frames.shift();
-				if (frame === undefined) throw new Error("No animation frame scheduled");
+				if (frame === undefined)
+					throw new Error("No animation frame scheduled");
 				frame(time);
 			},
 			dispatchWindowEvent: (type, event) => {
@@ -120,7 +142,7 @@ describe("mobile Design Studio interaction", () => {
 							const originalPosition = world.positions.get(selected);
 							if (originalPosition === undefined)
 								throw new Error("Expected selected entity position");
-							let interaction = yield* makeDesignStudioInteraction({
+							const interaction = yield* makeDesignStudioInteraction({
 								refresh: () => {},
 								refreshPreview: () => {},
 							});
@@ -149,6 +171,56 @@ describe("mobile Design Studio interaction", () => {
 			));
 	}
 
+	test("pans from an unselected entity without turning the drag into a selection click", () =>
+		withBrowserHarness(({ dispatchWindowEvent }) =>
+			Effect.runPromise(
+				Effect.scoped(
+					Effect.gen(function* () {
+						const entity = EntityId(8);
+						let world = editingWorld(null);
+						const actions: Array<AppAction> = [];
+						const interaction = yield* makeDesignStudioInteraction({
+							refresh: () => {},
+							refreshPreview: () => {},
+						});
+						const dispatch = (action: AppAction): void => {
+							actions.push(action);
+							world = applyAction(world, action);
+							interaction.update(world, dispatch);
+						};
+						interaction.update(world, dispatch);
+						interaction.startEntityMove(
+							{
+								button: 0,
+								clientX: 100,
+								clientY: 100,
+								pointerId: 31,
+								pointerType: "touch",
+								timeStamp: 0,
+								preventDefault: () => {},
+								stopPropagation: () => {},
+							} as unknown as PointerEvent,
+							world,
+							entity,
+							dispatch,
+						);
+						dispatchWindowEvent("pointermove", {
+							clientX: 124,
+							clientY: 100,
+							pointerId: 31,
+							pointerType: "touch",
+							timeStamp: 70,
+							preventDefault: () => {},
+						} as unknown as PointerEvent);
+
+						expect(actions.some(Action.$is("EditorCameraChanged"))).toBe(true);
+						expect(interaction.consumeTouchGestureClick()).toBe(true);
+						expect(interaction.consumeTouchGestureClick()).toBe(false);
+					}),
+				),
+			),
+		));
+
 	test("pans the camera with the joystick when nothing is selected and stops on release", () =>
 		withBrowserHarness(({ runFrame, dispatchWindowEvent }) =>
 			Effect.runPromise(
@@ -156,7 +228,7 @@ describe("mobile Design Studio interaction", () => {
 					Effect.gen(function* () {
 						let world = editingWorld(null);
 						const actions: Array<AppAction> = [];
-						let interaction = yield* makeDesignStudioInteraction({
+						const interaction = yield* makeDesignStudioInteraction({
 							refresh: () => {},
 							refreshPreview: () => {},
 						});
@@ -172,9 +244,7 @@ describe("mobile Design Studio interaction", () => {
 						});
 						runFrame(0);
 						runFrame(16);
-						expect(
-							actions.some(Action.$is("EditorCameraChanged")),
-						).toBe(true);
+						expect(actions.some(Action.$is("EditorCameraChanged"))).toBe(true);
 
 						dispatchWindowEvent("pointerup", {
 							pointerId: 19,
@@ -182,9 +252,7 @@ describe("mobile Design Studio interaction", () => {
 						actions.length = 0;
 						runFrame(32);
 						runFrame(48);
-						expect(
-							actions.some(Action.$is("EditorCameraChanged")),
-						).toBe(false);
+						expect(actions.some(Action.$is("EditorCameraChanged"))).toBe(false);
 					}),
 				),
 			),
@@ -197,7 +265,7 @@ describe("mobile Design Studio interaction", () => {
 					Effect.gen(function* () {
 						const selected = EntityId(2);
 						let world = editingWorld(selected);
-						let interaction = yield* makeDesignStudioInteraction({
+						const interaction = yield* makeDesignStudioInteraction({
 							refresh: () => {},
 							refreshPreview: () => {},
 						});
@@ -210,7 +278,18 @@ describe("mobile Design Studio interaction", () => {
 						expect(interaction.isTouchDetailsOpen()).toBe(true);
 
 						interaction.closeTouchDetails();
-						interaction.startTouchEntityMove(world, selected, dispatch);
+						const position = world.positions.get(selected);
+						const body = world.bodies.get(selected);
+						if (position === undefined || body === undefined)
+							throw new Error("Expected selected entity geometry");
+						world = beginEditSession(world, {
+							kind: "move",
+							entity: selected,
+							originalPosition: position,
+							originalBody: body,
+							position,
+						});
+						interaction.update(world, dispatch);
 						expect(world.editor.editSession).not.toBeNull();
 						interaction.cancelTouchSelection();
 						expect(world.editor.editSession).toBeNull();
