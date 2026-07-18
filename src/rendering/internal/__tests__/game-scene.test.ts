@@ -489,7 +489,11 @@ describe("game scene", () => {
 
 		expect(indicator).toBeGreaterThanOrEqual(0);
 		expect(indicatorMarkup).not.toContain("scale(");
-		expect(indicatorMarkup).toContain("M-14 0H14");
+		expect(indicatorMarkup).toContain('viewBox="-40 -40 80 80"');
+		expect(indicatorMarkup).toContain("width=40");
+		expect(indicatorMarkup).toContain(
+			"M-28 0H28M-28 0l8-8M-28 0l8 8M28 0l-8-8M28 0l-8 8M0-28V28M0-28l-8 8M0-28l8 8M0 28l-8-8M0 28l8-8",
+		);
 	});
 
 	test("offers Move while Resize mode is active", () => {
