@@ -1229,10 +1229,11 @@ export const makeDesignStudioInteraction = (input: {
 			suppressTouchGestureClick = false;
 			touchPointers.clear();
 			input.refreshPreview();
-			if (world?.editor.editSession === null) return true;
 			if (world === undefined || dispatch === undefined) return false;
+			const session = world.editor.editSession;
+			if (session === null) return true;
 			dispatch(Action.EditorEditSessionCommitted());
-			return currentWorld?.editor.editSession === null;
+			return session.validity.kind !== "invalid";
 		};
 
 		const finishTouchInteraction = (): void => {

@@ -435,4 +435,36 @@ describe("game scene", () => {
 		);
 		expect(scene).toContain('stroke-width="128"');
 	});
+
+	test("uses a painted edge band for mobile floor resizing", () => {
+		const world = {
+			...initialWorld,
+			editor: {
+				...initialWorld.editor,
+				open: true,
+				selected: "floor" as const,
+			},
+		};
+		const touchInteraction = {
+			...interaction,
+			touchEditorMode: () => "resize" as const,
+		};
+		const selection = flattenedTemplate(
+			makeDesignStudioView(touchInteraction).selectionTemplate(
+				world,
+				false,
+				() => {},
+			),
+		);
+		const touchTargetIndex = selection.indexOf("data-touch-resize-target");
+
+		expect(touchTargetIndex).toBeGreaterThanOrEqual(0);
+		const touchTarget = selection.slice(
+			touchTargetIndex,
+			touchTargetIndex + 500,
+		);
+		expect(touchTarget).toContain('stroke="#000"');
+		expect(touchTarget).toContain('stroke-opacity="0.001"');
+		expect(touchTarget).toContain('pointer-events="stroke"');
+	});
 });

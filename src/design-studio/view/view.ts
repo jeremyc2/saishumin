@@ -244,7 +244,8 @@ export const makeDesignStudioView = (interaction: DesignStudioInteraction) => {
 								data-touch-resize-target
 								points=${points(outline)}
 								fill="none"
-								stroke="transparent"
+								stroke="#000"
+								stroke-opacity="0.001"
 								stroke-width="128"
 								vector-effect="non-scaling-stroke"
 								pointer-events="stroke"
@@ -469,7 +470,8 @@ export const makeDesignStudioView = (interaction: DesignStudioInteraction) => {
 							data-touch-resize-target
 							points=${points(outline)}
 							fill="none"
-							stroke="transparent"
+							stroke="#000"
+							stroke-opacity="0.001"
 							stroke-width="128"
 							vector-effect="non-scaling-stroke"
 							pointer-events="stroke"

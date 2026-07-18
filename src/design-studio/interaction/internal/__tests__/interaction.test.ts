@@ -552,6 +552,45 @@ describe("mobile Design Studio interaction", () => {
 			),
 		));
 
+	test("toggles mode on the same tap that queues a valid move commit", () =>
+		withBrowserHarness(() =>
+			Effect.runPromise(
+				Effect.scoped(
+					Effect.gen(function* () {
+						const selected = EntityId(8);
+						let world = editingWorld(selected);
+						const originalPosition = world.positions.get(selected);
+						const body = world.bodies.get(selected);
+						if (originalPosition === undefined || body === undefined)
+							throw new Error("Expected selected entity geometry");
+						world = beginEditSession(world, {
+							kind: "move",
+							entity: selected,
+							originalPosition,
+							originalBody: body,
+							position: { x: originalPosition.x + 40, y: originalPosition.y },
+						});
+						const queuedActions: Array<AppAction> = [];
+						const interaction = yield* makeDesignStudioInteraction({
+							refresh: () => {},
+							refreshPreview: () => {},
+						});
+						const dispatch = (action: AppAction): void => {
+							queuedActions.push(action);
+						};
+						interaction.update(world, dispatch);
+
+						interaction.toggleTouchEditorMode();
+
+						expect(interaction.touchEditorMode()).toBe("resize");
+						expect(
+							queuedActions.some(Action.$is("EditorEditSessionCommitted")),
+						).toBe(true);
+					}),
+				),
+			),
+		));
+
 	test("pans from an unselected entity without turning the drag into a selection click", () =>
 		withBrowserHarness(({ dispatchWindowEvent }) =>
 			Effect.runPromise(
