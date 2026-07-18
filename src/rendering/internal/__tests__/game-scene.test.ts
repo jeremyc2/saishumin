@@ -466,32 +466,55 @@ describe("game scene", () => {
 		expect(scene).toContain("data-touch-details");
 	});
 
-	test("keeps the mobile move indicator at a constant screen size while zooming", () => {
+	test("scales the complete mobile move indicator with the World zoom", () => {
 		const selected = EntityId(8);
 		const world = {
 			...initialWorld,
 			editor: { ...initialWorld.editor, open: true, selected },
 		};
-		const zoomedInteraction = {
-			...interaction,
-			touchEditorMode: () => "move" as const,
-			zoom: () => 2,
+		const indicatorMarkupAtZoom = (zoom: number): string => {
+			const zoomedInteraction = {
+				...interaction,
+				touchEditorMode: () => "move" as const,
+				zoom: () => zoom,
+			};
+			const selection = flattenedTemplate(
+				makeDesignStudioView(zoomedInteraction).selectionTemplate(
+					world,
+					false,
+					() => {},
+				),
+			);
+			const indicator = selection.indexOf("data-touch-move-indicator");
+			expect(indicator).toBeGreaterThanOrEqual(0);
+			const indicatorEnd = selection.indexOf(
+				"interaction.startEntityMove",
+				indicator,
+			);
+			expect(indicatorEnd).toBeGreaterThan(indicator);
+			return selection.slice(indicator, indicatorEnd);
 		};
-		const selection = flattenedTemplate(
-			makeDesignStudioView(zoomedInteraction).selectionTemplate(
+		const zoomedOutIndicator = indicatorMarkupAtZoom(0.5);
+		const zoomedInIndicator = indicatorMarkupAtZoom(2);
+		const indicatorTemplate = findTemplate(
+			makeDesignStudioView(interaction).selectionTemplate(
 				world,
 				false,
 				() => {},
 			),
+			"data-touch-move-indicator",
 		);
-		const indicator = selection.indexOf("data-touch-move-indicator");
-		const indicatorMarkup = selection.slice(indicator, indicator + 900);
+		if (indicatorTemplate === undefined)
+			throw new Error("Missing touch move indicator");
+		const indicatorSource = indicatorTemplate.strings.join("");
+		const indicatorSourceStart = indicatorSource.indexOf(
+			"data-touch-move-indicator",
+		);
+		const isolatedIndicatorSource = indicatorSource.slice(indicatorSourceStart);
 
-		expect(indicator).toBeGreaterThanOrEqual(0);
-		expect(indicatorMarkup).not.toContain("scale(");
-		expect(indicatorMarkup).toContain('viewBox="-40 -40 80 80"');
-		expect(indicatorMarkup).toContain("width=40");
-		expect(indicatorMarkup).toContain(
+		expect(zoomedOutIndicator).toBe(zoomedInIndicator);
+		expect(isolatedIndicatorSource).not.toContain("vector-effect");
+		expect(isolatedIndicatorSource).toContain(
 			"M-28 0H28M-28 0l8-8M-28 0l8 8M28 0l-8-8M28 0l-8 8M0-28V28M0-28l-8 8M0-28l8 8M0 28l-8-8M0 28l8-8",
 		);
 	});

@@ -267,7 +267,6 @@ export const makeDesignStudioView = (interaction: DesignStudioInteraction) => {
 						interaction.startEntityMove(event, world, selected, dispatch)}
 				/>`;
 		const selectionCenter = midpoint(outline[0], outline[2]);
-		const moveIndicatorSize = 80 / interaction.zoom();
 		const touchMovePresentation = resizeTouchMode
 			? nothing
 			: svg`
@@ -282,19 +281,15 @@ export const makeDesignStudioView = (interaction: DesignStudioInteraction) => {
 						pointer-events="none"
 						class="hidden any-pointer-coarse:block"
 					/>
-					<svg
+					<g
 						data-touch-move-indicator
-						x=${selectionCenter.x - moveIndicatorSize / 2}
-						y=${selectionCenter.y - moveIndicatorSize / 2}
-						width=${moveIndicatorSize}
-						height=${moveIndicatorSize}
-						viewBox="-40 -40 80 80"
+						transform=${`translate(${selectionCenter.x} ${selectionCenter.y})`}
 						pointer-events="none"
 						class="hidden any-pointer-coarse:block"
 					>
-						<circle r="40" fill=${accent} stroke="#503b37" stroke-width="4" vector-effect="non-scaling-stroke" />
-						<path d="M-28 0H28M-28 0l8-8M-28 0l8 8M28 0l-8-8M28 0l-8 8M0-28V28M0-28l-8 8M0-28l8 8M0 28l-8-8M0 28l8-8" fill="none" stroke="#503b37" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke" />
-					</svg>
+						<circle r="40" fill=${accent} stroke="#503b37" stroke-width="4" />
+						<path d="M-28 0H28M-28 0l8-8M-28 0l8 8M28 0l-8-8M28 0l-8 8M0-28V28M0-28l-8 8M0-28l8 8M0 28l-8-8M0 28l8-8" fill="none" stroke="#503b37" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" />
+					</g>
 				`;
 		if (characterSelected)
 			return svg`<polygon points=${points(outline)} fill="none" stroke=${accent} stroke-width="4" stroke-dasharray="10 7" vector-effect="non-scaling-stroke" pointer-events="none" class=${resizeTouchMode ? "" : "any-pointer-coarse:hidden"} />${touchMovePresentation}${touchMoveTarget}`;
