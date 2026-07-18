@@ -466,6 +466,30 @@ describe("game scene", () => {
 		expect(scene).toContain("data-touch-details");
 	});
 
+	test("keeps the mobile move indicator at a constant screen size while zooming", () => {
+		const selected = EntityId(8);
+		const world = {
+			...initialWorld,
+			editor: { ...initialWorld.editor, open: true, selected },
+		};
+		const zoomedInteraction = {
+			...interaction,
+			touchEditorMode: () => "move" as const,
+			zoom: () => 2,
+		};
+		const selection = flattenedTemplate(
+			makeDesignStudioView(zoomedInteraction).selectionTemplate(
+				world,
+				false,
+				() => {},
+			),
+		);
+		const indicator = selection.indexOf("data-touch-move-indicator");
+
+		expect(indicator).toBeGreaterThanOrEqual(0);
+		expect(selection.slice(indicator, indicator + 300)).toContain("scale(0.5)");
+	});
+
 	test("offers Move while Resize mode is active", () => {
 		const selected = EntityId(8);
 		const world = {

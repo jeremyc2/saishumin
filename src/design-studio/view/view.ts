@@ -267,6 +267,7 @@ export const makeDesignStudioView = (interaction: DesignStudioInteraction) => {
 						interaction.startEntityMove(event, world, selected, dispatch)}
 				/>`;
 		const selectionCenter = midpoint(outline[0], outline[2]);
+		const moveIndicatorScale = 1 / interaction.zoom();
 		const touchMovePresentation = resizeTouchMode
 			? nothing
 			: svg`
@@ -283,7 +284,7 @@ export const makeDesignStudioView = (interaction: DesignStudioInteraction) => {
 					/>
 					<g
 						data-touch-move-indicator
-						transform=${`translate(${selectionCenter.x} ${selectionCenter.y})`}
+						transform=${`translate(${selectionCenter.x} ${selectionCenter.y}) scale(${moveIndicatorScale})`}
 						pointer-events="none"
 						class="hidden any-pointer-coarse:block"
 					>
