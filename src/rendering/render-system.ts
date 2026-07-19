@@ -1,6 +1,7 @@
 import { Context, Effect, Layer } from "effect";
 import { render } from "lit-html";
 import type { Action } from "../app/action";
+import { type AppScreen, AppScreens } from "../app/screen";
 import { EditSessionStatus } from "../design-studio/edit-session/edit-session";
 import {
 	type DesignStudioInteraction,
@@ -12,6 +13,7 @@ import {
 } from "../design-studio/view/view";
 import { nothing } from "../presentation/lit-template";
 import type { World } from "../world/world";
+import { frontEndTemplate } from "./internal/front-end";
 import { gameSceneTemplate } from "./internal/game-scene";
 
 type Dispatch = (action: Action) => void;
@@ -21,6 +23,8 @@ type RenderInput = {
 	readonly previewWorld: World;
 	readonly editSessionStatus: EditSessionStatus;
 	readonly dispatch: Dispatch;
+	readonly screen: AppScreen;
+	readonly navigate: (screen: AppScreen) => void;
 };
 
 export class RenderSystem extends Context.Service<
@@ -35,14 +39,18 @@ export class RenderSystem extends Context.Service<
 			let currentPreviewWorld: World | undefined;
 			let currentEditSessionStatus: EditSessionStatus | undefined;
 			let currentDispatch: Dispatch | undefined;
+			let currentScreen: AppScreen | undefined;
+			let currentNavigate: ((screen: AppScreen) => void) | undefined;
 			let designStudioView: DesignStudioView | undefined;
 			let interaction: DesignStudioInteraction | undefined;
 
-			const renderWorld = ({
+			const renderApplication = ({
 				world,
 				previewWorld,
 				editSessionStatus,
 				dispatch,
+				screen,
+				navigate,
 			}: RenderInput): void => {
 				if (designStudioView === undefined || interaction === undefined) return;
 				const activeInteraction = interaction;
@@ -51,6 +59,12 @@ export class RenderSystem extends Context.Service<
 				currentPreviewWorld = previewWorld;
 				currentEditSessionStatus = editSessionStatus;
 				currentDispatch = dispatch;
+				currentScreen = screen;
+				currentNavigate = navigate;
+				if (screen !== AppScreens.WorldBuilder) {
+					render(frontEndTemplate({ screen, navigate }), document.body);
+					return;
+				}
 				activeInteraction.update(world, dispatch);
 				render(
 					gameSceneTemplate({
@@ -59,6 +73,7 @@ export class RenderSystem extends Context.Service<
 						dispatch,
 						interaction: activeInteraction,
 						designStudioView: view,
+						onExitToMenu: () => navigate(AppScreens.MainMenu),
 						onRootPointerDown: (event) => {
 							const target = event.target;
 							if (
@@ -99,13 +114,17 @@ export class RenderSystem extends Context.Service<
 					currentWorld !== undefined &&
 					currentPreviewWorld !== undefined &&
 					currentEditSessionStatus !== undefined &&
-					currentDispatch !== undefined
+					currentDispatch !== undefined &&
+					currentScreen !== undefined &&
+					currentNavigate !== undefined
 				)
-					renderWorld({
+					renderApplication({
 						world: currentWorld,
 						previewWorld: currentPreviewWorld,
 						editSessionStatus: currentEditSessionStatus,
 						dispatch: currentDispatch,
+						screen: currentScreen,
+						navigate: currentNavigate,
 					});
 			};
 			interaction = yield* makeDesignStudioInteraction({
@@ -113,7 +132,7 @@ export class RenderSystem extends Context.Service<
 				refreshPreview: refreshCreatePreview,
 			});
 			designStudioView = makeDesignStudioView(interaction);
-			return { render: renderWorld };
+			return { render: renderApplication };
 		}),
 	);
 }

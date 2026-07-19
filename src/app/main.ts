@@ -10,8 +10,10 @@ import { UpdateSystemService } from "../gameplay/update/update-system";
 import { RenderSystem } from "../rendering/render-system";
 import { initialWorld } from "../world/initial-world";
 import { reconcileWorld } from "../world/reconcile-world";
+import type { World } from "../world/world";
 import { Action } from "./action";
 import { type Control, Controls, controlForKey } from "./control";
+import { type AppScreen, AppScreens, splashDuration } from "./screen";
 import { completeWorldUpdate } from "./world-update";
 
 document.documentElement.className = "h-full w-full overscroll-none";
@@ -43,6 +45,51 @@ const program = Effect.gen(function* () {
 	const dispatch = (action: Action): void => {
 		runtime.runFork(Queue.offer(actions, action));
 	};
+	let currentScreen: AppScreen = AppScreens.Splash;
+	let splashTimeout: number | undefined;
+
+	const releaseControls = (): void => {
+		heldControlsByKey.clear();
+		for (const key of [
+			Controls.Up,
+			Controls.Down,
+			Controls.Left,
+			Controls.Right,
+			Controls.Grab,
+			Controls.ContextAction,
+		] as const) {
+			dispatch(Action.KeyChanged({ key, pressed: false }));
+		}
+	};
+	function renderCurrent(current: World): void {
+		renderSystem.render({
+			world: current,
+			previewWorld: editSessionView(current),
+			editSessionStatus: editSessionStatus(current),
+			dispatch,
+			screen: currentScreen,
+			navigate,
+		});
+	}
+	function navigate(screen: AppScreen): void {
+		if (screen === currentScreen) return;
+		const previousScreen = currentScreen;
+		currentScreen = screen;
+		if (
+			previousScreen === AppScreens.WorldBuilder &&
+			screen !== AppScreens.WorldBuilder
+		)
+			releaseControls();
+		if (splashTimeout !== undefined && screen !== AppScreens.Splash) {
+			window.clearTimeout(splashTimeout);
+			splashTimeout = undefined;
+		}
+		runtime.runFork(
+			Ref.get(world).pipe(
+				Effect.tap((current) => Effect.sync(() => renderCurrent(current))),
+			),
+		);
+	}
 
 	const changeKey = (event: KeyboardEvent, pressed: boolean): void => {
 		const control = controlForKey(event.key);
@@ -63,44 +110,44 @@ const program = Effect.gen(function* () {
 			dispatch(Action.KeyChanged({ key: heldControl, pressed: false }));
 	};
 	const onKeyDown = (event: KeyboardEvent): void => {
+		if (currentScreen === AppScreens.Splash) return;
+		if (currentScreen === AppScreens.StoryMode) {
+			if (event.key === "Escape") {
+				event.preventDefault();
+				navigate(AppScreens.MainMenu);
+			}
+			return;
+		}
+		if (currentScreen !== AppScreens.WorldBuilder) return;
 		changeKey(event, true);
 	};
 	const onKeyUp = (event: KeyboardEvent): void => {
+		if (currentScreen !== AppScreens.WorldBuilder) return;
 		changeKey(event, false);
 	};
-	const onBlur = (): void => {
-		heldControlsByKey.clear();
-		for (const key of [
-			Controls.Up,
-			Controls.Down,
-			Controls.Left,
-			Controls.Right,
-			Controls.Grab,
-			Controls.ContextAction,
-		] as const) {
-			dispatch(Action.KeyChanged({ key, pressed: false }));
-		}
-	};
+	const onBlur = releaseControls;
 
 	let animationFrame: number | undefined;
 	const frame = (time: number): void => {
-		dispatch(Action.Tick({ time }));
+		if (currentScreen === AppScreens.WorldBuilder)
+			dispatch(Action.Tick({ time }));
 		animationFrame = window.requestAnimationFrame(frame);
 	};
 
 	const initial = yield* Ref.get(world);
-	renderSystem.render({
-		world: initial,
-		previewWorld: editSessionView(initial),
-		editSessionStatus: editSessionStatus(initial),
-		dispatch,
-	});
+	renderCurrent(initial);
 	yield* Effect.acquireUseRelease(
 		Effect.sync(() => {
 			window.addEventListener("keydown", onKeyDown);
 			window.addEventListener("keyup", onKeyUp);
 			window.addEventListener("blur", onBlur);
 			animationFrame = window.requestAnimationFrame(frame);
+			splashTimeout = window.setTimeout(
+				() => navigate(AppScreens.MainMenu),
+				splashDuration(
+					window.matchMedia("(prefers-reduced-motion: reduce)").matches,
+				),
+			);
 		}),
 		() =>
 			Stream.fromQueue(actions).pipe(
@@ -133,12 +180,7 @@ const program = Effect.gen(function* () {
 							next.readingSign !== current.readingSign ||
 							next.grabbed !== current.grabbed
 						)
-							renderSystem.render({
-								world: next,
-								previewWorld: editSessionView(next),
-								editSessionStatus: editSessionStatus(next),
-								dispatch,
-							});
+							renderCurrent(next);
 					}),
 				),
 			),
@@ -149,6 +191,7 @@ const program = Effect.gen(function* () {
 				window.removeEventListener("blur", onBlur);
 				if (animationFrame !== undefined)
 					window.cancelAnimationFrame(animationFrame);
+				if (splashTimeout !== undefined) window.clearTimeout(splashTimeout);
 				heldControlsByKey.clear();
 			}),
 	);
